@@ -1,0 +1,36 @@
+.error-banner {
+  background: var(--moon-dodoria-10);
+  color: var(--moon-dodoria);
+  border: 1px solid rgba(211, 48, 74, 0.2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.error-banner__icon {
+  margin-top: 1px;
+  opacity: 0.9;
+}
+
+.error-banner__message {
+  font-family: var(--moon-font-sans);
+}
+
+.error-banner__dismiss {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  opacity: 0.8;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.error-banner__dismiss:hover {
+  opacity: 1;
+  background: rgba(211, 48, 74, 0.15);
+}

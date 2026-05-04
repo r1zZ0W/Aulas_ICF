@@ -1,0 +1,29 @@
+.buscador__icon {
+  color: rgba(30, 41, 57, 0.5);
+  pointer-events: none;
+}
+
+.buscador__input {
+  width: 100%;
+  padding: 14px 16px 14px 56px;
+  font-family: var(--moon-font-sans);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--moon-content-text);
+  background: #fff;
+  border: 1.466px solid #e2e2e2;
+  border-radius: 12px;
+  transition: border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.buscador__input::placeholder {
+  color: rgba(30, 41, 57, 0.5);
+}
+
+.buscador__input:focus {
+  outline: none;
+  border-color: var(--moon-piccolo);
+  box-shadow: 0 0 0 3px var(--moon-piccolo-10),
+              0 1px 3px rgba(0, 0, 0, 0.04);
+}

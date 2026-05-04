@@ -1,0 +1,128 @@
+
+:root {
+  /* Backgrounds */
+  --moon-content-bg: #f5f6f8;
+  --moon-goku: #ffffff;
+  --moon-gohan: #efefef;
+
+  /* Borders */
+  --moon-content-border: #d6d6d6;
+  --moon-beerus: #d6d6d6;
+
+  /* Text */
+  --moon-content-text: #232222;
+  --moon-content-text-secondary: #898989;
+  --moon-bulma: #232222;
+  --moon-trunks: #898989;
+
+  /* Primary / accent */
+  --moon-content-focus: #4f46e5;
+  --moon-piccolo: #4f46e5;
+  --moon-piccolo-10: rgba(79, 70, 229, 0.1);
+  --moon-piccolo-60: #6366f1;
+  --moon-btn-primary: rgba(52, 72, 240, 0.6);
+
+  /* Status */
+  --moon-dodoria: #d3304a;
+  --moon-dodoria-10: rgba(211, 48, 74, 0.1);
+  --moon-chichi: #ff4e64;
+  --moon-chichi-10: rgba(255, 78, 100, 0.1);
+  --moon-chichi-90: rgba(255, 78, 100, 0.9);
+  --moon-teal: #0d9488;
+  --moon-teal-10: rgba(13, 148, 136, 0.1);
+  --moon-teal-90: rgba(13, 148, 136, 0.9);
+  --moon-krillin: #ffb319;
+  --moon-krillin-70: rgba(255, 179, 25, 0.7);
+  --moon-roshi-70: rgba(46, 125, 50, 0.7);
+  --moon-purple-10: rgba(92, 51, 207, 0.1);
+
+  /* Radius */
+  --moon-radius-s-sm: 8px;
+  --moon-radius-s-md: 12px;
+  --moon-radius-s-lg: 16px;
+
+  /* Shadows */
+  --moon-shadow-sm: 0 6px 6px -6px rgb(0 0 0 / 0.16), 0 0 1px rgb(0 0 0 / 0.4);
+  --moon-shadow-md: 0 12px 12px -6px rgb(0 0 0 / 0.16), 0 0 1px rgb(0 0 0 / 0.4);
+
+  /* Hover */
+  --moon-card-hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.03);
+  --moon-card-hover-transition: box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Typography */
+  --moon-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+
+.moon-card,
+.stat-card,
+.chart-card,
+.reported-assets-list__item,
+.qr-asset-modal__card,
+.users-view__card,
+.catalog-section__card,
+.requests-view__card {
+  transition: var(--moon-card-hover-transition);
+}
+
+.moon-card:hover,
+.stat-card:hover,
+.chart-card:hover,
+.reported-assets-list__item:hover,
+.qr-asset-modal__card:hover,
+.users-view__card:hover,
+.catalog-section__card:hover,
+.requests-view__card:hover {
+  box-shadow: var(--moon-card-hover-shadow);
+  transform: translateY(-2px);
+}
+
+/* Barra de herramientas y pestañas (catálogos, solicitudes) */
+.catalogs-card {
+  background: var(--moon-goku);
+  border: 1.337px solid var(--moon-content-border);
+  border-radius: var(--moon-radius-s-lg);
+}
+
+.catalogs-tabs__btn {
+  padding: 10px 20px;
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moon-content-text-secondary);
+  background: var(--moon-gohan);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.catalogs-tabs__btn:hover {
+  background: var(--moon-beerus);
+  color: var(--moon-content-text);
+}
+
+.catalogs-tabs__btn--active {
+  background: var(--moon-piccolo-60);
+  color: #fff;
+}
+
+.catalogs-tabs__btn--active:hover {
+  background: var(--moon-piccolo);
+  color: #fff;
+}
+
+.catalogs-card__buscador {
+  min-width: 200px;
+  max-width: 640px;
+}
+
+/* Sonner: el contenedor no captura hover → el temporizador no se pausa y el toast no queda "pegado" */
+[data-sonner-toaster] {
+  pointer-events: none;
+}
+
+[data-sonner-toast] {
+  pointer-events: auto;
+}

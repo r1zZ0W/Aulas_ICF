@@ -1,0 +1,130 @@
+html,
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu,
+    Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.bg-custom-layout {
+  background-color: rgba(52, 72, 240, 0.45);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.card-container {
+  width: 95vw;
+  height: 90vh;
+  background-color: #f5f5f5;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgb(0, 0, 0, 0.2);
+  overflow: hidden;
+  border: none;
+  min-height: 75vh;
+  display: flex;
+}
+
+.card-container > .row {
+  flex: 1;
+}
+
+.open-box {
+  border-radius: 16px;
+  background-color: #a5b4fc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #1a1a1a;
+  height: 100%;
+  overflow: hidden;
+}
+
+.illustration-img {
+  width: auto;
+  max-width: 800px;
+  max-height: 65vh;
+  object-fit: contain;
+  margin-bottom: 2rem;
+  margin-top: 1rem;
+}
+
+.ithera-progress-bar-color {
+  background-color: #4e46b4;
+  width: 50%;
+}
+
+.negative-space {
+  margin-top: -1rem;
+}
+
+@media (max-height: 768px) {
+  .illustration-img {
+    max-height: 57vh;
+  }
+}
+
+.back-to-login {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.back-to-login__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: #4e46b4;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.back-to-login__link:hover {
+  color: #3730a3;
+  background-color: rgba(78, 70, 180, 0.08);
+}
+
+.back-to-login__icon {
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+/* Mensajes de formulario */
+.form-message {
+  font-size: 0.875rem;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.form-message--error {
+  color: #b91c3c;
+  background: rgba(211, 48, 74, 0.1);
+  border: 1px solid rgba(211, 48, 74, 0.2);
+}
+
+.form-message--success {
+  color: #15803d;
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+.form-message--warning {
+  color: #a16207;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+/* Error inline en campos de formulario */
+.form-text.text-danger,
+.form-field-error {
+  font-size: 0.8125rem;
+  color: #b91c3c;
+  margin-top: 4px;
+  display: block;
+}

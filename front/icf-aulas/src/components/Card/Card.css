@@ -1,0 +1,5 @@
+.moon-card {
+  background: var(--moon-goku);
+  border-radius: var(--moon-radius-s-lg);
+}
+

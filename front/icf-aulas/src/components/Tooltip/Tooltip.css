@@ -1,0 +1,31 @@
+.radix-tooltip-content {
+  padding: 8px 12px;
+  background: #ffffff;
+  color: #232222;
+  font-family: var(--moon-font-sans, "Inter", sans-serif);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.08);
+  max-width: 320px;
+  z-index: 9999;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.radix-tooltip-arrow {
+  fill: #ffffff;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.06));
+}
