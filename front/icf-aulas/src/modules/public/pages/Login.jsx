@@ -1,150 +1,106 @@
-import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import Button from "../../../components/Button/Button";
 import InputField from "../components/InputField";
 import PasswordInput from "../components/PasswordInput";
 import LogoHeader from "../components/LogoHeader";
 import ProgressBar from "../components/ProgressBar";
-import {
-  validarCorreoLogin,
-  validarContrasenaLogin,
-} from "../../../utils/validaciones";
+import { useLogin } from "../../../hooks/useLogin";
+
 import "../styles/public.css";
 
+/**
+ * Login page rendered at /login.
+ *
+ * Delegates all form logic (state, validation, API call, session storage, and
+ * role-based redirect) to {@link useLogin}. This component is responsible only
+ * for layout and rendering.
+ *
+ * An optional success message (e.g., after a password reset) is shown when
+ * the previous route passes it through React Router location state.
+ */
 export default function Login() {
-  // Estado del formulario
-  const [form, setForm] = useState({ correo: "", contrasena: "" });
+  const { form, errors, loading, handleChange, handleSubmit } = useLogin();
 
-  // Errores de validación por campo y error general del servidor
-  const [errores, setErrores] = useState({});
-
-  // Indica si la petición al backend está en progreso
-  const [loading, setLoading] = useState(false);
-
-  const navigate = useNavigate();
   const location = useLocation();
   const successMessage = location.state?.success;
 
-  // Actualiza el valor del campo y limpia su error al escribir
-  const handleChange = (field) => (e) => {
-    const value = e.target.value;
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrores((prev) => ({ ...prev, [field]: null, _form: null }));
-  };
-
-  // Ejecuta todas las validaciones del cliente y guarda los mensajes de error
-  const validarTodo = () => {
-    const e = {};
-    e.correo = validarCorreoLogin(form.correo);
-    e.contrasena = validarContrasenaLogin(form.contrasena);
-    setErrores(e);
-    return !Object.values(e).some(Boolean);
-  };
-
-  // Envía las credenciales al backend y, si son correctas, guarda el token
-  // y redirige al área protegida forzando una recarga para que App.jsx reevalúe el token
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validarTodo()) return;
-  };
-
-  const roleHandler = (r) => {
-    if (r.role !== "Administrador") {
-      setErrores((prev) => ({
-        ...prev,
-        _form: "Tu no deberias de estar aquí",
-      }));
-      return false; // Retornamos false para indicar que NO debe continuar
-    }
-    return true; // Retornamos true indicando que el rol es correcto
-  };
-
   return (
-    <>
-      <main className="bg-custom-layout">
-        <div className="card-container">
-          <div className="row g-0 flex-grow-1">
-            {/* Panel izquierdo decorativo */}
-            <div className="col-sm-7 open-box d-md-flex align-items-center justify-content-center transition-all side-panel">
-              <div className="text-center w-100">
-                <img
-                  src="/src/assets/logo_login.png"
-                  alt="imagen_acá"
-                  className="img-fluid illustration-img"
-                />
-                <div className="container mt-3">
-                  <h1 className="fw-bolder">Control de Activos Inteligente</h1>
-                  <p className="fw-medium">
-                    Gestiona todos tus activos tecnológicos con códigos QR de
-                    forma rápida y eficiente.
-                  </p>
-                  <ProgressBar step={1} containerClassName="progress" />
-                </div>
-              </div>
-            </div>
-
-            {/* Panel derecho con el formulario */}
-            <div className="col-sm-5 p-5 bg-white">
-              <div
-                className="d-flex flex-column h-100 justify-content-center mt-4"
-                style={{ width: "33vw", marginLeft: "1vw" }}
-              >
-                <LogoHeader containerClassName="container text-end mb-4" />
-
-                <form onSubmit={handleSubmit}>
-                  <div className="container me-5 p-4">
-                    {successMessage && (
-                      <p className="form-message form-message--success mb-3 text-center">
-                        {successMessage}
-                      </p>
-                    )}
-                    {errores._form && (
-                      <p className="form-message form-message--error mb-3 text-center">
-                        {errores._form}
-                      </p>
-                    )}
-
-                    <InputField
-                      label="Email"
-                      type="email"
-                      placeholder="Ej: usuario@ejemplo.com"
-                      fullWidth
-                      value={form.correo}
-                      onChange={handleChange("correo")}
-                      error={errores.correo}
-                    />
-
-                    <PasswordInput
-                      label="Contraseña"
-                      placeholder="Ingresa la contraseña"
-                      fullWidth
-                      value={form.contrasena}
-                      onChange={handleChange("contrasena")}
-                      error={errores.contrasena}
-                    />
-
-                    <div className="text-end mb-3">
-                      <Link
-                        to="/password-recovery"
-                        className="text-decoration-none small text-primary"
-                      >
-                        ¿Olvidaste tu contraseña?
-                      </Link>
-                    </div>
-
-                    <Button
-                      text={loading ? "Ingresando..." : "Iniciar sesión"}
-                      fullWidth
-                      type="submit"
-                      disabled={loading}
-                    />
-                  </div>
-                </form>
+    <main className="bg-custom-layout">
+      <div className="card-container">
+        <div className="row g-0 flex-grow-1">
+          {/* Left decorative panel */}
+          <div className="col-sm-7 open-box d-md-flex align-items-center justify-content-center transition-all side-panel">
+            <div className="text-center w-100">
+              <img
+                src="/src/assets/logo_icf.png"
+                alt="Logo ICF"
+                className="img-fluid illustration-img"
+              />
+              <div className="container mt-3">
+                <h1 className="fw-bolder">Sistema de Reservas</h1>
+                <p className="fw-medium">
+                  Gestiona todas tus reservas de forma rápida y eficiente.
+                </p>
+                <ProgressBar step={1} containerClassName="progress" />
               </div>
             </div>
           </div>
+
+          {/* Right panel — login form */}
+          <div className="col-sm-5 p-5 bg-white">
+            <div
+              className="d-flex flex-column h-100 justify-content-center mt-4"
+              style={{ width: "33vw", marginLeft: "1vw" }}
+            >
+              <LogoHeader containerClassName="container text-end mb-4" />
+
+              <form onSubmit={handleSubmit}>
+                <div className="container me-5 p-4">
+                  {successMessage && (
+                    <p className="form-message form-message--success mb-3 text-center">
+                      {successMessage}
+                    </p>
+                  )}
+
+                  {errors._form && (
+                    <p className="form-message form-message--error mb-3 text-center">
+                      {errors._form}
+                    </p>
+                  )}
+
+                  <InputField
+                    label="Usuario"
+                    type="text"
+                    placeholder="Ingresa tu usuario"
+                    labelClassName="login-form-label"
+                    fullWidth
+                    value={form.username}
+                    onChange={handleChange("username")}
+                    error={errors.username}
+                  />
+
+                  <PasswordInput
+                    label="Contraseña"
+                    placeholder="Ingresa la contraseña"
+                    labelClassName="login-form-label"
+                    fullWidth
+                    value={form.password}
+                    onChange={handleChange("password")}
+                    error={errors.password}
+                  />
+
+                  <Button
+                    text={loading ? "Ingresando..." : "Iniciar sesión"}
+                    fullWidth
+                    type="submit"
+                    disabled={loading}
+                  />
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
-      </main>
-    </>
+      </div>
+    </main>
   );
 }

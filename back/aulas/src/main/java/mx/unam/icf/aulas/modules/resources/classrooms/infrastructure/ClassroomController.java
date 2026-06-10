@@ -9,7 +9,9 @@ import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.ClassroomService;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomRequestDTO;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomResponseDTO;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,31 +27,20 @@ import java.util.UUID;
 /**
  * REST controller for managing classroom API endpoints.
  * <p>
- * This controller provides HTTP endpoints for performing CRUD operations on classrooms.
+ * Read operations are available to any authenticated user.
+ * Write and delete operations are restricted to {@code ADMIN} role.
  * All endpoints are exposed under the base path {@code /api/v1/classrooms}.
- * Responses are wrapped with the {@link ApiResponse} format for consistency.
- *
- * @author Ithera
- * @version 1.0
- * @see ClassroomService
- * @see ClassroomResponseDTO
  */
 @RestController
-@RequestMapping("/api/v1/classrooms")
+@RequestMapping(value = "/api/v1/classrooms", produces = MediaType.APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class ClassroomController implements ResponseHandler {
 
-    /**
-     * Service instance for classroom business logic operations.
-     */
     private final ClassroomService classroomService;
 
     /**
      * Retrieves all classrooms from the system.
-     * <p>
      * GET /api/v1/classrooms
-     *
-     * @return a successful response containing a list of all classrooms
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<ClassroomResponseDTO>>> findAll() {
@@ -58,11 +49,8 @@ public class ClassroomController implements ResponseHandler {
 
     /**
      * Retrieves a specific classroom by its public UUID.
-     * <p>
      * GET /api/v1/classrooms/{uuid}
      *
-     * @param uuid the public UUID of the classroom to retrieve
-     * @return a successful response containing the requested classroom
      * @throws ResourceNotFoundException when the classroom is not found
      */
     @GetMapping("/{uuid}")
@@ -71,29 +59,24 @@ public class ClassroomController implements ResponseHandler {
     }
 
     /**
-     * Creates a new classroom in the system.
-     * <p>
+     * Creates a new classroom in the system. Requires ADMIN role.
      * POST /api/v1/classrooms
-     *
-     * @param dto the classroom data to create
-     * @return a created (201) response containing the newly created classroom
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ClassroomResponseDTO>> save(@Valid @RequestBody ClassroomRequestDTO dto) {
         return created(classroomService.save(dto));
     }
 
     /**
-     * Updates an existing classroom with new data.
-     * <p>
-     * PUT /api/v1/classrooms
+     * Updates an existing classroom with new data. Requires ADMIN role.
+     * PUT /api/v1/classrooms/{uuid}
      *
-     * @param dto the classroom data containing the update information
-     * @return a successful response containing the updated classroom
-     * @throws DomainException when the UUID is not valid.
+     * @throws DomainException           when the UUID is not valid
      * @throws ResourceNotFoundException when the classroom is not found
      */
     @PutMapping("/{uuid}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ClassroomResponseDTO>> update(
             @PathVariable UUID uuid,
             @Valid @RequestBody ClassroomRequestDTO dto
@@ -102,19 +85,16 @@ public class ClassroomController implements ResponseHandler {
     }
 
     /**
-     * Deletes a classroom from the system by its public UUID.
-     * <p>
+     * Deletes a classroom from the system by its public UUID. Requires ADMIN role.
      * DELETE /api/v1/classrooms/{uuid}
      *
-     * @param uuid the public UUID of the classroom to delete
-     * @return a successful response with a confirmation message
-     * @throws DomainException when the UUID is null
+     * @throws DomainException           when the UUID is null
      * @throws ResourceNotFoundException when the classroom is not found
      */
     @DeleteMapping("/{uuid}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteByUuid(@PathVariable UUID uuid) {
         classroomService.deleteByUuid(uuid);
         return ok("Classroom deleted successfully");
     }
 }
-

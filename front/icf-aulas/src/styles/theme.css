@@ -1,4 +1,3 @@
-
 :root {
   /* Backgrounds */
   --moon-content-bg: #f5f6f8;
@@ -16,11 +15,11 @@
   --moon-trunks: #898989;
 
   /* Primary / accent */
-  --moon-content-focus: #4f46e5;
-  --moon-piccolo: #4f46e5;
-  --moon-piccolo-10: rgba(79, 70, 229, 0.1);
-  --moon-piccolo-60: #6366f1;
-  --moon-btn-primary: rgba(52, 72, 240, 0.6);
+  --moon-content-focus: #005687;
+  --moon-piccolo: #005687;
+  --moon-piccolo-10: rgba(0, 86, 135, 0.1);
+  --moon-piccolo-60: #005687;
+  --moon-btn-primary: rgba(0, 86, 135, 0.7);
 
   /* Status */
   --moon-dodoria: #d3304a;
@@ -51,7 +50,7 @@
     transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Typography */
-  --moon-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --moon-font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 

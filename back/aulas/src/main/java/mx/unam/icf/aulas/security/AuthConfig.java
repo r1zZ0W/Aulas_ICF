@@ -9,28 +9,36 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * Configuración de beans relacionados con la autenticación.
- * Separado de MainSecurity para evitar dependencias circulares y mejorar la organización.
- * @author Ithera Team
+ * Authentication bean configuration for the Aulas ICF API.
+ *
+ * <p>Kept separate from {@code MainSecurity} to avoid a circular dependency:
+ * {@code MainSecurity} injects the JWT filter, the filter injects services that depend on
+ * {@code PasswordEncoder}, and {@code PasswordEncoder} would otherwise need to be defined
+ * in the same config class that wires the filter chain.</p>
  */
 @Configuration
 @RequiredArgsConstructor
 public class AuthConfig {
 
     /**
-     * Proveedor de codificador de contraseñas usando BCrypt.
-     * @return instancia de PasswordEncoder
+     * BCrypt password encoder with cost factor 12, used for hashing passwords at registration
+     * and verifying them at login. Cost 12 provides a good balance between security and latency.
+     *
+     * @return a {@link BCryptPasswordEncoder} instance
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(12);
     }
 
     /**
-     * Expone el AuthenticationManager configurado por Spring Security.
-     * @param authenticationConfiguration configuración auto-provista
-     * @return AuthenticationManager para inyectar en servicios
-     * @throws Exception si falla la carga de la configuración
+     * Exposes the {@link AuthenticationManager} configured by Spring Security so it can be
+     * injected into service-layer components (e.g., {@code AuthService}) without triggering
+     * a circular dependency.
+     *
+     * @param authenticationConfiguration auto-configured by Spring Security
+     * @return the application's {@link AuthenticationManager}
+     * @throws Exception if the underlying configuration fails to load
      */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {

@@ -5,18 +5,11 @@ import java.time.LocalDateTime;
 /**
  * Payload for transferring role catalog data across application layers.
  *
- * <p>Used for both request and response payloads. Roles are catalog entries
- * with predefined names such as {@code MAESTRO} and {@code ADMIN}.</p>
+ * <p>Used for both request and response payloads. Roles are predefined catalog entries
+ * (e.g., {@code MAESTRO}, {@code ADMIN}) and are managed by administrators only.</p>
  *
- * @param name        unique role name
- * @param description optional human-readable description of the role
- * @param createdAt   timestamp when the role was created
- *
- * @author Ithera
- * @version 2.0
+ * @param name unique role name
  */
 public record RoleDTO(
-        String name,
-        String description,
-        LocalDateTime createdAt
+        String name
 ) {}

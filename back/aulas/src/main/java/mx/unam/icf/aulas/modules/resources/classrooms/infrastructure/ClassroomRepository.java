@@ -31,5 +31,6 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Long> {
      */
     Optional<Classroom> findByUuid(UUID uuid);
 
+    /** Finds a classroom by its unique name, used to enforce name uniqueness before saving. */
     Optional<Classroom> findByName(String name);
 }

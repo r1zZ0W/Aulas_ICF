@@ -5,6 +5,7 @@ import mx.unam.icf.aulas.kernel.infrastructure.jwt.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -12,6 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -19,6 +21,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Spring Security filter-chain configuration for the Aulas ICF API.
+ *
+ * <p>Responsibilities:</p>
+ * <ul>
+ *   <li>CSRF disabled — the API is stateless and uses JWT bearer tokens.</li>
+ *   <li>CORS configured from {@code app.cors.allowed-origins} (defaults to {@code http://localhost:5173}).</li>
+ *   <li>Session management set to {@code STATELESS} — no server-side session is created.</li>
+ *   <li>Security headers: XSS protection enabled in block mode; CSP restricts scripts to {@code 'self'}.</li>
+ *   <li>Public routes: only {@code /api/v1/auth/**} is accessible without authentication.</li>
+ *   <li>JWT filter inserted before Spring's {@code UsernamePasswordAuthenticationFilter}.</li>
+ *   <li>Method-level security enabled via {@code @EnableMethodSecurity} ({@code @PreAuthorize}).</li>
+ * </ul>
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -37,10 +53,14 @@ public class MainSecurity {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(c -> c.configurationSource(corsRegistry()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(headers -> headers
+                        .xssProtection(xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("script-src 'self'; object-src 'none';"))
+                        .contentTypeOptions(Customizer.withDefaults())
+            )
             .authorizeHttpRequests(auth -> auth
-                // Solo las rutas de autenticación son públicas
+                // Authentication endpoints are public; all other routes require a valid JWT
                 .requestMatchers("/api/v1/auth/**").permitAll()
-                // El resto requiere autenticación
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

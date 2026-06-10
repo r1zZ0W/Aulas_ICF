@@ -3,8 +3,12 @@ package mx.unam.icf.aulas.kernel.infrastructure.exceptions;
 import jakarta.persistence.PersistenceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidCredentialsException;
+import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidTokenException;
+import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.MissingTokenException;
+import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.TokenRevokedException;
+import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -21,9 +25,12 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /**
- * Centralized exception handler for REST endpoints.
- * It converts application exceptions into consistent {@link ApiResponse} payloads
- * with the corresponding HTTP status code.
+ * Centralized exception handler for all REST endpoints.
+ *
+ * <p>Converts application exceptions into consistent {@link ApiResponse} payloads with
+ * the appropriate HTTP status code. All client-facing messages are in English and are
+ * deliberately terse to avoid leaking implementation details or enabling account-enumeration
+ * attacks.</p>
  */
 @Slf4j
 @RestControllerAdvice
@@ -32,172 +39,181 @@ public class GlobalExceptionHandler {
 
     private final Environment env;
 
-    /**
-     * Indicates whether the current runtime profile includes {@code dev}.
-     *
-     * @return {@code true} when the dev profile is active; otherwise {@code false}
-     */
     private boolean isDev() {
         return Arrays.asList(env.getActiveProfiles()).contains("dev");
     }
 
-    /**
-     * Handles missing-resource errors.
-     *
-     * @param ex the thrown resource-not-found exception
-     * @return a 404 response wrapped in {@link ApiResponse}
-     */
+    // ── Domain / business ────────────────────────────────────────────────────
+
+    /** Handles a missing entity lookup; returns 404 with the exception message as body. */
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(ResourceNotFoundException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
-    /**
-     * Handles domain validation and business-rule errors.
-     *
-     * @param ex the thrown domain exception
-     * @return a 400 response wrapped in {@link ApiResponse}
-     */
+    /** Handles business-rule violations raised in the domain layer; returns 400 with the rule message. */
     @ExceptionHandler(DomainException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDomainException(DomainException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleDomain(DomainException ex) {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
-    /**
-     * Handles authorization failures.
-     * @param e the thrown access-denied exception
-     * @return a 403 response wrapped in {@link ApiResponse}
-     */
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException e) {
-        log.debug("Access denied: {}", e.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("No tienes permiso para realizar esta acción"));
-    }
+    // ── Security ─────────────────────────────────────────────────────────────
 
     /**
-     *
-     * In the dev profile, detailed field errors are returned.
-     *
-     * @param e the validation exception
-     * @return a 400 response wrapped in {@link ApiResponse}
+     * Handles explicit credential failures thrown by the auth service; returns 401.
+     * The response message is intentionally generic to prevent account enumeration.
      */
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException e) {
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidCredentials(InvalidCredentialsException ex) {
+        log.warn("Authentication failed: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error(e.getMessage()));
+                .body(ApiResponse.error("Invalid credentials."));
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException e) {
-        String mensaje;
-        if (isDev()) {
-            mensaje = e.getBindingResult().getFieldErrors().stream()
-                    .map(err -> err.getField() + ": " + err.getDefaultMessage())
-                    .collect(Collectors.joining("; "));
-        } else {
-            mensaje = "Los datos enviados no son válidos.";
-        }
+    /** Handles requests that arrive without an Authorization header or token body; returns 401. */
+    @ExceptionHandler(MissingTokenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingToken(MissingTokenException ex) {
+        log.warn("Missing token: {}", ex.getMessage());
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(mensaje));
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Authentication token is required."));
     }
+
+    /** Handles tokens that fail signature verification, are expired, or carry the wrong type claim; returns 401. */
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidToken(InvalidTokenException ex) {
+        log.warn("Invalid token: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("The provided token is invalid or has expired."));
+    }
+
+    /** Handles tokens that were explicitly revoked (blacklisted in Redis after logout or password reset); returns 401. */
+    @ExceptionHandler(TokenRevokedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTokenRevoked(TokenRevokedException ex) {
+        log.warn("Revoked token used: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("The provided token has been revoked."));
+    }
+
+    /** Safety net for {@link BadCredentialsException} thrown internally by Spring Security's AuthenticationManager; returns 401. */
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
+        log.warn("BadCredentialsException (Spring Security): {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Invalid credentials."));
+    }
+
+    /** Handles role-based access control rejections from {@code @PreAuthorize}; returns 403. */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
+        log.debug("Access denied: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("You do not have permission to perform this action."));
+    }
+
+    // ── Input validation ─────────────────────────────────────────────────────
 
     /**
-     * Handles malformed JSON payloads or unreadable request bodies.
-     *
-     * @param e the unreadable-message exception
-     * @return a 400 response wrapped in {@link ApiResponse}
+     * Handles Bean Validation failures ({@code @Valid} on controller parameters).
+     * In {@code dev} profile the individual field errors are included; in production
+     * a generic message is returned to avoid leaking field names.
      */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException e) {
-        log.debug("JSON inválido o cuerpo ilegible: {}", e.getMessage());
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
+        String message = isDev()
+                ? ex.getBindingResult().getFieldErrors().stream()
+                        .map(err -> err.getField() + ": " + err.getDefaultMessage())
+                        .collect(Collectors.joining("; "))
+                : "The submitted data is not valid.";
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Solicitud con formato incorrecto."));
+                .body(ApiResponse.error(message));
+    }
+
+    /** Handles unreadable or malformed JSON request bodies that cannot be deserialized; returns 400. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException ex) {
+        log.debug("Unreadable request body: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("Request body is malformed or unreadable."));
     }
 
     /**
-     * Handles invalid argument or parameter type mismatch scenarios.
-     *
-     * @param e the bad-request related exception
-     * @return a 400 response wrapped in {@link ApiResponse}
+     * Handles path variable type mismatches (e.g., non-UUID string in a UUID path variable)
+     * and explicit {@link IllegalArgumentException} from service/domain code; returns 400.
+     * In {@code dev} profile the raw message is forwarded; in production a generic message is used.
      */
     @ExceptionHandler({ MethodArgumentTypeMismatchException.class, IllegalArgumentException.class })
-    public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception e) {
-        String mensaje = isDev() && e.getMessage() != null && !e.getMessage().isBlank()
-                ? e.getMessage()
-                : "Parámetros inválidos.";
+    public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex) {
+        String message = isDev() && ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "Invalid parameters.";
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(mensaje));
+                .body(ApiResponse.error(message));
     }
 
-    /**
-     * Handles data-access layer exceptions.
-     *
-     * @param e the data-access exception
-     * @return a 500 response wrapped in {@link ApiResponse}
-     */
+    // ── Persistence ───────────────────────────────────────────────────────────
+
+    /** Handles Spring Data access failures (query errors, connection issues, constraint violations); returns 500. */
     @ExceptionHandler(DataAccessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataAccess(DataAccessException e) {
-        log.error("Error de persistencia o SQL (detalle solo en servidor)", e);
+    public ResponseEntity<ApiResponse<Void>> handleDataAccess(DataAccessException ex) {
+        log.error("Data access error", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("No se pudo completar la operación. Intenta más tarde."));
+                .body(ApiResponse.error("The operation could not be completed. Please try again later."));
     }
 
-    /**
-     * Handles JPA persistence exceptions.
-     *
-     * @param e the persistence exception
-     * @return a 500 response wrapped in {@link ApiResponse}
-     */
+    /** Handles low-level JPA/Hibernate persistence exceptions not caught by Spring's exception translation; returns 500. */
     @ExceptionHandler(PersistenceException.class)
-    public ResponseEntity<ApiResponse<Void>> handlePersistence(PersistenceException e) {
-        log.error("Error de persistencia JPA (detalle solo en servidor)", e);
+    public ResponseEntity<ApiResponse<Void>> handlePersistence(PersistenceException ex) {
+        log.error("JPA persistence error", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("No se pudo completar la operación. Intenta más tarde."));
+                .body(ApiResponse.error("The operation could not be completed. Please try again later."));
     }
 
+    // ── Infrastructure ────────────────────────────────────────────────────────
+
     /**
-     * Handles mail sending failures.
-     *
-     * @param e the mail sending exception
-     * @return a 500 response wrapped in {@link ApiResponse}
+     * Handles failures from the email-sending infrastructure (SMTP errors, template issues); returns 500.
+     * In {@code dev} profile the raw message is forwarded; in production a generic message is used.
      */
     @ExceptionHandler(MailSendingException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMailSending(MailSendingException e) {
-        log.error("Error trying to send the email.", e);
-        String msg = isDev() && e.getMessage() != null && !e.getMessage().isBlank()
-                ? e.getMessage()
-                : "We can not retrieve this email. Please try later.";
+    public ResponseEntity<ApiResponse<Void>> handleMailSending(MailSendingException ex) {
+        log.error("Mail sending error", ex);
+        String message = isDev() && ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "The email could not be sent. Please try again later.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(msg));
+                .body(ApiResponse.error(message));
     }
 
+    // ── Fallback ──────────────────────────────────────────────────────────────
+
     /**
-     * Fallback handler for uncaught exceptions.
-     *
-     * @param e the unexpected exception
-     * @return a 500 response wrapped in {@link ApiResponse}
+     * Catch-all handler for any unhandled exception not matched by a more specific handler; returns 500.
+     * In {@code dev} profile the raw exception message is included to aid debugging.
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception e) {
-        log.error("Error inesperado", e);
-        String mensaje = isDev() && e.getMessage() != null
-                ? e.getMessage()
-                : "Ocurrió un error interno. Intenta más tarde.";
+    public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex) {
+        log.error("Unexpected error", ex);
+        String message = isDev() && ex.getMessage() != null
+                ? ex.getMessage()
+                : "An internal error occurred. Please try again later.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(mensaje));
+                .body(ApiResponse.error(message));
     }
 }

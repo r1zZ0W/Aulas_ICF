@@ -1,6 +1,6 @@
 /**
- * Mapeo de iconos para tipos de activo según nombre y tipoBien.
- * Prioridad: 1) tipoBien (vehículo), 2) keywords en nombre, 3) default.
+ * Icon mapping for asset type display.
+ * Resolution priority: 1) tipoBien classification (vehicle), 2) keyword match in name, 3) default icon.
  */
 import {
   SportCarRacing,
@@ -19,10 +19,10 @@ import {
   GenericHome,
 } from "@heathmont/moon-icons";
 
-/** Icono por defecto cuando no hay coincidencia */
+/** Fallback icon used when no keyword matches the asset name. */
 export const DEFAULT_TIPO_ACTIVO_ICON = ShopBag;
 
-/** Mapeos: array de { keywords, icon } — si nombre incluye keyword → ese icono */
+/** Keyword-to-icon mappings evaluated in order until a match is found. */
 const MAPEOS = [
   { keywords: ["auto", "carro", "vehículo", "vehiculo", "coche", "camioneta", "moto", "motocicleta"], icon: SportCarRacing },
   { keywords: ["laptop", "portátil", "portatil", "computadora", "pc ", "notebook", "macbook"], icon: DevicesMacbook },
@@ -39,22 +39,22 @@ const MAPEOS = [
 ];
 
 /**
- * Devuelve el icono para un tipo de activo.
- * @param {{ nombre?: string, tipoBien?: string }} item - tipo de activo
- * @returns {import("react").ComponentType} componente de icono
+ * Returns the display icon component for a given asset type.
+ * @param {{ nombre?: string, tipoBien?: string }} item - Asset type object
+ * @returns {import("react").ComponentType} Icon component to render
  */
 export function getTipoActivoIcon(item) {
   const n = (item?.nombre ?? "").toLowerCase().trim();
   const tipoBien = (item?.tipoBien ?? "").toLowerCase();
 
-  // 1) Si es vehículo por tipoBien (Inmueble = vehículo en la UI)
+  // 1) Vehicle classification based on tipoBien (Inmueble maps to vehicle in this UI context)
   if (tipoBien.includes("inmueble")) return SportCarRacing;
 
-  // 2) Buscar por keywords en el nombre
+  // 2) Keyword match against the asset name
   for (const { keywords, icon } of MAPEOS) {
     if (keywords.some((k) => n.includes(k))) return icon;
   }
 
-  // 3) Default: icono genérico de activo
+  // 3) No match found — return the default generic icon
   return DEFAULT_TIPO_ACTIVO_ICON;
 }

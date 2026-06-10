@@ -1,3 +1,9 @@
+/**
+ * Progress bar component for the login form.
+ * Shows the current step of the login process.
+ * @param {number} step - The current step of the login process (1 or 2).
+ * @param {string} containerClassName - The class name for the progress bar container.
+ */
 export default function ProgressBar({
   step = 1,
   containerClassName = "progress",

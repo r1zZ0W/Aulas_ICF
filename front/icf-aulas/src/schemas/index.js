@@ -1,3 +1,7 @@
+/**
+ * Central re-export barrel for all Zod validation schemas.
+ * Import schemas from this file rather than from individual schema modules.
+ */
 export { default as ClassroomSchema } from './classroom'
 export { default as RoleSchema } from './role'
 export { default as UserSchema, UserLoginSchema, UserRegisterSchema } from './user'

@@ -13,7 +13,11 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Spring-based implementation of {@link MailSender}.
+ * Spring-based implementation of {@link MailSender} that delegates to {@link JavaMailSender}.
+ *
+ * <p>Both plain-text and HTML emails are sent as {@link jakarta.mail.internet.MimeMessage}
+ * with UTF-8 encoding. The sender address is read from {@code spring.mail.username}; if the
+ * property is blank (e.g., in local dev without SMTP), the {@code From} header is omitted.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -47,7 +51,7 @@ public class MailSenderImpl implements MailSender {
             helper.setText(content, html);
             javaMailSender.send(message);
         } catch (MessagingException e) {
-            throw new MailSendingException("No se pudo enviar el correo.", e);
+            throw new MailSendingException("Failed to send email message.", e);
         }
     }
 }

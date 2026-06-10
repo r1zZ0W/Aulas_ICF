@@ -1,12 +1,12 @@
 html,
 body {
   font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu,
+    var(--moon-font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu,
     Cantarell, "Helvetica Neue", sans-serif;
 }
 
 .bg-custom-layout {
-  background-color: rgba(52, 72, 240, 0.45);
+  background-color: #6694D1;
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -26,13 +26,13 @@ body {
   display: flex;
 }
 
-.card-container > .row {
+.card-container>.row {
   flex: 1;
 }
 
 .open-box {
   border-radius: 16px;
-  background-color: #a5b4fc;
+  background-color: #759fd6;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -52,8 +52,16 @@ body {
 }
 
 .ithera-progress-bar-color {
-  background-color: #4e46b4;
+  background-color: #005687;
   width: 50%;
+}
+
+.progress {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.progress-bar:not(.ithera-progress-bar-color) {
+  background-color: rgba(255, 255, 255, 0.25) !important;
 }
 
 .negative-space {
@@ -127,4 +135,15 @@ body {
   color: #b91c3c;
   margin-top: 4px;
   display: block;
+}
+
+/* Custom label styles for Login page */
+.login-form-label {
+  font-family: var(--moon-font-sans) !important;
+  font-size: 18px !important;
+  font-weight: 400 !important;
+  text-transform: none !important;
+  color: #1c1c1c !important;
+  letter-spacing: -0.5px !important;
+  margin-bottom: 4px !important;
 }

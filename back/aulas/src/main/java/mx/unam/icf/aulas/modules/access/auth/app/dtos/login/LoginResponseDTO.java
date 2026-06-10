@@ -10,12 +10,13 @@ import java.util.UUID;
  *
  * @param token  signed JWT to be sent in subsequent {@code Authorization: Bearer} headers
  * @param uuid   public identifier of the authenticated user
- * @param nombre full name for display purposes
+ * @param name full name for display purposes
  * @param role   role name (e.g. "MAESTRO", "ADMIN")
  * @param email  login email of the authenticated user
  */
 public record LoginResponseDTO(
         String token,
+        String refreshToken,
         UUID   uuid,
         String name,
         String role,

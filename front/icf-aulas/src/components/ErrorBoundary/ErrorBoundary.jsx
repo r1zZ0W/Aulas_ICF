@@ -4,7 +4,9 @@ import Button from "../Button/Button";
 import "./ErrorBoundary.css";
 
 /**
- * Captura errores de React y muestra una vista amigable en lugar del fallo.
+ * React class-based error boundary that catches unhandled runtime errors in its child tree
+ * and renders a user-friendly fallback UI instead of crashing the entire application.
+ * Provides retry (re-render subtree) and go-home (redirect to /) recovery actions.
  */
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -17,7 +19,7 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("Error capturado:", error, errorInfo);
+    console.error("Error caught by ErrorBoundary:", error, errorInfo);
   }
 
   handleRetry = () => {
