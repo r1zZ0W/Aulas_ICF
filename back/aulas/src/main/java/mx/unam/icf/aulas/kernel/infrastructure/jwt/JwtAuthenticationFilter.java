@@ -13,6 +13,8 @@ import org.jspecify.annotations.NonNull;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -21,6 +23,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Per-request filter that extracts and validates the JWT from the {@code Authorization} header.
@@ -35,7 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider            jwtProvider;
     private final UserDetailsServiceImpl userDetailsService;
-    private final TokenBlacklistService  blacklistService;
+    private final TokenBlacklist          blacklistService;
     private final FilterResponseWriter   filterResponseWriter;
 
     @Override
@@ -64,15 +68,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            String uuid      = jwtProvider.getUuidFromToken(token);
-            UserDetails user = userDetailsService.loadUserByUuid(uuid);
+            String uuid = jwtProvider.getUuidFromToken(token);
+            String role = jwtProvider.getRoleFromToken(token);
 
+            // Load user ONLY to verify the account is still active.
+            // The role/authorities come from the signed JWT claim below, never from the
+            // client or from a separate header the frontend could forge via localStorage.
+            UserDetails user = userDetailsService.loadUserByUuid(uuid);
             if (!user.isEnabled()) {
                 filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, "Account is disabled");
                 return;
             }
 
-            var auth = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+            // Build authorities from the JWT 'role' claim.
+            // The HMAC signature guarantees this value was written by the server at login time.
+            List<GrantedAuthority> authorities = (role != null)
+                    ? List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                    : Collections.emptyList();
+
+            var auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(auth);
         }

@@ -41,7 +41,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MainSecurity {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter     jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint authenticationEntryPoint;
+    private final JwtAccessDeniedHandler      accessDeniedHandler;
 
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private String allowedOrigins;
@@ -62,6 +64,14 @@ public class MainSecurity {
                 // Authentication endpoints are public; all other routes require a valid JWT
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .anyRequest().authenticated()
+            )
+            // Wire JSON error responses for the two security-layer rejection paths:
+            //   401 → no token / unauthenticated (AuthenticationEntryPoint)
+            //   403 → authenticated but insufficient role at URL level (AccessDeniedHandler)
+            // @PreAuthorize 403s are handled separately by GlobalExceptionHandler.
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(authenticationEntryPoint)
+                .accessDeniedHandler(accessDeniedHandler)
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

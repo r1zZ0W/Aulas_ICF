@@ -24,6 +24,13 @@ public class FilterResponseWriter {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * Provides a safe HTTP response from the server that will be displayed into the frontend without using <code>ResponseEntity<?></code>
+     * @param response          what the server will respond.
+     * @param status            what HTTP status it will provide.
+     * @param message           the message it will display in the JSON.
+     * @throws IOException      the connection failure.
+     */
     public void writeError(HttpServletResponse response, HttpStatus status, String message)
             throws IOException {
         response.setStatus(status.value());

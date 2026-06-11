@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidCredentialsException;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.MissingTokenException;
 import mx.unam.icf.aulas.kernel.infrastructure.jwt.JwtProvider;
-import mx.unam.icf.aulas.kernel.infrastructure.jwt.TokenBlacklistService;
+import mx.unam.icf.aulas.kernel.infrastructure.jwt.TokenBlacklist;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -26,7 +26,7 @@ class AuthUtils {
 
     private final AuthenticationManager authenticationManager;
     private final JwtProvider           jwtProvider;
-    private final TokenBlacklistService blacklistService;
+    private final TokenBlacklist        blacklistService;
 
     /**
      * Extracts the raw token from a Bearer header value and validates it is present.
@@ -47,8 +47,8 @@ class AuthUtils {
      * is wrong, or the account is disabled — are mapped to the same neutral message to
      * prevent user-enumeration attacks.</p>
      *
-     * @param email    user email
-     * @param password user password
+     * @param username    username
+     * @param password    user password
      * @return authenticated {@link Authentication}
      * @throws InvalidCredentialsException always with a neutral message on any auth failure
      */

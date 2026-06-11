@@ -56,7 +56,6 @@ public interface ResponseHandler {
     /**
      * Builds a successful HTTP 201 response containing a message instead of a payload.
      *
-     * @param message the message that we want to retrieve in the API response body
      * @return a {@link ResponseEntity} with status 201 and a successful {@link ApiResponse}
      */
     default ResponseEntity<ApiResponse<Void>> created() {

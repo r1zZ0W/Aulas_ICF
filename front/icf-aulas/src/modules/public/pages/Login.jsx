@@ -4,6 +4,7 @@ import InputField from "../components/InputField";
 import PasswordInput from "../components/PasswordInput";
 import LogoHeader from "../components/LogoHeader";
 import ProgressBar from "../components/ProgressBar";
+import LoadingOverlay from "../../../components/LoadingOverlay/LoadingOverlay";
 import { useLogin } from "../../../hooks/useLogin";
 
 import "../styles/public.css";
@@ -25,6 +26,8 @@ export default function Login() {
   const successMessage = location.state?.success;
 
   return (
+    <>
+    {loading && <LoadingOverlay label="Ingresando..." />}
     <main className="bg-custom-layout">
       <div className="card-container">
         <div className="row g-0 flex-grow-1">
@@ -102,5 +105,6 @@ export default function Login() {
         </div>
       </div>
     </main>
+    </>
   );
 }

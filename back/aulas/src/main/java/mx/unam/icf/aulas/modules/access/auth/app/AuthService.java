@@ -6,7 +6,7 @@ import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidTokenExcep
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.MissingTokenException;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.TokenRevokedException;
 import mx.unam.icf.aulas.kernel.infrastructure.jwt.JwtProvider;
-import mx.unam.icf.aulas.kernel.infrastructure.jwt.TokenBlacklistService;
+import mx.unam.icf.aulas.kernel.infrastructure.jwt.TokenBlacklist;
 import mx.unam.icf.aulas.kernel.infrastructure.services.MailSender;
 import mx.unam.icf.aulas.modules.access.auth.app.dtos.login.LoginRequestDTO;
 import mx.unam.icf.aulas.modules.access.auth.app.dtos.login.LoginResponseDTO;
@@ -34,7 +34,7 @@ import java.util.UUID;
 public class AuthService {
 
     private final JwtProvider            jwtProvider;
-    private final TokenBlacklistService  blacklistService;
+    private final TokenBlacklist          blacklistService;
     private final UserDetailsServiceImpl userDetailsService;
     private final UserRepository         userRepository;
     private final UserService            userService;

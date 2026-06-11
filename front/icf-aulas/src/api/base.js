@@ -35,7 +35,7 @@ export class HttpError extends Error {
 export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = {}) {
 
   // ── Core request ────────────────────────────────────────────────────────────
-  
+
   /**
    * Core request wrapper around the native fetch API.
    * Handles relative URL resolution, headers merging, body serialization,
@@ -58,7 +58,15 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
       ...localHeaders,
     };
 
-    // Serializa el body y añade Content-Type solo cuando el caller pasa un objeto JS.
+    // Request interceptor: auto-inject the JWT stored in localStorage.
+    // localHeaders['Authorization'] always takes precedence so callers can override
+    // (e.g. the logout endpoint passes its own header explicitly).
+    const storedToken = localStorage.getItem('token');
+    if (storedToken && !mergedHeaders['Authorization']) {
+      mergedHeaders['Authorization'] = `Bearer ${storedToken}`;
+    }
+
+    // Serialize the body and add Content-Type only when the caller passes a JS object.
     let serializedBody;
     if (body !== undefined && body !== null) {
       if (typeof body === 'object' && !(body instanceof FormData) && !(body instanceof Blob)) {
@@ -78,11 +86,11 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
         ...fetchOptions,
       });
     } catch (networkError) {
-      // fetch solo rechaza la promesa ante fallos de red (sin conexión, DNS, etc.).
+      // fetch only rejects promise on network failures (no connection, DNS, etc.).
       throw new HttpError(`Network error: ${networkError.message}`, 0, null);
     }
 
-    // Parseo automático: detecta JSON por Content-Type para evitar el doble await.
+    // Auto-parse JSON by Content-Type to avoid double await.
     const contentType = response.headers.get('Content-Type') ?? '';
     let data;
     if (contentType.includes('application/json')) {
@@ -96,6 +104,17 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
     // fetch NO lanza en 4xx/5xx; lo hacemos nosotros con el cuerpo ya parseado
     // para que HttpError.data contenga el mensaje de error del servidor.
     if (!response.ok) {
+      // Response interceptor: detect a revoked/expired/tampered session.
+      // The guard `storedToken` prevents this branch from firing on intentionally
+      // unauthenticated requests like POST /auth/login (401 = wrong credentials).
+      if ((response.status === 401 || response.status === 403) && storedToken) {
+        localStorage.clear();
+        window.location.href = '/login';
+        // Return a promise that never resolves so no downstream code runs while
+        // the browser is navigating away (prevents stale error toasts/state).
+        return new Promise(() => { });
+      }
+
       throw new HttpError(
         `HTTP ${response.status} ${response.statusText}`,
         response.status,
@@ -119,16 +138,16 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
      * @param {Object} [options] - Additional request configurations and options.
      * @returns {Promise<{data: *, status: number, headers: Headers, ok: boolean}>}
      */
-    get:    (url, options)        => request('GET',    url, options),
-    
+    get: (url, options) => request('GET', url, options),
+
     /**
      * Sends a DELETE request.
      * @param {string} url - Target URL.
      * @param {Object} [options] - Additional request configurations and options.
      * @returns {Promise<{data: *, status: number, headers: Headers, ok: boolean}>}
      */
-    delete: (url, options)        => request('DELETE', url, options),
-    
+    delete: (url, options) => request('DELETE', url, options),
+
     /**
      * Sends a POST request.
      * @param {string} url - Target URL.
@@ -136,8 +155,8 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
      * @param {Object} [options] - Additional request configurations and options.
      * @returns {Promise<{data: *, status: number, headers: Headers, ok: boolean}>}
      */
-    post:   (url, body, options)  => request('POST',   url, { body, ...options }),
-    
+    post: (url, body, options) => request('POST', url, { body, ...options }),
+
     /**
      * Sends a PUT request.
      * @param {string} url - Target URL.
@@ -145,8 +164,8 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
      * @param {Object} [options] - Additional request configurations and options.
      * @returns {Promise<{data: *, status: number, headers: Headers, ok: boolean}>}
      */
-    put:    (url, body, options)  => request('PUT',    url, { body, ...options }),
-    
+    put: (url, body, options) => request('PUT', url, { body, ...options }),
+
     /**
      * Sends a PATCH request.
      * @param {string} url - Target URL.
@@ -154,6 +173,6 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
      * @param {Object} [options] - Additional request configurations and options.
      * @returns {Promise<{data: *, status: number, headers: Headers, ok: boolean}>}
      */
-    patch:  (url, body, options)  => request('PATCH',  url, { body, ...options }),
+    patch: (url, body, options) => request('PATCH', url, { body, ...options }),
   };
 }

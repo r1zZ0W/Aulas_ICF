@@ -123,6 +123,20 @@ public class JwtProvider {
         return parseClaims(token).get("type", String.class);
     }
 
+    /**
+     * Extracts the {@code role} claim embedded in the JWT by the server at issuance time.
+     *
+     * <p>This value is cryptographically bound to the token signature: any client-side
+     * modification (e.g., via localStorage or a forged header) invalidates the signature
+     * and is rejected by {@link #isTokenInvalid} before this method is ever called.</p>
+     *
+     * @return the role name (e.g. "ADMIN", "MAESTRO"), or {@code null} if the token type
+     *         does not carry a role claim (refresh / reset tokens)
+     */
+    public String getRoleFromToken(String token) {
+        return parseClaims(token).get("role", String.class);
+    }
+
     public long getRemainingTtlSeconds(String token) {
         long expMs = parseClaims(token).getExpiration().getTime();
         long remaining = (expMs - System.currentTimeMillis()) / 1000;

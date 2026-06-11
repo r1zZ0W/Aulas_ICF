@@ -9,6 +9,7 @@ export const SESSION_KEYS = {
   REFRESH_TOKEN: 'refreshToken',
   UUID: 'uuid',
   NAME: 'name',
-  ROLE: 'role',
   EMAIL: 'email',
+  // ROLE is intentionally absent — it is always derived from JWT claims at
+  // runtime and never stored as a plain string that the client could tamper with.
 };

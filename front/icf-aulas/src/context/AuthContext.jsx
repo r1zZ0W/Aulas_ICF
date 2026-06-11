@@ -1,18 +1,27 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { SESSION_KEYS } from '../utils/session';
+import { getRoleFromToken } from '../utils/jwt';
 
 const AuthContext = createContext(null);
 
-/** Reads all session fields from localStorage into a plain object. */
+/**
+ * Reads persisted fields from localStorage and derives the role from the JWT.
+ * The role is NEVER read as a raw localStorage string — it always comes from
+ * the signed token payload, which the client cannot forge without the server key.
+ */
 function readPersistedSession() {
-  return Object.fromEntries(
+  const base = Object.fromEntries(
     Object.values(SESSION_KEYS).map((key) => [key, localStorage.getItem(key)])
   );
+  return { ...base, role: getRoleFromToken(base.token) };
 }
 
 /** Builds an empty session object with all keys set to null. */
 function emptySession() {
-  return Object.fromEntries(Object.values(SESSION_KEYS).map((key) => [key, null]));
+  return {
+    ...Object.fromEntries(Object.values(SESSION_KEYS).map((key) => [key, null])),
+    role: null,
+  };
 }
 
 /**
@@ -23,9 +32,9 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(readPersistedSession);
 
   /**
-   * Writes all session fields to both localStorage and React state.
-   * SESSION_KEYS values are identical to the property names on AuthTokens,
-   * so iterating over them covers every field without manual mapping.
+   * Writes session fields to localStorage and React state.
+   * The role is intentionally excluded from localStorage — it is always
+   * re-derived from the JWT so the client string cannot be tampered with.
    *
    * @param {import('../api/auth.js').AuthTokens} sessionData
    */
@@ -33,7 +42,7 @@ export function AuthProvider({ children }) {
     Object.values(SESSION_KEYS).forEach((key) => {
       localStorage.setItem(key, sessionData[key]);
     });
-    setSession(sessionData);
+    setSession({ ...sessionData, role: getRoleFromToken(sessionData.token) });
   }, []);
 
   /** Removes all session data from localStorage and resets React state. */
