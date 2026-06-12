@@ -1,0 +1,246 @@
+.calendar-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid var(--moon-beerus);
+  overflow: hidden;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────── */
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1.125rem;
+  border-bottom: 1px solid var(--moon-beerus);
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.cal-toolbar__left,
+.cal-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.cal-toolbar__icon-btn {
+  background: none;
+  border: 1px solid var(--moon-beerus);
+  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--moon-trunks);
+  font-size: 0.95rem;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.cal-toolbar__icon-btn:hover {
+  background: var(--moon-gohan);
+  color: var(--moon-bulma);
+}
+
+.cal-toolbar__nav-btn {
+  background: none;
+  border: 1px solid var(--moon-beerus);
+  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--moon-bulma);
+  font-size: 0.7rem;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.cal-toolbar__nav-btn:hover {
+  background: var(--moon-gohan);
+}
+
+.cal-toolbar__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--moon-bulma);
+  margin: 0 0.375rem;
+  white-space: nowrap;
+}
+
+.cal-toolbar__view-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--moon-gohan);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.cal-toolbar__view-btn {
+  background: none;
+  border: none;
+  padding: 0.3rem 0.875rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--moon-trunks);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.cal-toolbar__view-btn--active {
+  background: var(--moon-piccolo);
+  color: #fff;
+  font-weight: 600;
+}
+
+.cal-toolbar__today-btn {
+  background: none;
+  border: 1px solid var(--moon-piccolo);
+  border-radius: 7px;
+  padding: 0.3rem 0.875rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--moon-piccolo);
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.cal-toolbar__today-btn:hover {
+  background: var(--moon-piccolo-10);
+}
+
+/* ── FullCalendar container ──────────────────────────────── */
+.calendar-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Day header (custom two-line) ────────────────────────── */
+.cal-day-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0 4px;
+}
+
+.cal-day-header__wd {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--moon-trunks);
+  letter-spacing: 0.04em;
+}
+
+.cal-day-header__d {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--moon-bulma);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.cal-day-header__d--today {
+  background: var(--moon-piccolo);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── Global FC overrides ─────────────────────────────────── */
+.fc {
+  height: 100%;
+  font-family: var(--moon-font-sans);
+  font-size: 0.8rem;
+}
+
+.fc .fc-scrollgrid {
+  border-color: var(--moon-beerus);
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: var(--moon-beerus);
+}
+
+.fc .fc-col-header-cell {
+  background: #fff;
+}
+
+.fc .fc-col-header-cell-cushion {
+  padding: 0;
+  text-decoration: none;
+}
+
+/* Today column subtle bg */
+.fc .fc-timegrid-col.fc-day-today,
+.fc .fc-daygrid-day.fc-day-today {
+  background: var(--moon-piccolo-10) !important;
+}
+
+/* All-day text */
+.fc .fc-timegrid-axis-cushion {
+  font-size: 0.7rem;
+  color: var(--moon-trunks);
+}
+
+/* Time slot labels */
+.fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.68rem;
+  color: var(--moon-trunks);
+  padding-right: 0.5rem;
+}
+
+.fc .fc-timegrid-slot {
+  height: 2rem;
+}
+
+/* Events */
+.fc .fc-event {
+  border-radius: 6px;
+  border: none;
+  padding: 2px 5px;
+  font-size: 0.75rem;
+}
+
+.fc .fc-event-title {
+  font-weight: 600;
+}
+
+/* Month day numbers */
+.fc .fc-daygrid-day-number {
+  font-size: 0.8rem;
+  color: var(--moon-bulma);
+  text-decoration: none;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  background: var(--moon-piccolo);
+  color: #fff;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Remove default FC button styles (we replaced them) */
+.fc .fc-button {
+  display: none;
+}

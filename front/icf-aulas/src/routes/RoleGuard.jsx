@@ -8,8 +8,8 @@ import { Navigate } from 'react-router-dom';
  * @param {{ allowedRoles: string[], userRole: string, children: JSX.Element }} props
  */
 export default function RoleGuard({ allowedRoles, userRole, children }) {
-  if (!allowedRoles.includes(userRole)) {
+  if (!allowedRoles.includes(userRole))
     return <Navigate to="/access-denied" replace />;
-  }
+
   return children;
 }

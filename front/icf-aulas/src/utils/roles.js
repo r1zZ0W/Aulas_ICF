@@ -16,8 +16,8 @@ export const ROLES = {
  */
 export function getDashboardRoute(role) {
   const routes = {
-    [ROLES.ADMIN]: '/admin',
-    [ROLES.MAESTRO]: '/teacher',
+    [ROLES.ADMIN]: '/dashboard',
+    [ROLES.MAESTRO]: '/dashboard',
   };
   return routes[role] ?? '/login';
 }

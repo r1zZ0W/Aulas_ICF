@@ -1,7 +1,6 @@
 import { ROLES } from '../utils/roles';
 
-import AdminHome from '../modules/admin/Home';
-import MaestroHome from '../modules/maestro/Home';
+import Dashboard from '../modules/shared/dashboard/Dashboard';
 import ClassroomsPage from '../modules/shared/classrooms/ClassroomsPage';
 import ReservationsPage from '../modules/shared/reservations/ReservationsPage';
 import UsersPage from '../modules/admin/users/UsersPage';
@@ -25,15 +24,9 @@ import UsersPage from '../modules/admin/users/UsersPage';
  */
 export const PRIVATE_ROUTES = [
   {
-    path: '/admin',
-    element: <AdminHome />,
-    allowedRoles: [ROLES.ADMIN],
-    sidebar: { label: 'Dashboard', icon: 'bi-speedometer2', show: true },
-  },
-  {
-    path: '/maestro',
-    element: <MaestroHome />,
-    allowedRoles: [ROLES.MAESTRO],
+    path: '/dashboard',
+    element: <Dashboard />,
+    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
     sidebar: { label: 'Dashboard', icon: 'bi-speedometer2', show: true },
   },
   {

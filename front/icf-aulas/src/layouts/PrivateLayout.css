@@ -1,11 +1,15 @@
 .private-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .private-layout__content {
   flex: 1;
-  padding: 2rem;
+  padding: 1.5rem;
   background-color: var(--moon-content-bg);
   min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
