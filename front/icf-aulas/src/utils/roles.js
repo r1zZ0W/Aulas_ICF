@@ -8,6 +8,16 @@ export const ROLES = {
 };
 
 /**
+ * Maps backend roles to display names.
+ *
+ * @type {Record<string, string>}
+ */
+export const DISPLAYED_ROLES = {
+  [ROLES.ADMIN]: 'Administrador',
+  [ROLES.MAESTRO]: 'Maestro',
+}
+
+/**
  * Maps a role to its default landing route after login.
  * Returns '/login' for unknown roles so callers can always navigate safely.
  *
@@ -16,8 +26,8 @@ export const ROLES = {
  */
 export function getDashboardRoute(role) {
   const routes = {
-    [ROLES.ADMIN]: '/dashboard',
-    [ROLES.MAESTRO]: '/dashboard',
+    [ROLES.ADMIN]: '/reservations',
+    [ROLES.MAESTRO]: '/reservations',
   };
   return routes[role] ?? '/login';
 }

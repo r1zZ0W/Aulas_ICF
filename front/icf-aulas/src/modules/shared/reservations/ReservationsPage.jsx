@@ -1,8 +1,9 @@
-export default function ReservationsPage() {
+import CalendarView from '../../../components/Calendar/CalendarView';
+
+export default function Dashboard() {
   return (
-    <div>
-      <h1 className="fw-semibold mb-1">Reservaciones</h1>
-      <p className="text-secondary">Gestión de reservaciones de aulas.</p>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <CalendarView />
     </div>
   );
 }

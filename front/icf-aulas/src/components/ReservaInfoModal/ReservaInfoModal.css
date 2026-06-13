@@ -1,0 +1,35 @@
+.modal-content.reserva-info-modal {
+  width: 100%;
+  max-width: min(650px, calc(100vw - 48px));
+  border-radius: 32px;
+  overflow: hidden;
+  padding: 0;
+  background: #f9fafb;
+  max-height: none;
+}
+
+.reserva-info-modal .reserva-modal__inner {
+  overflow: visible;
+  max-height: none;
+}
+
+.reserva-info-modal__recurrente-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0f7ff;
+  border: 1px solid #bfe0ff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: var(--moon-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: #005687;
+}
+
+.reserva-info-modal__readonly {
+  background: #f9fafb;
+  cursor: default;
+  pointer-events: none;
+  color: var(--moon-bulma);
+}

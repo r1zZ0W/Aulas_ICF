@@ -4,22 +4,18 @@ import { useAuth } from '../../context/AuthContext';
 import { useLogout } from '../../hooks/useLogout';
 import { PRIVATE_ROUTES } from '../../routes/routeConfig';
 import MiniCalendar from '../Calendar/MiniCalendar';
+import { useReservation } from '../../context/ReservationContext';
+import { SALAS } from '../../utils/salas';
+import { DISPLAYED_ROLES } from '../../utils/roles';
 
 import './Sidebar.css';
-import logoIcf from '../../assets/logo_icf.png';
-
-const SALAS = [
-  { label: 'Auditorio',           color: '#2563eb' },
-  { label: 'Aula I - Multimodal', color: '#16a34a' },
-  { label: 'Aula II - Multimodal',color: '#9333ea' },
-  { label: 'Aula III',            color: '#ea580c' },
-  { label: 'Aula IV',             color: '#f59e0b' },
-];
+import aulasHeader from '../../assets/aulas_header.png';
 
 export default function Sidebar() {
   const { user } = useAuth();
   const { handleLogout } = useLogout();
-  const [calOpen, setCalOpen]     = useState(true);
+  const { openModal, visibleSalas, toggleSala } = useReservation();
+  const [calOpen, setCalOpen] = useState(true);
   const [salasOpen, setSalasOpen] = useState(true);
 
   const navItems = PRIVATE_ROUTES.filter(
@@ -37,8 +33,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Brand */}
       <div className="sidebar__brand">
-        <img src={logoIcf} alt="ICF Aulas" className="sidebar__logo" />
-        <span className="sidebar__brand-name">Aulas ICF</span>
+        <img src={aulasHeader} alt="ICF Aulas" className="sidebar__logo" />
       </div>
 
       {/* Nav */}
@@ -51,7 +46,7 @@ export default function Sidebar() {
               `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
             }
           >
-            <i className={`bi ${sidebar.icon} sidebar__icon`} />
+            <span className="sidebar__icon">{sidebar.icon}</span>
             <span>{sidebar.label}</span>
           </NavLink>
         ))}
@@ -59,7 +54,7 @@ export default function Sidebar() {
 
       {/* Nueva Reserva */}
       <div className="sidebar__action">
-        <button className="sidebar__new-reserva-btn">
+        <button className="sidebar__new-reserva-btn" onClick={() => openModal()}>
           <i className="bi bi-plus-lg" />
           <span>Nueva Reserva</span>
         </button>
@@ -90,12 +85,29 @@ export default function Sidebar() {
         </button>
         {salasOpen && (
           <ul className="sidebar__salas">
-            {SALAS.map(({ label, color }) => (
-              <li key={label} className="sidebar__sala-item">
-                <span className="sidebar__sala-dot" style={{ background: color }} />
-                <span>{label}</span>
-              </li>
-            ))}
+            {SALAS.map(({ id, label, color }) => {
+              const visible = visibleSalas.has(id);
+              return (
+                <li key={id} className="sidebar__sala-item">
+                  <button
+                    type="button"
+                    className={`sidebar__sala-toggle${visible ? ' sidebar__sala-toggle--on' : ''}`}
+                    onClick={() => toggleSala(id)}
+                    aria-pressed={visible}
+                    aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${label}`}
+                    style={{ '--sala-color': color }}
+                  >
+                    <span
+                      className="sidebar__sala-dot"
+                      style={{ background: visible ? color : 'transparent', borderColor: color }}
+                    />
+                    <span className={`sidebar__sala-label${visible ? '' : ' sidebar__sala-label--off'}`}>
+                      {label}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -106,7 +118,7 @@ export default function Sidebar() {
           <div className="sidebar__avatar">{initials}</div>
           <div className="sidebar__user-info">
             <span className="sidebar__user-name">{user.name}</span>
-            <span className="sidebar__user-role">{user.role}</span>
+            <span className="sidebar__user-role">{DISPLAYED_ROLES[user.role]}</span>
           </div>
         </div>
         <button className="sidebar__logout-btn" onClick={handleLogout}>

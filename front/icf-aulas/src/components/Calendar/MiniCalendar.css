@@ -72,7 +72,14 @@
   visibility: hidden;
 }
 
-.mini-cal__cell:not(.mini-cal__cell--empty):hover {
+.mini-cal__cell--past {
+  color: var(--moon-trunks);
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.mini-cal__cell:not(.mini-cal__cell--empty):not(.mini-cal__cell--past):hover {
   background: var(--moon-gohan);
 }
 
@@ -85,4 +92,11 @@
   background: var(--moon-piccolo);
   color: #fff;
   font-weight: 700;
+}
+
+.mini-cal__cell--selected {
+  background: var(--moon-piccolo-10);
+  color: var(--moon-piccolo);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px var(--moon-piccolo);
 }

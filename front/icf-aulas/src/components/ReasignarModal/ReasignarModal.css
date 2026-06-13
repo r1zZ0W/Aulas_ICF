@@ -1,0 +1,13 @@
+.modal-content.reasignar-modal {
+  width: 100%;
+  max-width: min(650px, calc(100vw - 48px));
+  border-radius: 32px;
+  overflow: hidden;
+  padding: 0;
+  max-height: none;
+}
+
+.reasignar-modal .reserva-modal__inner {
+  overflow: visible;
+  max-height: none;
+}

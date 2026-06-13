@@ -68,6 +68,13 @@
   background: var(--moon-gohan);
 }
 
+.cal-toolbar__nav-btn--disabled,
+.cal-toolbar__nav-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  background: none !important;
+}
+
 .cal-toolbar__title {
   font-size: 1.05rem;
   font-weight: 700;
@@ -119,6 +126,26 @@
 
 .cal-toolbar__today-btn:hover {
   background: var(--moon-piccolo-10);
+}
+
+.cal-toolbar__create-btn {
+  background: var(--moon-piccolo);
+  border: 1px solid var(--moon-piccolo);
+  border-radius: 7px;
+  padding: 0.3rem 0.875rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-toolbar__create-btn:hover {
+  opacity: 0.9;
 }
 
 /* ── FullCalendar container ──────────────────────────────── */
@@ -216,6 +243,7 @@
   border: none;
   padding: 2px 5px;
   font-size: 0.75rem;
+  cursor: pointer;
 }
 
 .fc .fc-event-title {
@@ -243,4 +271,40 @@
 /* Remove default FC button styles (we replaced them) */
 .fc .fc-button {
   display: none;
+}
+
+/* Month view – past day cells */
+.fc .fc-daygrid-day.fc-day-past {
+  background: #fafafa;
+  cursor: not-allowed;
+}
+
+.fc .fc-daygrid-day.fc-day-past .fc-daygrid-day-number {
+  color: #c0c6ce;
+}
+
+/* Month view – future/today cells are clickable */
+.fc .fc-daygrid-day.fc-day-future .fc-daygrid-day-frame,
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame {
+  cursor: pointer;
+}
+
+/* More-link pill */
+.fc .fc-daygrid-more-link {
+  font-family: var(--moon-font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--moon-piccolo);
+  background: var(--moon-piccolo-10);
+  border-radius: 20px;
+  padding: 1px 7px;
+  margin-top: 2px;
+  display: inline-block;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.fc .fc-daygrid-more-link:hover {
+  background: var(--moon-piccolo);
+  color: #fff;
 }

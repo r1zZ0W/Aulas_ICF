@@ -1,0 +1,514 @@
+/* ── Modal shell ─────────────────────────────────────────── */
+.modal-content.reserva-modal {
+  width: 100%;
+  max-width: min(650px, calc(100vw - 48px));
+  border-radius: 32px;
+  overflow: hidden;
+  padding: 0;
+}
+
+.reserva-modal__inner {
+  display: flex;
+  flex-direction: column;
+  background: var(--moon-goku);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.reserva-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  height: 72px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #e2e2e2;
+  position: sticky;
+  top: 0;
+  background: var(--moon-goku);
+  z-index: 1;
+}
+
+.reserva-modal__title {
+  font-family: var(--moon-font-sans);
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e2939;
+  margin: 0;
+}
+
+.reserva-modal__close {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--moon-trunks);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.reserva-modal__close:hover {
+  background: rgba(211, 48, 74, 0.1);
+  color: var(--moon-dodoria);
+}
+
+/* ── Body / form ─────────────────────────────────────────── */
+.reserva-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px;
+  flex: 1;
+}
+
+/* ── Field ───────────────────────────────────────────────── */
+.reserva-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reserva-modal__label {
+  font-family: var(--moon-font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #595d62;
+}
+
+/* ── Select wrapper ──────────────────────────────────────── */
+.reserva-modal__select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.reserva-modal__select {
+  width: 100%;
+  height: 50px;
+  padding: 0 40px 0 16px;
+  border: 1px solid #e2e2e2;
+  border-radius: 12px;
+  background: #fff;
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--moon-bulma);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.reserva-modal__select:focus {
+  outline: none;
+  border-color: var(--moon-piccolo);
+  box-shadow: 0 0 0 3px var(--moon-piccolo-10);
+}
+
+.reserva-modal__select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #f9fafb;
+}
+
+.reserva-modal__chevron {
+  position: absolute;
+  right: 14px;
+  pointer-events: none;
+  color: var(--moon-trunks);
+  flex-shrink: 0;
+}
+
+/* Time selects have a clock icon on the left */
+.reserva-modal__select-wrap--time .reserva-modal__select {
+  padding-left: 44px;
+}
+
+.reserva-modal__select--time {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.reserva-modal__time-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--moon-trunks);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* ── Text input ──────────────────────────────────────────── */
+.reserva-modal__input {
+  height: 50px;
+  padding: 0 16px;
+  border: 1px solid #e2e2e2;
+  border-radius: 12px;
+  background: #fff;
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  color: var(--moon-bulma);
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.reserva-modal__input::placeholder {
+  color: #99a1af;
+  font-weight: 400;
+}
+
+.reserva-modal__input:focus {
+  outline: none;
+  border-color: var(--moon-piccolo);
+  box-shadow: 0 0 0 3px var(--moon-piccolo-10);
+}
+
+/* ── Sala info card ──────────────────────────────────────── */
+.reserva-modal__sala-card {
+  background: #f0f7ff;
+  border: 1px solid #bfe0ff;
+  border-radius: 12px;
+  padding: 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reserva-modal__sala-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--moon-font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  color: #005687;
+  line-height: 1.5;
+}
+
+.reserva-modal__sala-card-details {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.reserva-modal__sala-card-details span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--moon-font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  color: #004670;
+  white-space: nowrap;
+}
+
+/* ── Header left group ───────────────────────────────────── */
+.reserva-modal__header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Back button ─────────────────────────────────────────── */
+.reserva-modal__back {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--moon-trunks);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.reserva-modal__back:hover {
+  background: rgba(0, 86, 135, 0.08);
+  color: #005687;
+}
+
+/* ── Date badge (step 2) ─────────────────────────────────── */
+.reserva-modal__date-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0f7ff;
+  border: 1px solid #bfe0ff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--moon-font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: #005687;
+  text-transform: capitalize;
+}
+
+/* ── Date picker (step 1) ────────────────────────────────── */
+.date-picker {
+  padding: 24px 32px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.date-picker__prompt {
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  color: var(--moon-trunks);
+  margin: 0;
+  text-align: center;
+}
+
+.date-picker__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 360px;
+}
+
+.date-picker__nav-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e2e2;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  color: #1e2939;
+  font-size: 14px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.date-picker__nav-btn:hover:not(:disabled) {
+  background: #f0f4f8;
+  border-color: #c8cdd5;
+}
+
+.date-picker__nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.date-picker__month {
+  font-family: var(--moon-font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e2939;
+  letter-spacing: 0.2px;
+}
+
+.date-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.date-picker__weekday {
+  font-family: var(--moon-font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--moon-trunks);
+  text-align: center;
+  padding: 2px 0 8px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.date-picker__cell {
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e2939;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.date-picker__cell:hover:not(:disabled):not(.date-picker__cell--empty) {
+  background: #f0f4f8;
+}
+
+.date-picker__cell--empty {
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.date-picker__cell--past {
+  color: #c0c6ce;
+  cursor: not-allowed;
+}
+
+.date-picker__cell--today {
+  background: #e8f0fe;
+  color: #005687;
+  font-weight: 700;
+}
+
+.date-picker__cell--selected {
+  background: #005687;
+  color: #fff;
+  font-weight: 700;
+}
+
+.date-picker__cell--selected:hover:not(:disabled) {
+  background: #004570;
+}
+
+/* ── Recurrente toggle row ───────────────────────────────── */
+.reserva-modal__recurrente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #f9fafb;
+  border: 1px solid #e2e2e2;
+  border-radius: 12px;
+}
+
+.reserva-modal__recurrente-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.reserva-modal__recurrente-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e2939;
+}
+
+.reserva-modal__recurrente-desc {
+  font-family: var(--moon-font-sans);
+  font-size: 12px;
+  color: #595d62;
+}
+
+.reserva-modal__toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
+  background: #d1d5db;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.reserva-modal__toggle::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.reserva-modal__toggle--on {
+  background: #005687;
+}
+
+.reserva-modal__toggle--on::after {
+  transform: translateX(20px);
+}
+
+/* ── Two-column row (times) ──────────────────────────────── */
+.reserva-modal__row {
+  display: flex;
+  gap: 16px;
+}
+
+.reserva-modal__row > .reserva-modal__field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Footer ──────────────────────────────────────────────── */
+.reserva-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin: 8px -32px -32px;
+  padding: 20px 32px 28px;
+  border-top: 1px solid #e2e2e2;
+  background: rgba(249, 250, 251, 0.5);
+}
+
+.reserva-modal__btn {
+  height: 54px;
+  padding: 0 24px;
+  border-radius: 16px;
+  font-family: var(--moon-font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  border: none;
+  white-space: nowrap;
+}
+
+.reserva-modal__btn--cancel {
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  color: #1e2939;
+}
+
+.reserva-modal__btn--cancel:hover {
+  background: #f5f6f8;
+}
+
+.reserva-modal__btn--submit {
+  background: #005687;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.reserva-modal__btn--submit:hover:not(:disabled) {
+  background: #004570;
+}
+
+.reserva-modal__btn--submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

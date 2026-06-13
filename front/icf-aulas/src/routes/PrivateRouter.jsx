@@ -4,7 +4,7 @@ import { PRIVATE_ROUTES } from './routeConfig';
 import { getDashboardRoute } from '../utils/roles';
 import PrivateLayout from '../layouts/PrivateLayout';
 import RoleGuard from './RoleGuard';
-// import AccessDenied from '../modules/shared/AccessDenied';
+
 import Error401 from '../errors/Error401.jsx';
 import Error403 from '../errors/Error403.jsx';
 import Error404 from '../errors/Error404.jsx';
@@ -13,9 +13,8 @@ export default function PrivateRouter() {
     const { isAuthenticated, user } = useAuth();
 
     // Protección extra en caso de que se renderice sin sesión
-    if (!isAuthenticated) {
+    if (!isAuthenticated)
         return <Navigate to="/401" replace />;
-    }
 
     const defaultRoute = getDashboardRoute(user.role);
 

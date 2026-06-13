@@ -1,9 +1,9 @@
 import { ROLES } from '../utils/roles';
 
-import Dashboard from '../modules/shared/dashboard/Dashboard';
 import ClassroomsPage from '../modules/shared/classrooms/ClassroomsPage';
 import ReservationsPage from '../modules/shared/reservations/ReservationsPage';
 import UsersPage from '../modules/admin/users/UsersPage';
+import { Calendar, School, Users } from 'lucide-react';
 
 /**
  * Central declaration of every private route.
@@ -24,27 +24,21 @@ import UsersPage from '../modules/admin/users/UsersPage';
  */
 export const PRIVATE_ROUTES = [
   {
-    path: '/dashboard',
-    element: <Dashboard />,
+    path: '/reservations',
+    element: <ReservationsPage />,
     allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
-    sidebar: { label: 'Dashboard', icon: 'bi-speedometer2', show: true },
+    sidebar: { label: 'Reservaciones', icon: <Calendar />, show: true },
   },
   {
     path: '/classrooms',
     element: <ClassroomsPage />,
-    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
-    sidebar: { label: 'Aulas', icon: 'bi-building', show: true },
-  },
-  {
-    path: '/reservations',
-    element: <ReservationsPage />,
-    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
-    sidebar: { label: 'Reservaciones', icon: 'bi-calendar-check', show: true },
+    allowedRoles: [ROLES.ADMIN],
+    sidebar: { label: 'Aulas', icon: <School />, show: true },
   },
   {
     path: '/users',
     element: <UsersPage />,
     allowedRoles: [ROLES.ADMIN],
-    sidebar: { label: 'Usuarios', icon: 'bi-people', show: true },
+    sidebar: { label: 'Usuarios', icon: <Users />, show: true },
   },
 ];

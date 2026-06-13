@@ -34,4 +34,5 @@ build/
 
 .env
 
+.claude/
 graphify-out/
