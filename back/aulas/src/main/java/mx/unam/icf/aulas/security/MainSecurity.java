@@ -61,8 +61,8 @@ public class MainSecurity {
                         .contentTypeOptions(Customizer.withDefaults())
             )
             .authorizeHttpRequests(auth -> auth
-                // Authentication endpoints are public; all other routes require a valid JWT
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated()
             )
             // Wire JSON error responses for the two security-layer rejection paths:
@@ -84,7 +84,7 @@ public class MainSecurity {
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowCredentials(true);
-
+        
         UrlBasedCorsConfigurationSource src = new UrlBasedCorsConfigurationSource();
         src.registerCorsConfiguration("/**", config);
         return src;

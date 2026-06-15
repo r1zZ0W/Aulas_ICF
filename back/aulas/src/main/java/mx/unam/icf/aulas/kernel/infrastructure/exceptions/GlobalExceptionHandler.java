@@ -4,10 +4,11 @@ import jakarta.persistence.PersistenceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidCredentialsException;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidTokenException;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.MissingTokenException;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.TokenRevokedException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.AccountLockedException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidCredentialsException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidTokenException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.MissingTokenException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.TokenRevokedException;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
@@ -62,6 +63,15 @@ public class GlobalExceptionHandler {
     }
 
     // ── Security ─────────────────────────────────────────────────────────────
+
+    /** Returns 429 when an account is temporarily locked after too many failed login attempts. */
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountLocked(AccountLockedException ex) {
+        log.warn("Locked account login attempt: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.error("Account temporarily locked due to too many failed attempts. Try again in 10 minutes."));
+    }
 
     /**
      * Handles explicit credential failures thrown by the auth service; returns 401.

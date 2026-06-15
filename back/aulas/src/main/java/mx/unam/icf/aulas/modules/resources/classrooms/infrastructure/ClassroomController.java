@@ -6,12 +6,14 @@ import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
+import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.ClassroomService;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomRequestDTO;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomResponseDTO;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,12 +41,17 @@ public class ClassroomController implements ResponseHandler {
     private final ClassroomService classroomService;
 
     /**
-     * Retrieves all classrooms from the system.
+     * Retrieves classrooms from the system.
+     * ADMIN users receive all classrooms (active and inactive) for management purposes.
+     * MAESTRO users receive only active classrooms (DFR §2.3).
      * GET /api/v1/classrooms
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ClassroomResponseDTO>>> findAll() {
-        return ok(classroomService.findAll());
+    public ResponseEntity<ApiResponse<List<ClassroomResponseDTO>>> findAll(
+            @AuthenticationPrincipal UserDetailsImp principal) {
+        if ("ADMIN".equals(principal.getRoleName()))
+            return ok(classroomService.findAll());
+        return ok(classroomService.findAllActive());
     }
 
     /**
@@ -85,7 +92,9 @@ public class ClassroomController implements ResponseHandler {
     }
 
     /**
-     * Deletes a classroom from the system by its public UUID. Requires ADMIN role.
+     * Deactivates a classroom (soft-delete) by its public UUID. Requires ADMIN role.
+     * The classroom is marked inactive and hidden from Maestro catalog but is never
+     * physically removed, preserving existing reservation history (DFR NFR / LFTAIP).
      * DELETE /api/v1/classrooms/{uuid}
      *
      * @throws DomainException           when the UUID is null
@@ -95,6 +104,6 @@ public class ClassroomController implements ResponseHandler {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteByUuid(@PathVariable UUID uuid) {
         classroomService.deleteByUuid(uuid);
-        return ok("Classroom deleted successfully");
+        return ok("Classroom deactivated successfully");
     }
 }

@@ -1,10 +1,10 @@
 package mx.unam.icf.aulas.modules.access.auth.app;
 
 import lombok.RequiredArgsConstructor;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidCredentialsException;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidTokenException;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.MissingTokenException;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.TokenRevokedException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidCredentialsException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidTokenException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.MissingTokenException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.TokenRevokedException;
 import mx.unam.icf.aulas.kernel.infrastructure.jwt.JwtProvider;
 import mx.unam.icf.aulas.kernel.infrastructure.jwt.TokenBlacklist;
 import mx.unam.icf.aulas.kernel.infrastructure.services.MailSender;

@@ -2,8 +2,9 @@ package mx.unam.icf.aulas.modules.access.auth.app;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.InvalidCredentialsException;
-import mx.unam.icf.aulas.kernel.infrastructure.exceptions.auth.MissingTokenException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.AccountLockedException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidCredentialsException;
+import mx.unam.icf.aulas.modules.access.auth.app.exceptions.MissingTokenException;
 import mx.unam.icf.aulas.kernel.infrastructure.jwt.JwtProvider;
 import mx.unam.icf.aulas.kernel.infrastructure.jwt.TokenBlacklist;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,6 +28,7 @@ class AuthUtils {
     private final AuthenticationManager authenticationManager;
     private final JwtProvider           jwtProvider;
     private final TokenBlacklist        blacklistService;
+    private final LoginAttemptService   loginAttemptService;
 
     /**
      * Extracts the raw token from a Bearer header value and validates it is present.
@@ -53,12 +55,20 @@ class AuthUtils {
      * @throws InvalidCredentialsException always with a neutral message on any auth failure
      */
     public Authentication authenticate(String username, String password) {
+        if (loginAttemptService.isLocked(username))
+            throw new AccountLockedException("Account temporarily locked. Try again in 10 minutes.");
+
         try {
-            return authenticationManager.authenticate(
+            Authentication auth = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password)
             );
+            loginAttemptService.reset(username);
+            return auth;
         } catch (AuthenticationException e) {
+            loginAttemptService.recordFailure(username);
             log.warn("Authentication failed for username={} reason={}", username, e.getClass().getSimpleName());
+            if (loginAttemptService.isLocked(username))
+                throw new AccountLockedException("Account temporarily locked. Try again in 10 minutes.");
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MSG);
         }
     }

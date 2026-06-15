@@ -5,24 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import mx.unam.icf.aulas.modules.resources.classrooms.domain.ClassroomType;
 
 import java.util.UUID;
 
-/**
- * Request payload for creating or updating a classroom.
- *
- * <p>Serves as both the create and update DTO since the fields are identical in both cases.
- * The {@code linkedRoomUuid} is optional and only set when two classrooms can be merged
- * into a larger space.</p>
- *
- * @param name           display name of the classroom
- * @param capacity       maximum number of students the classroom can accommodate
- * @param linkedRoomUuid public UUID of the paired classroom, or {@code null} if standalone
- * @param isActive       whether this classroom is available for reservations
- *
- * @author Ithera
- * @version 2.0
- */
 public record ClassroomRequestDTO(
 
         @NotBlank(message = "Name is required")
@@ -36,6 +22,12 @@ public record ClassroomRequestDTO(
         @NotNull(message = "Capacity is required")
         @Min(value = 1, message = "Capacity must be at least 1")
         Long capacity,
+
+        @NotNull(message = "Type is required")
+        ClassroomType type,
+
+        @Size(max = 500, message = "Description must be at most 500 characters")
+        String description,
 
         UUID linkedRoomUuid,
         Boolean isActive

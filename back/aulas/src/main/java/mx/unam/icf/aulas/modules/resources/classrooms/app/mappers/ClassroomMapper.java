@@ -10,13 +10,6 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-/**
- * MapStruct mapper for converting between {@link Classroom} entities and DTOs.
- *
- * <p>{@code toDto} maps the optional linked-room UUID from the nested entity.
- * {@code toEntity} and {@code updateEntityFromDto} ignore {@code uuid}, {@code linkedRoom},
- * and {@code classroomResources} — those fields are managed explicitly in the service layer.</p>
- */
 @Mapper(componentModel = "spring")
 public interface ClassroomMapper extends BaseMapper<Classroom, ClassroomRequestDTO, ClassroomResponseDTO> {
 

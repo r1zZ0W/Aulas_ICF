@@ -4,6 +4,7 @@ import mx.unam.icf.aulas.modules.resources.classrooms.domain.Classroom;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,4 +34,7 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Long> {
 
     /** Finds a classroom by its unique name, used to enforce name uniqueness before saving. */
     Optional<Classroom> findByName(String name);
+
+    /** Returns all classrooms that are currently active (isActive = true). */
+    List<Classroom> findByIsActiveTrue();
 }

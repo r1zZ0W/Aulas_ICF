@@ -193,7 +193,7 @@ public class JwtProvider {
                 .signWith(secretKey);
 
         if (uuid   != null) builder.claim("uuid",   uuid);
-        if (name != null) builder.claim("name", name);
+        if (name   != null) builder.claim("name",   name);
         if (role   != null) builder.claim("role",   role);
 
         if ("auth".equals(type)) {

@@ -17,35 +17,25 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Service class for managing classroom operations.
+ * Service managing the lifecycle of {@link Classroom} entities.
  *
- * This service provides business logic for CRUD (Create, Read, Update, Delete) operations
- * on classroom entities. It acts as an intermediary between the presentation layer (controller)
- * and the persistence layer (repository), handling data transformations via the mapper.
+ * <p>Enforces business rules such as unique classroom names and linked room validation.
+ * Soft-delete is not applied here; a full delete removes the record from the database.</p>
  *
  * @author Ithera
- * @version 1.0
- * @see Classroom
- * @see ClassroomResponseDTO
+ * @version 2.0
  */
 @Service
 @RequiredArgsConstructor
 public class ClassroomService {
 
-    /**
-     * Mapper instance for converting between Classroom dto and classroom DTOs.
-     */
     private final ClassroomMapper classroomMapper;
-
-    /**
-     * Repository instance for classroom data access operations.
-     */
     private final ClassroomRepository classroomRepository;
 
     /**
-     * Retrieves all classrooms from the database and converts them to DTOs.
-     *
-     * @return a list of all classroom DTOs
+     * Returns all classrooms in the system (active and inactive).
+     * Intended for ADMIN users who need visibility into inactive rooms.
+     * GET /api/v1/classrooms
      */
     @Transactional(readOnly = true)
     public List<ClassroomResponseDTO> findAll() {
@@ -53,38 +43,45 @@ public class ClassroomService {
     }
 
     /**
-     * Retrieves a specific classroom by its public UUID.
+     * Returns only active classrooms.
+     * Used by non-admin users (Maestro) who should not see inactive rooms.
+     */
+    @Transactional(readOnly = true)
+    public List<ClassroomResponseDTO> findAllActive() {
+        return classroomMapper.toDtoList(classroomRepository.findByIsActiveTrue());
+    }
+
+    /**
+     * Returns a single classroom by its public UUID.
      *
-     * @param uuid the public UUID of the classroom to retrieve
-     * @return the classroom DTO associated with the provided UUID
-     * @throws ResourceNotFoundException when no classroom exists with the provided UUID
+     * @param uuid public UUID of the classroom
+     * @throws ResourceNotFoundException when no classroom matches the given UUID
      */
     @Transactional(readOnly = true)
     public ClassroomResponseDTO findByUuid(UUID uuid) {
         return classroomMapper.toDto(
             classroomRepository.findByUuid(uuid)
-                        .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with uuid: " + uuid))
+                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + uuid))
         );
     }
 
     /**
-     * Creates and persists a new classroom in the database.
+     * Creates a new classroom.
      *
-     * @param dto the classroom DTO containing the data to persist
-     * @return the persisted classroom DTO with its generated UUID
+     * @param dto creation payload
+     * @throws DomainException           when a classroom with the same name already exists
+     * @throws ResourceNotFoundException when the linked classroom UUID is provided but not found
      */
     @Transactional(rollbackFor = Exception.class)
     public ClassroomResponseDTO save(ClassroomRequestDTO dto) {
-
-        classroomRepository.findByName(dto.name()).orElseThrow(
-                () -> new ResourceNotFoundException("There is another classroom with ts name lil bro: " + dto.name())
-        );
+        if (classroomRepository.findByName(dto.name()).isPresent())
+            throw new DomainException("A classroom with that name already exists: " + dto.name());
 
         Classroom classroom = classroomMapper.toEntity(dto);
 
         if (dto.linkedRoomUuid() != null) {
             Classroom linked = classroomRepository.findByUuid(dto.linkedRoomUuid())
-                    .orElseThrow(() -> new ResourceNotFoundException("Linked classroom not found with uuid: " + dto.linkedRoomUuid()));
+                .orElseThrow(() -> new ResourceNotFoundException("Linked classroom not found: " + dto.linkedRoomUuid()));
             classroom.setLinkedRoom(linked);
         }
 
@@ -92,26 +89,29 @@ public class ClassroomService {
     }
 
     /**
-     * Updates an existing classroom with new data.
+     * Updates an existing classroom.
      *
-     * @param dto the classroom DTO containing the updated data
-     * @return the updated classroom DTO
-     * @throws DomainException when the DTO does not contain a valid UUID
-     * @throws ResourceNotFoundException when no classroom exists with the provided UUID
+     * @param uuid public UUID of the classroom to update
+     * @param dto  update payload
+     * @throws DomainException           when the UUID is null or the new name is already taken
+     * @throws ResourceNotFoundException when the classroom or linked classroom is not found
      */
     @Transactional(rollbackFor = Exception.class)
     public ClassroomResponseDTO update(UUID uuid, ClassroomRequestDTO dto) {
         if (uuid == null)
-            throw new DomainException("Classroom uuid is required to update a record");
+            throw new DomainException("Classroom UUID is required to perform an update");
 
         Classroom classroom = classroomRepository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with uuid: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + uuid));
+
+        if (!classroom.getName().equals(dto.name()) && classroomRepository.findByName(dto.name()).isPresent())
+            throw new DomainException("A classroom with that name already exists: " + dto.name());
 
         classroomMapper.updateEntityFromDto(dto, classroom);
 
         if (dto.linkedRoomUuid() != null) {
             Classroom linked = classroomRepository.findByUuid(dto.linkedRoomUuid())
-                    .orElseThrow(() -> new ResourceNotFoundException("Linked classroom not found with uuid: " + dto.linkedRoomUuid()));
+                .orElseThrow(() -> new ResourceNotFoundException("Linked classroom not found: " + dto.linkedRoomUuid()));
             classroom.setLinkedRoom(linked);
         }
 
@@ -119,20 +119,26 @@ public class ClassroomService {
     }
 
     /**
-     * Deletes a classroom from the database by its public UUID.
+     * Deactivates a classroom (soft-delete) to preserve referential integrity with
+     * existing reservations. The classroom is marked as inactive ({@code isActive=false})
+     * and will no longer appear in the Maestro catalog or accept new reservations.
      *
-     * @param uuid the public UUID of the classroom to delete
-     * @throws DomainException when the UUID is null
-     * @throws ResourceNotFoundException when no classroom exists with the provided UUID
+     * <p>Physical deletion is intentionally avoided to comply with the DFR NFR
+     * ("nada se elimina físicamente") and LFTAIP auditability requirements.</p>
+     *
+     * @param uuid public UUID of the classroom to deactivate
+     * @throws DomainException           when the UUID is null
+     * @throws ResourceNotFoundException when no classroom matches the given UUID
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteByUuid(UUID uuid) {
         if (uuid == null)
-            throw new DomainException("Classroom uuid is required to delete a record");
+            throw new DomainException("Classroom UUID is required to perform a deactivation");
 
         Classroom classroom = classroomRepository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with uuid: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + uuid));
 
-        classroomRepository.delete(classroom);
+        classroom.setIsActive(false);
+        classroomRepository.save(classroom);
     }
 }
