@@ -22,4 +22,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     /** Finds a user by their public UUID for external API lookups. */
     Optional<User> findByUuid(UUID uuid);
+
+    /** Finds a user by their unique matrícula. */
+    Optional<User> findByMatricula(String matricula);
+
+    /**
+     * Returns all active users assigned to a specific role by role name.
+     * Used to resolve admin recipients for reservation notifications.
+     */
+    java.util.List<User> findByRole_NameAndIsActiveTrue(String roleName);
+
+    /** Returns true if at least one user with the given role name exists (used by AdminSeeder). */
+    boolean existsByRole_Name(String roleName);
 }

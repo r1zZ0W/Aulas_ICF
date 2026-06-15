@@ -2,9 +2,12 @@ package mx.unam.icf.aulas.security;
 
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.infrastructure.jwt.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -48,6 +51,10 @@ public class MainSecurity {
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private String allowedOrigins;
 
+    /** Injected to check the active Spring profile for Swagger gating. */
+    @Autowired
+    private Environment env;
+
     @Bean
     public SecurityFilterChain filterInternal(HttpSecurity http) throws Exception {
 
@@ -60,11 +67,16 @@ public class MainSecurity {
                         .contentSecurityPolicy(csp -> csp.policyDirectives("script-src 'self'; object-src 'none';"))
                         .contentTypeOptions(Customizer.withDefaults())
             )
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                .anyRequest().authenticated()
-            )
+            .authorizeHttpRequests(auth -> {
+                auth.requestMatchers("/api/v1/auth/**").permitAll();
+                // Swagger/OpenAPI is only publicly accessible in the dev profile.
+                // In production the springdoc properties disable the endpoints entirely;
+                // this rule adds defence-in-depth at the security layer.
+                if (env.acceptsProfiles(Profiles.of("dev"))) {
+                    auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll();
+                }
+                auth.anyRequest().authenticated();
+            })
             // Wire JSON error responses for the two security-layer rejection paths:
             //   401 → no token / unauthenticated (AuthenticationEntryPoint)
             //   403 → authenticated but insufficient role at URL level (AccessDeniedHandler)

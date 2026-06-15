@@ -6,6 +6,7 @@ import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
 import mx.unam.icf.aulas.modules.reservations.instances.app.ReservInstanceService;
+import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReassignRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -160,15 +161,18 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
-     * Reassigns an approved reservation to a different classroom. Requires ADMIN role.
-     * PATCH /api/v1/reservations/{uuid}/reassign?newClassroomUuid=...
+     * Reassigns an approved reservation to a different classroom and/or time-slot block. Requires ADMIN role.
+     * PATCH /api/v1/reservations/{uuid}/reassign
+     *
+     * <p>At least one of {@code newClassroomUuid} or {@code newTimeSlotIds} must be provided.
+     * This replaces the previous query-param contract (DFR §4.3 — aula y/o bloque).</p>
      */
     @PatchMapping("/{uuid}/reassign")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ReservInstanceResponseDTO>> reassign(
             @PathVariable UUID uuid,
-            @RequestParam UUID newClassroomUuid
+            @RequestBody ReassignRequestDTO dto
     ) {
-        return ok(service.reassign(uuid, newClassroomUuid));
+        return ok(service.reassign(uuid, dto));
     }
 }

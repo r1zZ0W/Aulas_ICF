@@ -28,7 +28,7 @@ class AuthUtils {
     private final AuthenticationManager authenticationManager;
     private final JwtProvider           jwtProvider;
     private final TokenBlacklist        blacklistService;
-    private final LoginAttemptService   loginAttemptService;
+    private final LoginAttemptStore     loginAttemptService;
 
     /**
      * Extracts the raw token from a Bearer header value and validates it is present.

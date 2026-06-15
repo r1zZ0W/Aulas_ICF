@@ -47,5 +47,9 @@ public record UserUpdateRequestDTO(
         @NotNull(message = "Role is required")
         Long roleId,
 
-        Boolean isActive
+        Boolean isActive,
+
+        /** Department or area the user belongs to (optional). */
+        @Size(max = 100, message = "Department must be at most 100 characters")
+        String departamento
 ) {}

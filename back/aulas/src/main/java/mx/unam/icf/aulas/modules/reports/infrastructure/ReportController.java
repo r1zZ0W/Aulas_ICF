@@ -32,16 +32,18 @@ public class ReportController {
 
     /**
      * Generates and downloads a PDF report of approved reservations for the requested period.
-     * GET /api/v1/reports/reservations?period=MES_EN_CURSO|MES_ANTERIOR
+     * GET /api/v1/reports/reservations?period=MES_EN_CURSO|MES_ANTERIOR[&classroomUuid=...]
      *
-     * @param period report period; defaults to {@code MES_EN_CURSO} when omitted
+     * @param period        report period; defaults to {@code MES_EN_CURSO} when omitted
+     * @param classroomUuid optional UUID to filter by a specific classroom; omit for all classrooms
      */
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping(value = "/reservations", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> reservationReport(
-            @RequestParam(defaultValue = "MES_EN_CURSO") ReportPeriod period) {
+            @RequestParam(defaultValue = "MES_EN_CURSO") ReportPeriod period,
+            @RequestParam(required = false) java.util.UUID classroomUuid) {
 
-        byte[] pdf = reportService.generatePdf(period);
+        byte[] pdf = reportService.generatePdf(period, classroomUuid);
 
         YearMonth month = period == ReportPeriod.MES_ANTERIOR
                 ? YearMonth.now().minusMonths(1)

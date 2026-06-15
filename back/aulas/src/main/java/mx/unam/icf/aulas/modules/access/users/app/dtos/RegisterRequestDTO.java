@@ -63,6 +63,15 @@ public record RegisterRequestDTO(
         )
         String password,
 
-        @NotNull(message = "El rol es obligatorio")
+        /**
+         * Optional department or area. Free-text, maximum 100 characters.
+         */
+        @Size(max = 100, message = "El departamento debe tener como máximo 100 caracteres")
+        String departamento,
+
+        /**
+         * Optional role identifier. When {@code null}, the system defaults to the
+         * {@code MAESTRO} role (DFR §3.1).
+         */
         Long roleId
 ) {}

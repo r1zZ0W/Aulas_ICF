@@ -63,6 +63,18 @@ public class User extends BaseEntity {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    /**
+     * Auto-generated unique academic identifier assigned at registration.
+     * Format: {@code ICF<yyyy><5 digits>} (e.g. {@code ICF202600001}).
+     * Managed by the service layer; never supplied by the client.
+     */
+    @Column(name = "matricula", nullable = false, unique = true, length = 20)
+    private String matricula;
+
+    /** Department or area the user belongs to (optional free-text). */
+    @Column(name = "departamento", length = 100)
+    private String departamento;
+
     /** Soft-delete flag; inactive users cannot authenticate. */
     @Column(name = "is_active")
     private Boolean isActive;

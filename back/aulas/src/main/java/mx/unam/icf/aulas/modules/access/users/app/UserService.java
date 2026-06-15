@@ -3,6 +3,7 @@ package mx.unam.icf.aulas.modules.access.users.app;
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
+import mx.unam.icf.aulas.kernel.infrastructure.services.NotificationService;
 import mx.unam.icf.aulas.modules.access.roles.domain.Role;
 import mx.unam.icf.aulas.modules.access.roles.infrastructure.RoleRepository;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.RegisterRequestDTO;
@@ -16,6 +17,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,20 +28,33 @@ import java.util.UUID;
  * <p>Covers user registration (admin-only), profile retrieval, admin updates,
  * soft-deactivation, and self-service profile editing.</p>
  *
+ * <p>On registration (DFR §3.1):</p>
+ * <ul>
+ *   <li>The role defaults to {@code MAESTRO} when {@code roleId} is omitted.</li>
+ *   <li>A unique {@code matricula} is auto-generated in the format {@code ICF<yyyy><5 digits>}.</li>
+ *   <li>An HTML email with credentials is sent to the new user's institutional address (best-effort).</li>
+ * </ul>
+ *
  * @author Ithera
- * @version 2.0
+ * @version 3.0
  */
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final UserMapper userMapper;
+    private final UserRepository         userRepository;
+    private final RoleRepository         roleRepository;
+    private final PasswordEncoder        passwordEncoder;
+    private final UserMapper             userMapper;
+    private final NotificationService    notificationService;
+
+    // ── Registration ─────────────────────────────────────────────────────────
 
     /**
      * Registers a new user account. Restricted to ADMIN role.
+     *
+     * <p>When {@code roleId} is {@code null}, the system defaults the role to {@code MAESTRO} (DFR §3.1).
+     * A unique matrícula is generated automatically. Credentials are sent by email after save.</p>
      *
      * @param request registration payload
      * @throws DomainException           when the email or username is already registered
@@ -52,8 +68,15 @@ public class UserService {
         if (userRepository.findByUsernameIgnoreCase(request.username()).isPresent())
             throw new DomainException("Username is already registered");
 
-        Role role = roleRepository.findById(request.roleId())
-            .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + request.roleId()));
+        Role role;
+        if (request.roleId() == null) {
+            // DFR §3.1: default role is MAESTRO
+            role = roleRepository.findByName("MAESTRO")
+                .orElseThrow(() -> new ResourceNotFoundException("Default role MAESTRO not found — ensure seed migration V4 has run"));
+        } else {
+            role = roleRepository.findById(request.roleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + request.roleId()));
+        }
 
         User user = new User();
         user.setFirstName(request.firstName());
@@ -63,13 +86,26 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setRole(role);
         user.setIsActive(true);
+        user.setMatricula(generateMatricula());
+        user.setDepartamento(request.departamento());
 
         userRepository.save(user);
+
+        // DFR §3.1: send credentials email (best-effort; SMTP failures do not roll back).
+        notificationService.notifyNewUserCredentials(
+                user.getEmail(),
+                user.getFirstName() + " " + user.getLastNames(),
+                user.getMatricula(),
+                user.getUsername(),
+                user.getDepartamento(),
+                request.password()
+        );
     }
+
+    // ── Queries ───────────────────────────────────────────────────────────────
 
     /**
      * Returns all users in the system. Restricted to ADMIN role.
-     * GET /api/v1/users
      */
     @Transactional(readOnly = true)
     public List<UserResponseDTO> findAll() {
@@ -90,12 +126,13 @@ public class UserService {
         );
     }
 
+    // ── Admin mutations ───────────────────────────────────────────────────────
+
     /**
      * Updates a user's profile information. Restricted to ADMIN role.
      *
      * <p>An administrator cannot modify their own role or active status via this method
-     * to prevent accidental privilege loss (DFR §3.2). For self-service profile edits
-     * (username/password) use {@link #selfEdit(UUID, UserSelfEditRequestDTO)} instead.</p>
+     * to prevent accidental privilege loss (DFR §3.2).</p>
      *
      * @param uuid            public UUID of the user to update
      * @param dto             update payload
@@ -128,6 +165,7 @@ public class UserService {
         user.setUsername(dto.username());
         user.setEmail(dto.email());
         user.setRole(role);
+        user.setDepartamento(dto.departamento());
         if (dto.isActive() != null)
             user.setIsActive(dto.isActive());
 
@@ -154,6 +192,8 @@ public class UserService {
         user.setIsActive(false);
         userRepository.save(user);
     }
+
+    // ── Self-service ──────────────────────────────────────────────────────────
 
     /**
      * Allows an authenticated user to update their own username and/or password.
@@ -195,5 +235,24 @@ public class UserService {
             .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uuid));
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         userRepository.save(user);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Generates a unique matrícula in the format {@code ICF<yyyy><5 digits>} (e.g. {@code ICF202600001}).
+     * Retries up to 10 times on collision; collision probability is negligible for admin-only registration volumes.
+     *
+     * @throws DomainException after 10 failed attempts (extremely unlikely)
+     */
+    String generateMatricula() {
+        String year = String.valueOf(LocalDate.now().getYear());
+        SecureRandom rng = new SecureRandom();
+        for (int i = 0; i < 10; i++) {
+            String candidate = "ICF" + year + String.format("%05d", rng.nextInt(100_000));
+            if (userRepository.findByMatricula(candidate).isEmpty())
+                return candidate;
+        }
+        throw new DomainException("Could not generate a unique matricula; please try again");
     }
 }

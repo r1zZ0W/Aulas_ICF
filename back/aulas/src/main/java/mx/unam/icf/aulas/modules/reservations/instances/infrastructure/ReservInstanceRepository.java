@@ -63,4 +63,17 @@ public interface ReservInstanceRepository extends JpaRepository<ReservInstance, 
             @Param("timeSlotIds") List<Integer> timeSlotIds,
             @Param("status") ReservInstanceStatus status
     );
+
+    /**
+     * Like {@link #existsConflict} but excludes a specific instance from the check.
+     * Used during reassignment to avoid a false self-conflict when the same classroom/slots are re-requested.
+     */
+    @Query("SELECT COUNT(rs) > 0 FROM ReservSlot rs WHERE rs.classroomId = :classroomId AND rs.date = :date AND rs.timeSlot.id IN :timeSlotIds AND rs.instance.status = :status AND rs.instance.id <> :excludeId")
+    boolean existsConflictExcluding(
+            @Param("classroomId") Long classroomId,
+            @Param("date") LocalDate date,
+            @Param("timeSlotIds") List<Integer> timeSlotIds,
+            @Param("status") ReservInstanceStatus status,
+            @Param("excludeId") Long excludeId
+    );
 }
