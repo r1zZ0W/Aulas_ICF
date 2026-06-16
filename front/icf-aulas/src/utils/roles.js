@@ -12,7 +12,7 @@ export const ROLES = {
  *
  * @type {Record<string, string>}
  */
-export const DISPLAYED_ROLES = {
+export const DISPLAY_ROLE = {
   [ROLES.ADMIN]: 'Administrador',
   [ROLES.MAESTRO]: 'Maestro',
 }

@@ -52,8 +52,7 @@ public class MainSecurity {
     private String allowedOrigins;
 
     /** Injected to check the active Spring profile for Swagger gating. */
-    @Autowired
-    private Environment env;
+    private final Environment env;
 
     @Bean
     public SecurityFilterChain filterInternal(HttpSecurity http) throws Exception {

@@ -20,7 +20,7 @@ export function validateLoginUsername(username) {
     return "El usuario no puede exceder los 50 caracteres";
 
   if (username.trim().length < 3)
-    return "El usuario debe tener al menos 5 caracteres";
+    return "El usuario debe tener al menos 3 caracteres";
 
   return null;
 }
@@ -30,44 +30,24 @@ export function validateLoginUsername(username) {
  * It only checks the presence.
  * @returns {string|null} Error message or null if valid
  */
-export function validatePasswordLogin(contrasena) {
-  if (!contrasena || contrasena.trim().length === 0) {
+export function validatePasswordLogin(password) {
+  if (!password || password.trim().length === 0) {
     return "La contraseña es obligatoria";
   }
   return null;
 }
 
+/**
+ * Validates that a string does not contain special characters.
+ * 
+ * @param {string} val The string to validate.
+ * @returns {boolean} True if the string contains special characters, false otherwise.
+ */
 function isNotAValidCharacter(val) {
-  if (val.includes(",")) return true;
-  if (val.includes("/")) return true;
-  if (val.includes("\\")) return true;
-  if (val.includes("*")) return true;
-  if (val.includes("+")) return true;
-  if (val.includes("=")) return true;
-  if (val.includes("!")) return true;
-  if (val.includes("?")) return true;
-  if (val.includes("¡")) return true;
-  if (val.includes("¿")) return true;
-  if (val.includes("#")) return true;
-  if (val.includes("%")) return true;
-  if (val.includes('"')) return true;
-  if (val.includes("'")) return true;
-  if (val.includes("$")) return true;
-  if (val.includes("&")) return true;
-  if (val.includes("@")) return true;
-  if (val.includes("{")) return true;
-  if (val.includes("}")) return true;
-  if (val.includes("[")) return true;
-  if (val.includes("]")) return true;
-  if (val.includes("(")) return true;
-  if (val.includes(")")) return true;
-  if (val.includes("|")) return true;
-  if (val.includes("<")) return true;
-  if (val.includes(">")) return true;
-  if (val.includes("~")) return true;
-  if (val.includes("`")) return true;
-  if (val.includes("^")) return true;
-  return false;
+  if (!val) return true;
+
+  const regex = /[\,\/\\*\+\=\!\?\¡\¿\#\%\"\'\$\&\@\{\}\[\]\(\)\|\<\>\~\`\^]/;
+  return regex.test(val);
 }
 
 export function handleOnChangeName(e, setForm, setErrores) {

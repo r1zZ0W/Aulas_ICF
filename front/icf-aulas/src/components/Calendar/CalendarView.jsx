@@ -181,15 +181,8 @@ export default function CalendarView() {
               Mes
             </button>
           </div>
-          <button className="cal-toolbar__icon-btn" aria-label="Buscar">
-            <i className="bi bi-search" />
-          </button>
           <button className="cal-toolbar__today-btn" onClick={() => goTo('today')}>
             Hoy
-          </button>
-          <button className="cal-toolbar__create-btn" onClick={() => openModal()}>
-            <i className="bi bi-plus-lg" />
-            <span>Nueva Reserva</span>
           </button>
         </div>
       </div>
@@ -198,6 +191,7 @@ export default function CalendarView() {
       <div className="calendar-container">
         <FullCalendar
           ref={calRef}
+          firstDay={1}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           headerToolbar={false}

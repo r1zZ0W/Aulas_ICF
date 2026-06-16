@@ -1,20 +1,10 @@
 /**
  * Central re-export barrel for all Zod validation schemas.
  * Import schemas from this file rather than from individual schema modules.
+ * Minor details to fix, like the reactor of the other files.
  */
-export { default as ClassroomSchema } from './classroom'
-export { default as RoleSchema } from './role'
-export { default as UserSchema, UserLoginSchema, UserRegisterSchema } from './user'
-export { default as SemesterSchema } from './semester'
-export { default as ResourceSchema, ClassroomResourceSchema } from './resource'
-export { default as TimeSlotSchema } from './timeSlot'
-export {
-  default as ReservationGroupSchema,
-  DayOfWeekEnum,
-  ReservationStatusEnum,
-  InstanceStatusEnum,
-  ReservationGroupDaysSchema,
-  ReservationInstanceSchema,
-  ReservationSlotSchema,
-  CreateReservationGroupSchema
-} from './reservation'
+export { default as UserRequestSchema } from './user/userRequest'
+export { default as UserResponseSchema } from './user/userResponse'
+
+export { default as LoginRequestSchema } from './login/loginRequest'
+export { default as LoginResponseSchema } from './login/loginResponse'

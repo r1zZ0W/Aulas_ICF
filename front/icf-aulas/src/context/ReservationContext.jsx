@@ -6,6 +6,7 @@ const ALL_SALA_IDS = SALAS.map(s => s.id);
 function buildSampleEvents() {
   const today = new Date();
   const d = (h, m) => new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, 0);
+
   const offset = (days, h, m) => {
     const dt = new Date(today);
     dt.setDate(dt.getDate() + days);
@@ -14,12 +15,12 @@ function buildSampleEvents() {
   };
 
   return [
-    { id: 1, salaId: 1, title: 'Reunión de trabajo',   start: d(8, 0),          end: d(10, 0),          recurrente: false },
-    { id: 2, salaId: 3, title: 'Clase Magistral',       start: d(10, 30),        end: d(12, 0),          recurrente: true  },
-    { id: 3, salaId: 2, title: 'Taller de Innovación',  start: offset(1, 9, 0),  end: offset(1, 11, 0),  recurrente: true  },
-    { id: 4, salaId: 4, title: 'Capacitación Docente',  start: offset(2, 14, 0), end: offset(2, 16, 0),  recurrente: false },
-    { id: 5, salaId: 5, title: 'Seminario de Tesis',    start: offset(-1, 8, 0), end: offset(-1, 10, 0), recurrente: true  },
-    { id: 6, salaId: 1, title: 'Conferencia Magistral', start: offset(3, 11, 0), end: offset(3, 13, 0),  recurrente: false },
+    { id: 1, salaId: 1, title: 'Reunión de trabajo', start: d(8, 0), end: d(10, 0), recurrente: false },
+    { id: 2, salaId: 3, title: 'Clase Magistral', start: d(10, 30), end: d(12, 0), recurrente: true },
+    { id: 3, salaId: 2, title: 'Taller de Innovación', start: offset(1, 9, 0), end: offset(1, 11, 0), recurrente: true },
+    { id: 4, salaId: 4, title: 'Capacitación Docente', start: offset(2, 14, 0), end: offset(2, 16, 0), recurrente: false },
+    { id: 5, salaId: 5, title: 'Seminario de Tesis', start: offset(-1, 8, 0), end: offset(-1, 10, 0), recurrente: true },
+    { id: 6, salaId: 1, title: 'Conferencia Magistral', start: offset(3, 11, 0), end: offset(3, 13, 0), recurrente: false },
   ];
 }
 
@@ -27,13 +28,13 @@ const ReservationContext = createContext(null);
 
 export function ReservationProvider({ children }) {
   const [selectedDate, setSelectedDate] = useState(null);
-  const [modalOpen, setModalOpen]       = useState(false);
-  const [modalSlot, setModalSlot]       = useState({ start: null, end: null });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalSlot, setModalSlot] = useState({ start: null, end: null });
   const [visibleSalas, setVisibleSalas] = useState(new Set(ALL_SALA_IDS));
   const [reservations, setReservations] = useState(buildSampleEvents);
 
   // Info modal (read-only view of existing reservation)
-  const [infoModalOpen, setInfoModalOpen]           = useState(false);
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState(null);
 
   // Reasignar modal (admin edit form)

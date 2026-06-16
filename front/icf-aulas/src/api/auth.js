@@ -1,19 +1,27 @@
 import { createApiClient, HttpError } from './base.js';
+import { LoginRequestSchema, LoginResponseSchema } from '../schemas/index.js';
 
 /**
- * @typedef {Object} LoginPayload
- * @property {string} email    - Institutional email (@icf.unam.mx).
+ * @typedef {Object} LoginRequestSchema
+ * @property {string} username - Username.
  * @property {string} password - Plain-text password (max 128 chars).
  */
 
 /**
- * @typedef {Object} AuthTokens
+ * @typedef {Object} LoginResponseSchema
  * @property {string} token        - Signed JWT access token.
  * @property {string} refreshToken - Signed JWT refresh token.
  * @property {string} uuid         - Public UUID of the authenticated user.
  * @property {string} name         - Full display name.
  * @property {string} role         - Role name (e.g. "ADMIN", "MAESTRO").
  * @property {string} email        - Login email of the authenticated user.
+ */
+
+/**
+ * @typedef  {Object} HttpError
+ * @property {string} message        - Error message.
+ * @property {string} status         - Status code.
+ * @property {string} type           - Error type.
  */
 
 const BASE_PATH = '/api/v1/auth';
@@ -42,7 +50,7 @@ function resolveErrorMessage(error, overrides = {}) {
   const serverMessage = error.data?.message;
 
   const defaults = {
-    0:   'No se pudo conectar con el servidor. Verifica tu conexión.',
+    0: 'No se pudo conectar con el servidor. Verifica tu conexión.',
     400: 'Los datos enviados no son válidos.',
     401: 'Credenciales incorrectas.',
     403: 'No tienes permisos para realizar esta acción.',
@@ -61,18 +69,20 @@ function resolveErrorMessage(error, overrides = {}) {
 /**
  * Authenticates a user and returns access + refresh tokens with basic profile info.
  *
- * @param {LoginPayload} credentials - User credentials.
- * @returns {Promise<AuthTokens>} Resolved token pair and user info on success.
+ * @param {LoginRequestSchema} credentials - User credentials.
+ * @returns {Promise<LoginResponseSchema>} Resolved token pair and user info on success.
  * @throws {Error} With a user-facing message derived from the HTTP status code.
  *
  * @example
- * const session = await login({ email: 'user@icf.unam.mx', password: 'secret' });
+ * const session = await login({ username: [USERNAME]', password: '[PASSWORD]' });
  * localStorage.setItem('token', session.token);
  */
 export async function login(credentials) {
   try {
-    const { data } = await api.post(`${BASE_PATH}/login`, credentials);
-    return data.data;
+    const user = LoginRequestSchema.parse(credentials);
+    const { data } = await api.post(`${BASE_PATH}/login`, user);
+    const parsed = LoginResponseSchema.parse(data.data);
+    return parsed;
   } catch (error) {
     if (error instanceof HttpError) {
       throw new Error(resolveErrorMessage(error, {

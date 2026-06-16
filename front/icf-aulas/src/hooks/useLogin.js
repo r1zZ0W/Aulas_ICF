@@ -53,6 +53,7 @@ export function useLogin() {
     if (!validateAll()) return;
 
     setLoading(true);
+
     try {
       const session = await login({ username: form.username, password: form.password });
 
@@ -65,10 +66,16 @@ export function useLogin() {
       persistSession(session);
       navigate(route, { replace: true });
     } catch (err) {
+
+      const msg = (err instanceof Error && err.name === 'ZodError')
+        ? 'Ocurrió un problema de compatibilidad. Intenta de nuevo.'
+        : (err.message ?? 'Ocurrió un error inesperado.');
+
       setErrors((prev) => ({
         ...prev,
-        _form: err.message ?? 'Ocurrió un error inesperado. Intenta de nuevo.',
+        _form: msg,
       }));
+
     } finally {
       setLoading(false);
     }

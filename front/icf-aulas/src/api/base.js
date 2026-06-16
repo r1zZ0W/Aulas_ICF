@@ -101,8 +101,8 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
       data = await response.blob();
     }
 
-    // fetch NO lanza en 4xx/5xx; lo hacemos nosotros con el cuerpo ya parseado
-    // para que HttpError.data contenga el mensaje de error del servidor.
+    // Fetch does not throw on non-OK HTTP status. 
+    // We do it with parsed body for HttpError.data.
     if (!response.ok) {
       // Response interceptor: detect a revoked/expired/tampered session.
       // The guard `storedToken` prevents this branch from firing on intentionally
@@ -130,7 +130,7 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
     };
   }
 
-  // ── Métodos públicos ─────────────────────────────────────────────────────────
+  // ── Public methods ─────────────────────────────────────────────────────────
   return {
     /**
      * Sends a GET request.

@@ -13,7 +13,8 @@ export function useLogout() {
   const handleLogout = async () => {
     try {
       await logout(user.token, user.refreshToken);
-    } catch {
+    } catch (error) {
+      console.warn("Error al cerrar sesión:", error);
       // Server-side revocation failing (e.g. expired token) is non-fatal.
       // The local session is always cleared so the user is logged out locally.
     } finally {

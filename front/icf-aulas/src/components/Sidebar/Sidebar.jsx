@@ -6,7 +6,7 @@ import { PRIVATE_ROUTES } from '../../routes/routeConfig';
 import MiniCalendar from '../Calendar/MiniCalendar';
 import { useReservation } from '../../context/ReservationContext';
 import { SALAS } from '../../utils/salas';
-import { DISPLAYED_ROLES } from '../../utils/roles';
+import { DISPLAY_ROLE } from '../../utils/roles';
 
 import './Sidebar.css';
 import aulasHeader from '../../assets/aulas_header.png';
@@ -118,7 +118,7 @@ export default function Sidebar() {
           <div className="sidebar__avatar">{initials}</div>
           <div className="sidebar__user-info">
             <span className="sidebar__user-name">{user.name}</span>
-            <span className="sidebar__user-role">{DISPLAYED_ROLES[user.role]}</span>
+            <span className="sidebar__user-role">{DISPLAY_ROLE[user.role]}</span>
           </div>
         </div>
         <button className="sidebar__logout-btn" onClick={handleLogout}>
