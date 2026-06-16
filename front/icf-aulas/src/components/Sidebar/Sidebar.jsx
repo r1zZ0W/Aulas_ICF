@@ -60,7 +60,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* Mini Calendario */}
+      {/* Mini Calendar */}
       <div className="sidebar__section">
         <button
           className="sidebar__section-header"

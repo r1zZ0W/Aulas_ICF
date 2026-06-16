@@ -71,12 +71,21 @@ export function ReservationProvider({ children }) {
     setSelectedReservation(null);
   }, []);
 
+  /**
+   * Toggles the visibility of a classroom.
+   * @param {number} id - The ID of the classroom.
+   * @returns {Set<number>} - A set of visible classroom IDs.
+   */
   const toggleSala = useCallback((id) => {
     setVisibleSalas(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+
+      // If we are selecting the same classroom, we will show all the classrooms again.
+      if (prev.has(id) && prev.size === 1) {
+        return new Set(ALL_SALA_IDS)
+      }
+
+      // Otherwise, it will only show the selected classroom.
+      return new Set([id])
     });
   }, []);
 

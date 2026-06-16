@@ -12,7 +12,7 @@ import Error404 from '../errors/Error404.jsx';
 export default function PrivateRouter() {
     const { isAuthenticated, user } = useAuth();
 
-    // Protección extra en caso de que se renderice sin sesión
+    // Extra protection in case it renders without a session
     if (!isAuthenticated)
         return <Navigate to="/401" replace />;
 
@@ -21,7 +21,7 @@ export default function PrivateRouter() {
     return (
         <Routes>
             <Route element={<PrivateLayout />}>
-                {/* Rutas protegidas con control de roles */}
+                {/* Protected routes with role control */}
                 {PRIVATE_ROUTES.map(({ path, element, allowedRoles }) => (
                     <Route
                         key={path}
@@ -37,18 +37,18 @@ export default function PrivateRouter() {
                     />
                 ))}
 
-                {/* Páginas de error dentro del sistema */}
+                {/* Error pages inside the system */}
                 <Route path="/401" element={<Error401 />} />
                 <Route path="/403" element={<Error403 />} />
                 <Route path="/404" element={<Error404 />} />
 
-                {/* Ruta principal según el rol del usuario */}
+                {/* Main route according to user role */}
                 <Route
                     path="/"
                     element={<Navigate to={defaultRoute} replace />}
                 />
 
-                {/* Cualquier ruta que no exista dentro del sistema */}
+                {/* Any route that doesn't exist inside the system */}
                 <Route path="*" element={<Error404 />} />
             </Route>
         </Routes>

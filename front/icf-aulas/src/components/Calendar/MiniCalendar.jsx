@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { useReservation } from '../../context/ReservationContext';
 import './MiniCalendar.css';
 
-const DAYS   = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const MONTHS = [
-  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
-  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
+/**
+ * MiniCalendar - Renders a tiny version of the original calendar.
+ * @returns {JSX.Component}
+ */
 export default function MiniCalendar() {
   const today = new Date();
   const { selectedDate, openModal } = useReservation();
@@ -22,10 +26,10 @@ export default function MiniCalendar() {
     }
   }, [selectedDate]);
 
-  const year        = viewDate.getFullYear();
-  const month       = viewDate.getMonth();
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDay    = new Date(year, month, 1).getDay();
+  const firstDay = new Date(year, month, 1).getDay();
 
   const prevMonth = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
   const nextMonth = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
@@ -45,7 +49,7 @@ export default function MiniCalendar() {
 
   const isCurrentWeek = (d) => {
     const date = new Date(year, month, d);
-    const sun  = new Date(today);
+    const sun = new Date(today);
     sun.setDate(today.getDate() - today.getDay());
     sun.setHours(0, 0, 0, 0);
     const sat = new Date(sun);
@@ -90,11 +94,11 @@ export default function MiniCalendar() {
             onKeyDown={e => e.key === 'Enter' && handleDayClick(d)}
             className={[
               'mini-cal__cell',
-              !d                                                                         ? 'mini-cal__cell--empty'    : '',
-              d && isPast(d)                                                             ? 'mini-cal__cell--past'     : '',
-              d && !isPast(d) && isToday(d)                                             ? 'mini-cal__cell--today'    : '',
-              d && !isPast(d) && !isToday(d) && isSelected(d)                          ? 'mini-cal__cell--selected' : '',
-              d && !isPast(d) && !isToday(d) && !isSelected(d) && isCurrentWeek(d)     ? 'mini-cal__cell--week'     : '',
+              !d ? 'mini-cal__cell--empty' : '',
+              d && isPast(d) ? 'mini-cal__cell--past' : '',
+              d && !isPast(d) && isToday(d) ? 'mini-cal__cell--today' : '',
+              d && !isPast(d) && !isToday(d) && isSelected(d) ? 'mini-cal__cell--selected' : '',
+              d && !isPast(d) && !isToday(d) && !isSelected(d) && isCurrentWeek(d) ? 'mini-cal__cell--week' : '',
             ].filter(Boolean).join(' ')}
           >
             {d}
