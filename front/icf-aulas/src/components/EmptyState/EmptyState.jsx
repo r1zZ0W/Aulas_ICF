@@ -1,5 +1,5 @@
 import Button from "../Button/Button";
-import { GenericPlus } from "@moondesignsystem/react";
+import { Plus } from "lucide-react";
 import fantasmitaSvg from "../../assets/fantasmita.svg";
 import "./EmptyState.css";
 
@@ -29,7 +29,7 @@ export default function EmptyState({
       {showAction && (
         <Button
           variant="primary"
-          iconLeft={GenericPlus}
+          iconLeft={Plus}
           iconSize={24}
           onClick={onAction}
           className="empty-state__action"

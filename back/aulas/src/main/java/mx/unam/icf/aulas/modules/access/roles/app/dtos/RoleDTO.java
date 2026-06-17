@@ -5,11 +5,13 @@ import java.time.LocalDateTime;
 /**
  * Payload for transferring role catalog data across application layers.
  *
- * <p>Used for both request and response payloads. Roles are predefined catalog entries
+ * <p>Used as a response payload. Roles are predefined catalog entries
  * (e.g., {@code MAESTRO}, {@code ADMIN}) and are managed by administrators only.</p>
  *
+ * @param id   internal numeric identifier (used as {@code roleId} in write requests)
  * @param name unique role name
  */
 public record RoleDTO(
+        Long id,
         String name
 ) {}

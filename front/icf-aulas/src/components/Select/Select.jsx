@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Icon from "../Icon/Icon";
-import { ControlsChevronDown } from "@moondesignsystem/react";
+import { ChevronDown } from "lucide-react";
 import "./Select.css";
 
 /**
@@ -149,7 +149,7 @@ export default function Select({
       >
         <span className="select-wrap__value">{displayText}</span>
         <Icon
-          icon={ControlsChevronDown}
+          icon={ChevronDown}
           size={size === "sm" ? 18 : 20}
           className={`select-wrap__icon ${open ? "select-wrap__icon--open" : ""}`}
           aria-hidden

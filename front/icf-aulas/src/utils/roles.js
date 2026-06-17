@@ -3,8 +3,8 @@
  * Add new roles here — all role checks downstream consume this map.
  */
 export const ROLES = {
-  ADMIN: 'admin',
-  MAESTRO: 'teacher',
+  ADMIN: 'ADMIN',
+  MAESTRO: 'MAESTRO',
 };
 
 /**

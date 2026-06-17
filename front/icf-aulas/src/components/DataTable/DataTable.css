@@ -1,0 +1,62 @@
+/* ── DataTable ─────────────────────────────────────────────────────────────── */
+
+.data-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+}
+
+/* Head */
+.data-table__head {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.data-table__th {
+  padding: 11px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--moon-trunks, #6a7282);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.data-table__th:first-child {
+  padding-left: 24px;
+}
+
+/* Body rows */
+.data-table__row {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background 0.12s;
+}
+
+.data-table__row:last-child {
+  border-bottom: none;
+}
+
+.data-table__row:hover {
+  background: #f9fafb;
+}
+
+.data-table__td {
+  padding: 16px;
+  color: var(--moon-bulma, #232222);
+  vertical-align: middle;
+}
+
+.data-table__td:first-child {
+  padding-left: 24px;
+}
+
+/* States (loading / empty) */
+.data-table__state {
+  padding: 8px 0 16px;
+}

@@ -1,23 +1,23 @@
 /**
- * @fileoverview Validation schemas for user API responses.
+ * @fileoverview Validation schema for user API responses.
  */
-import { z } from 'zod'
-
-/** Institutional email domain restriction pattern ensuring only university domains (@icf.unam.mx) are registered. */
-const ICF_EMAIL_REGEX = /^[^\s@]+@icf\.unam\.mx$/
+import { z } from 'zod';
 
 /**
  * Schema for validating and parsing user information retrieved from administrative queries.
- * Contains user identifier, active status, creation dates, and role name metadata.
+ * Matches the backend UserResponseDTO exactly.
  */
 export const UserResponseSchema = z.object({
   uuid: z.string().uuid(),
+  matricula: z.string().nullable().optional(),
   firstName: z.string(),
   lastNames: z.string(),
+  username: z.string(),
   email: z.string().email(),
+  departamento: z.string().nullable().optional(),
   roleName: z.string(),
   isActive: z.boolean(),
-  createdAt: z.string().datetime()
-})
+  createdAt: z.string(),
+});
 
 export default UserResponseSchema;

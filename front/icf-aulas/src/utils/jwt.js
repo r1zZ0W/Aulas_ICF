@@ -37,7 +37,7 @@ export function decodeToken(token) {
  *
  * @example
  * const role = getRoleFromToken(localStorage.getItem('token'));
- * // role === 'admin' | 'teacher' | null
+ * // role === 'ADMIN' | 'MAESTRO' | null
  */
 export function getRoleFromToken(token) {
   return decodeToken(token)?.role ?? null;

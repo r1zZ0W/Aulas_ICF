@@ -1,0 +1,42 @@
+/* ── Badge ─────────────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 11px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  font-family: var(--moon-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* Activo — verde */
+.badge--success {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #059669;
+}
+
+/* Inactivo — rojo */
+.badge--danger {
+  background: #fef2f2;
+  border-color: #ffc9c9;
+  color: #c10007;
+}
+
+/* Administrador — azul ICF */
+.badge--primary {
+  background: #d7e2f1;
+  border-color: var(--moon-piccolo, #005687);
+  color: var(--moon-piccolo, #005687);
+}
+
+/* Usuario / Maestro — gris */
+.badge--neutral {
+  background: #f3f4f6;
+  border-color: #d1d5dc;
+  color: #364153;
+}

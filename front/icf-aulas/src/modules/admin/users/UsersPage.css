@@ -1,0 +1,250 @@
+/* ── UsersPage ─────────────────────────────────────────────────────────────── */
+
+.users-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 48px;
+  background: #f9fafb;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Header -------------------------------------------------------------------- */
+
+.users-page__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.users-page__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #101828;
+  margin: 0 0 4px;
+  line-height: 1.3;
+}
+
+.users-page__subtitle {
+  font-size: 15px;
+  color: var(--moon-trunks, #6a7282);
+  margin: 0;
+}
+
+/* Stat cards ---------------------------------------------------------------- */
+
+.users-page__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-top: 28px;
+}
+
+@media (max-width: 1100px) {
+  .users-page__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .users-page__stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.users-page__stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 24px;
+  background: var(--moon-goku, #fff);
+  border: 1px solid #e5e7eb;
+  border-radius: var(--moon-radius-s-lg, 16px);
+  box-shadow: 0px 1px 1.5px rgba(0,0,0,0.1), 0px 1px 1px rgba(0,0,0,0.1);
+}
+
+.users-page__stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.users-page__stat-icon--blue   { background: #e6f0f5; color: var(--moon-piccolo, #005687); }
+.users-page__stat-icon--green  { background: #ecfdf5; color: #059669; }
+.users-page__stat-icon--red    { background: #fef2f2; color: #c10007; }
+.users-page__stat-icon--purple { background: #faf5ff; color: #7c3aed; }
+
+.users-page__stat-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--moon-trunks, #6a7282);
+  margin: 0 0 2px;
+}
+
+.users-page__stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #101828;
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Table card ---------------------------------------------------------------- */
+
+.users-page__table-card {
+  margin-top: 28px;
+  background: var(--moon-goku, #fff);
+  border: 1px solid #e5e7eb;
+  border-radius: var(--moon-radius-s-lg, 16px);
+  box-shadow: 0px 1px 3px rgba(0,0,0,0.1), 0px 1px 2px -1px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.users-page__table-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Avatar -------------------------------------------------------------------- */
+
+.users-page__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #d7e2f1;
+  color: var(--moon-piccolo, #005687);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.users-page__user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.users-page__user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #101828;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.users-page__user-email {
+  font-size: 13px;
+  color: var(--moon-trunks, #6a7282);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Action buttons ------------------------------------------------------------ */
+
+.users-page__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.users-page__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  color: var(--moon-trunks, #6a7282);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+
+.users-page__action-btn:hover {
+  background: var(--moon-gohan, #efefef);
+  color: var(--moon-bulma, #232222);
+}
+
+.users-page__action-btn--danger:hover {
+  background: var(--moon-chichi-10, rgba(255,78,100,0.1));
+  color: var(--moon-chichi, #ff4e64);
+}
+
+/* Pagination ---------------------------------------------------------------- */
+
+.users-page__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-top: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.users-page__pagination-info {
+  font-size: 14px;
+  color: var(--moon-trunks, #6a7282);
+  margin: 0;
+}
+
+.users-page__pagination-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.users-page__page-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--moon-font-sans);
+  color: #4a5565;
+  background: var(--moon-goku, #fff);
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.users-page__page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.users-page__page-btn:not(:disabled):hover {
+  background: var(--moon-gohan, #efefef);
+}
+
+/* Form errors --------------------------------------------------------------- */
+
+.users-page__form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 580px) {
+  .users-page__form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.users-page__form-grid--full {
+  grid-column: 1 / -1;
+}

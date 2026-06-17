@@ -1,4 +1,4 @@
-import { GenericSearch } from "@moondesignsystem/react";
+import { Search } from "lucide-react";
 import Icon from "../Icon/Icon";
 import "./Buscador.css";
 
@@ -9,7 +9,7 @@ export default function Buscador({ value, onChange, placeholder = "Buscar...", .
         className="buscador__icon position-absolute top-50 start-0 translate-middle-y ms-3 d-flex align-items-center justify-content-center"
         aria-hidden
       >
-        <Icon icon={GenericSearch} size={30} />
+        <Icon icon={Search} size={30} />
       </span>
       <input
         type="search"

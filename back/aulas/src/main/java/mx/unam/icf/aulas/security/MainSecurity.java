@@ -67,13 +67,16 @@ public class MainSecurity {
                         .contentTypeOptions(Customizer.withDefaults())
             )
             .authorizeHttpRequests(auth -> {
-                auth.requestMatchers("/api/v1/auth/**").permitAll();
+                // /error must be public so that exceptions from filters (e.g. in the JWT
+                // filter chain) don't produce a 401 that the frontend mistakes for an
+                // expired session and triggers an auto-logout.
+                auth.requestMatchers("/api/v1/auth/**", "/error").permitAll();
                 // Swagger/OpenAPI is only publicly accessible in the dev profile.
                 // In production the springdoc properties disable the endpoints entirely;
-                // this rule adds defence-in-depth at the security layer.
-                if (env.acceptsProfiles(Profiles.of("dev"))) {
+                // this rule adds defense-in-depth at the security layer.
+                if (env.acceptsProfiles(Profiles.of("dev")))
                     auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll();
-                }
+
                 auth.anyRequest().authenticated();
             })
             // Wire JSON error responses for the two security-layer rejection paths:

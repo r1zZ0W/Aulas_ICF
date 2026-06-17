@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import Sidebar from '../components/Sidebar/Sidebar';
 import ReservaModal from '../components/ReservaModal/ReservaModal';
 import ReservaInfoModal from '../components/ReservaInfoModal/ReservaInfoModal';
@@ -39,6 +40,8 @@ function Layout() {
         onClose={closeReasignar}
         reservation={selectedReservation}
       />
+
+      <Toaster position="bottom-right" richColors={false} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 package mx.unam.icf.aulas.modules.access.users.infrastructure;
 
 import mx.unam.icf.aulas.modules.access.users.domain.User;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
@@ -17,10 +18,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** Finds a user by email, ignoring case, for authentication lookups. */
     Optional<User> findByEmailIgnoreCase(String email);
 
-    /** Finds a user by username, ignoring case, for uniqueness checks. */
+    /**
+     * Finds a user by username for Spring Security's authentication process.
+     * The {@code role} association is eagerly joined in the same query so that
+     * {@code UserDetailsImp} can read {@code role.getName()} after the session closes
+     * (the security filter chain runs outside the Open-Session-In-View scope).
+     */
+    @EntityGraph(attributePaths = "role")
     Optional<User> findByUsernameIgnoreCase(String username);
 
-    /** Finds a user by their public UUID for external API lookups. */
+    /**
+     * Finds a user by their public UUID, used on every authenticated request
+     * to verify the account is still active.
+     * The {@code role} association is eagerly joined in the same query for the
+     * same reason as {@link #findByUsernameIgnoreCase}.
+     */
+    @EntityGraph(attributePaths = "role")
     Optional<User> findByUuid(UUID uuid);
 
     /** Finds a user by their unique matrícula. */
