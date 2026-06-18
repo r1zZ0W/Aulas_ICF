@@ -40,6 +40,8 @@ export default function PrivateRouter() {
                 {/* Error pages inside the system */}
                 <Route path="/401" element={<Error401 />} />
                 <Route path="/403" element={<Error403 />} />
+                {/* Backwards-compatible alias used in some guards/components */}
+                <Route path="/access-denied" element={<Error403 />} />
                 <Route path="/404" element={<Error404 />} />
 
                 {/* Main route according to user role */}
@@ -47,6 +49,9 @@ export default function PrivateRouter() {
                     path="/"
                     element={<Navigate to={defaultRoute} replace />}
                 />
+
+                {/* Dashboard alias: redirect to role-specific landing */}
+                <Route path="/dashboard" element={<Navigate to={defaultRoute} replace />} />
 
                 {/* Any route that doesn't exist inside the system */}
                 <Route path="*" element={<Error404 />} />

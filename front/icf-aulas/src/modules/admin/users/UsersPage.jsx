@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, UserCheck, UserX, ShieldCheck, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Users, ShieldCheck, Plus, Pencil, Trash2 } from 'lucide-react';
 
 import { useUsers }          from '../../../hooks/useUsers';
 import { useUsersForm }      from '../../../hooks/useUsersForm';
@@ -109,7 +109,7 @@ export default function UsersPage() {
     {
       key: 'usuario',
       header: 'Usuario',
-      width: '32%',
+      width: '28%',
       render: (row) => (
         <div className="users-page__user-cell">
           <span className="users-page__avatar">{getInitials(row)}</span>
@@ -123,13 +123,13 @@ export default function UsersPage() {
     {
       key: 'departamento',
       header: 'Departamento',
-      width: '20%',
+      width: '16%',
       render: (row) => row.departamento || '—',
     },
     {
       key: 'roleName',
       header: 'Rol',
-      width: '16%',
+      width: '14%',
       render: (row) => (
         <Badge variant={roleBadgeVariant(row.roleName)}>{roleLabel(row.roleName)}</Badge>
       ),
@@ -137,7 +137,7 @@ export default function UsersPage() {
     {
       key: 'isActive',
       header: 'Estado',
-      width: '14%',
+      width: '12%',
       render: (row) => (
         <Badge variant={row.isActive ? 'success' : 'danger'}>
           {row.isActive ? 'Activo' : 'Inactivo'}
@@ -145,9 +145,25 @@ export default function UsersPage() {
       ),
     },
     {
+      key: 'createdAt',
+      header: 'Registro',
+      width: '16%',
+      render: (row) => {
+        if (!row.createdAt) return '—';
+        const date = new Date(row.createdAt);
+        return date.toLocaleDateString('es-MX', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      },
+    },
+    {
       key: 'acciones',
       header: 'Acciones',
-      width: '10%',
+      width: '14%',
       align: 'right',
       render: (row) => (
         <div className="users-page__actions">
@@ -194,45 +210,27 @@ export default function UsersPage() {
         </Button>
       </div>
 
-      {/* Stats — sourced from GET /api/v1/users/stats (full corpus counts) */}
-      <div className="users-page__stats">
-        <Card className="users-page__stat-card">
-          <span className="users-page__stat-icon users-page__stat-icon--blue">
-            <Users size={24} />
-          </span>
-          <div>
-            <p className="users-page__stat-label">Total Usuarios</p>
-            <p className="users-page__stat-value">{stats.total}</p>
-          </div>
-        </Card>
-        <Card className="users-page__stat-card">
-          <span className="users-page__stat-icon users-page__stat-icon--green">
-            <UserCheck size={24} />
-          </span>
-          <div>
-            <p className="users-page__stat-label">Activos</p>
-            <p className="users-page__stat-value">{stats.active}</p>
-          </div>
-        </Card>
-        <Card className="users-page__stat-card">
-          <span className="users-page__stat-icon users-page__stat-icon--red">
-            <UserX size={24} />
-          </span>
-          <div>
-            <p className="users-page__stat-label">Inactivos</p>
-            <p className="users-page__stat-value">{stats.inactive}</p>
-          </div>
-        </Card>
-        <Card className="users-page__stat-card">
-          <span className="users-page__stat-icon users-page__stat-icon--purple">
-            <ShieldCheck size={24} />
-          </span>
-          <div>
-            <p className="users-page__stat-label">Administradores</p>
-            <p className="users-page__stat-value">{stats.admins}</p>
-          </div>
-        </Card>
-      </div>
+       {/* Stats — sourced from GET /api/v1/users/stats (full corpus counts) */}
+       <div className="users-page__stats">
+         <Card className="users-page__stat-card">
+           <span className="users-page__stat-icon users-page__stat-icon--blue">
+             <Users size={24} />
+           </span>
+           <div>
+             <p className="users-page__stat-label">Total de Usuarios</p>
+             <p className="users-page__stat-value">{stats.total}</p>
+           </div>
+         </Card>
+         <Card className="users-page__stat-card">
+           <span className="users-page__stat-icon users-page__stat-icon--purple">
+             <ShieldCheck size={24} />
+           </span>
+           <div>
+             <p className="users-page__stat-label">Total de Administradores</p>
+             <p className="users-page__stat-value">{stats.admins}</p>
+           </div>
+         </Card>
+       </div>
 
       {/* Table card */}
       <div className="users-page__table-card">

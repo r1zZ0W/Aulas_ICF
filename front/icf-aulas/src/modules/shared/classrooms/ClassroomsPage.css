@@ -1,0 +1,42 @@
+/* Styles adapted from UsersPage to match visual system */
+
+.classrooms-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 48px;
+  background: #f9fafb;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.classrooms-page__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.classrooms-page__title { font-size: 24px; font-weight: 700; color: #101828; margin: 0 0 4px; }
+.classrooms-page__subtitle { font-size: 15px; color: #6a7282; margin: 0; }
+
+.classrooms-page__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 28px; }
+@media (max-width: 900px) { .classrooms-page__stats { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 620px) { .classrooms-page__stats { grid-template-columns: 1fr; } }
+
+.classrooms-page__stat-card { display:flex; align-items:center; gap:16px; padding:22px 24px; background:#fff; border:1px solid #e5e7eb; border-radius:16px; }
+.classrooms-page__stat-label { font-size:13px; font-weight:500; color:#6a7282; margin:0 0 2px; }
+.classrooms-page__stat-value { font-size:24px; font-weight:700; color:#101828; margin:0; }
+
+.classrooms-page__table-card { margin-top:28px; background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow: 0px 1px 3px rgba(0,0,0,0.1); overflow:hidden; }
+.classrooms-page__table-toolbar { display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid #e5e7eb; }
+
+.classrooms__actions { display:flex; gap:8px; justify-content:flex-end; }
+.classrooms__action-btn { display:inline-flex; align-items:center; justify-content:center; padding:6px; border:none; background:transparent; border-radius:10px; color:#6a7282; cursor:pointer; }
+.classrooms__action-btn:hover { background:#efefef; color:#232222; }
+
+.classrooms-page__form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:580px) { .classrooms-page__form-grid { grid-template-columns:1fr; } }
+.classrooms-page__form-grid--full { grid-column: 1 / -1; }
+
