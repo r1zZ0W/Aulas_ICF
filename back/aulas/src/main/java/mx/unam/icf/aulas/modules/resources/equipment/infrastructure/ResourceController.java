@@ -1,7 +1,10 @@
 package mx.unam.icf.aulas.modules.resources.equipment.infrastructure;
 
 import lombok.RequiredArgsConstructor;
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.resources.equipment.app.ResourceService;
 import mx.unam.icf.aulas.modules.resources.equipment.app.dtos.ResourceDTO;
@@ -16,8 +19,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * REST controller for managing the equipment resource catalog.
@@ -34,12 +35,19 @@ public class ResourceController implements ResponseHandler {
     private final ResourceService service;
 
     /**
-     * Retrieves all equipment resources in the catalog.
-     * GET /api/v1/resources
+     * Retrieves all equipment resources in the catalog, paginated.
+     * GET /api/v1/resources[?page=0&size=20&sort=name&direction=asc]
+     *
+     * <p>Allowed sort fields: {@code createdAt}, {@code name}.</p>
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ResourceDTO>>> findAll() {
-        return ok(service.findAll());
+    public ResponseEntity<ApiResponse<PagedResultDTO<ResourceDTO>>> findAll(
+            @SortWhitelist(
+                    value = {"createdAt", "name"},
+                    defaultSort = "name",
+                    defaultDirection = "asc")
+            PageCriteria criteria) {
+        return ok(service.findAll(criteria.toPageable()));
     }
 
     /**

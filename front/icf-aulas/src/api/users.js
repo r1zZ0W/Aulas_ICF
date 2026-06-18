@@ -8,8 +8,15 @@
  *  - Map HttpErrors to user-facing Spanish messages.
  */
 import { createApiClient, HttpError } from './base.js';
-import { UserResponseSchema, UserCreateSchema, UserUpdateSchema, RoleResponseSchema } from '../schemas/index.js';
-import { z } from 'zod';
+import {
+  UserResponseSchema,
+  UserCreateSchema,
+  UserUpdateSchema,
+  UserStatsSchema,
+  RoleResponseSchema,
+  PagedResultSchema,
+} from '../schemas/index.js';
+import { buildPageParams } from '../utils/queryUtils.js';
 
 const api = createApiClient({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
@@ -27,7 +34,7 @@ function resolveErrorMessage(error, overrides = {}) {
   const serverMessage = error.data?.message;
   const defaults = {
     0:   'No se pudo conectar con el servidor. Verifica tu conexión.',
-    400: 'Los datos enviados no son válidos.',
+    400: serverMessage || 'Los datos enviados no son válidos.',
     401: 'No autorizado.',
     403: 'No tienes permisos para realizar esta acción.',
     404: 'El usuario solicitado no existe.',
@@ -35,19 +42,46 @@ function resolveErrorMessage(error, overrides = {}) {
     422: 'Los datos enviados no pudieron ser procesados.',
     500: 'Error interno del servidor. Intenta de nuevo más tarde.',
   };
-  return serverMessage || defaults[error.status] || `Error inesperado (${error.status}).`;
+  return defaults[error.status] || serverMessage || `Error inesperado (${error.status}).`;
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 /**
- * Fetches all users. ADMIN only.
- * @returns {Promise<import('../schemas/user/userResponse.js').UserResponseSchema[]>}
+ * Fetches a paginated, optionally-filtered list of users. ADMIN only.
+ *
+ * When called with no args the backend returns all users in a single large page
+ * (the same PagedResultDTO contract applies).
+ *
+ * @param {object} [params={}]
+ * @param {string}       [params.search]    - Free-text filter over name/email/username/matricula.
+ * @param {number}       [params.page]      - Zero-based page index.
+ * @param {number}       [params.size]      - Page size (1–100).
+ * @param {string}       [params.sort]      - Sort field. Allowed: createdAt, email, username, matricula, firstName.
+ * @param {'asc'|'desc'} [params.direction] - Sort direction.
+ * @returns {Promise<import('../schemas/pagedResult.js').PagedResultSchema>} Parsed paged result.
  */
-export async function getUsers() {
+export async function getUsers({ search, page, size, sort, direction } = {}) {
   try {
-    const { data } = await api.get('/api/v1/users');
-    return z.array(UserResponseSchema).parse(data.data ?? data);
+    const qs = buildPageParams({ search, page, size, sort, direction });
+    const { data } = await api.get(`/api/v1/users${qs}`);
+    return PagedResultSchema(UserResponseSchema).parse(data.data);
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
+}
+
+/**
+ * Fetches aggregated user statistics for the admin dashboard. ADMIN only.
+ * GET /api/v1/users/stats
+ *
+ * @returns {Promise<{ total: number, active: number, inactive: number, admins: number }>}
+ */
+export async function getUserStats() {
+  try {
+    const { data } = await api.get('/api/v1/users/stats');
+    return UserStatsSchema.parse(data.data);
   } catch (error) {
     if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
     throw error;
@@ -122,7 +156,7 @@ export async function deactivateUser(uuid) {
 export async function getRoles() {
   try {
     const { data } = await api.get('/api/v1/roles');
-    return z.array(RoleResponseSchema).parse(data.data ?? data);
+    return RoleResponseSchema.array().parse(data.data ?? data);
   } catch (error) {
     if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
     throw error;

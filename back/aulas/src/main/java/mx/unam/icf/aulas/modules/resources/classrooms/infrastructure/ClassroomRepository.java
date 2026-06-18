@@ -1,6 +1,8 @@
 package mx.unam.icf.aulas.modules.resources.classrooms.infrastructure;
 
 import mx.unam.icf.aulas.modules.resources.classrooms.domain.Classroom;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -37,4 +39,7 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Long> {
 
     /** Returns all classrooms that are currently active (isActive = true). */
     List<Classroom> findByIsActiveTrue();
+
+    /** Returns a page of active classrooms, used by the paginated Maestro endpoint. */
+    Page<Classroom> findByIsActiveTrue(Pageable pageable);
 }

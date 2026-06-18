@@ -2,7 +2,10 @@ package mx.unam.icf.aulas.modules.reservations.groups.infrastructure;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
 import mx.unam.icf.aulas.modules.reservations.groups.app.ReservationGroupService;
@@ -22,7 +25,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -39,13 +41,20 @@ public class ReservationGroupController implements ResponseHandler {
     private final ReservationGroupService service;
 
     /**
-     * Retrieves all reservation groups. Requires ADMIN role.
-     * GET /api/v1/reservation-groups
+     * Retrieves all reservation groups, paginated. Requires ADMIN role.
+     * GET /api/v1/reservation-groups[?page=0&size=20&sort=createdAt&direction=desc]
+     *
+     * <p>Allowed sort fields: {@code createdAt}, {@code status}.</p>
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ReservationGroupResponseDTO>>> findAll() {
-        return ok(service.findAll());
+    public ResponseEntity<ApiResponse<PagedResultDTO<ReservationGroupResponseDTO>>> findAll(
+            @SortWhitelist(
+                    value = {"createdAt", "status"},
+                    defaultSort = "createdAt",
+                    defaultDirection = "desc")
+            PageCriteria criteria) {
+        return ok(service.findAll(criteria.toPageable()));
     }
 
     /**
@@ -60,19 +69,26 @@ public class ReservationGroupController implements ResponseHandler {
     }
 
     /**
-     * Retrieves all reservation groups for a specific user.
+     * Retrieves reservation groups for a specific user, paginated.
      * ADMIN users may query any user; a Maestro may only query their own groups.
-     * GET /api/v1/reservation-groups/user?userUuid={uuid}
+     * GET /api/v1/reservation-groups/user?userUuid={uuid}[&page=0&size=20&sort=createdAt&direction=desc]
+     *
+     * <p>Allowed sort fields: {@code createdAt}, {@code status}.</p>
      *
      * @throws AccessDeniedException when a non-admin attempts to view another user's groups
      */
     @GetMapping("/user")
-    public ResponseEntity<ApiResponse<List<ReservationGroupResponseDTO>>> findByUser(
+    public ResponseEntity<ApiResponse<PagedResultDTO<ReservationGroupResponseDTO>>> findByUser(
             @RequestParam UUID userUuid,
-            @AuthenticationPrincipal UserDetailsImp principal) {
+            @AuthenticationPrincipal UserDetailsImp principal,
+            @SortWhitelist(
+                    value = {"createdAt", "status"},
+                    defaultSort = "createdAt",
+                    defaultDirection = "desc")
+            PageCriteria criteria) {
         if (!"ADMIN".equals(principal.getRoleName()) && !userUuid.equals(principal.getUuid()))
             throw new AccessDeniedException("You can only view your own reservation groups");
-        return ok(service.findByUser(userUuid));
+        return ok(service.findByUser(userUuid, criteria.toPageable()));
     }
 
     /**

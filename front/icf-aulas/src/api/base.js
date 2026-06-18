@@ -46,11 +46,14 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
    * @param {Object} [options={}] - Extra request options.
    * @param {*} [options.body] - The request payload (automatically serialized to JSON if it is a plain object).
    * @param {Record<string, string>} [options.headers] - Request-specific headers.
+   * @param {boolean} [options.skipAuthRedirect=false] - When true, a 401/403 response will NOT trigger the
+   *   forced logout redirect. Use this for endpoints that intentionally send their own Authorization header
+   *   (e.g. the logout endpoint) so a server-side 401 doesn't cause a redirect loop.
    * @param {Object} [options.fetchOptions] - Additional options to pass to the native fetch call.
    * @returns {Promise<{data: *, status: number, headers: Headers, ok: boolean}>} The response object.
    * @throws {HttpError} If a network failure occurs or the server returns a non-OK status.
    */
-  async function request(method, url, { body, headers: localHeaders = {}, ...fetchOptions } = {}) {
+  async function request(method, url, { body, headers: localHeaders = {}, skipAuthRedirect = false, ...fetchOptions } = {}) {
     const fullURL = url.startsWith('http') ? url : `${baseURL}${url}`;
 
     const mergedHeaders = {
@@ -107,7 +110,10 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
       // Response interceptor: detect a revoked/expired/tampered session.
       // The guard `storedToken` prevents this branch from firing on intentionally
       // unauthenticated requests like POST /auth/login (401 = wrong credentials).
-      if ((response.status === 401 || response.status === 403) && storedToken) {
+      // `skipAuthRedirect` lets callers (e.g. the logout endpoint) opt-out so a
+      // server-side 401 during logout doesn't re-trigger the redirect while the
+      // local session is already being cleared.
+      if ((response.status === 401 || response.status === 403) && storedToken && !skipAuthRedirect) {
         localStorage.clear();
         window.location.href = '/login';
         // Return a promise that never resolves so no downstream code runs while

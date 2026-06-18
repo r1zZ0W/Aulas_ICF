@@ -4,6 +4,7 @@ import { getRoleFromToken } from '../utils/jwt';
 
 const AuthContext = createContext(null);
 
+
 /**
  * Reads persisted fields from localStorage and derives the role from the JWT.
  * The role is NEVER read as a raw localStorage string — it always comes from
@@ -16,7 +17,9 @@ function readPersistedSession() {
   return { ...base, role: getRoleFromToken(base.token) };
 }
 
-/** Builds an empty session object with all keys set to null. */
+/** Builds an empty session object with all keys set to null. 
+ * @returns {import('../api/auth.js').LoginResponseSchema} An empty session object.
+*/
 function emptySession() {
   return {
     ...Object.fromEntries(Object.values(SESSION_KEYS).map((key) => [key, null])),
@@ -36,7 +39,7 @@ export function AuthProvider({ children }) {
    * The role is intentionally excluded from localStorage — it is always
    * re-derived from the JWT so the client string cannot be tampered with.
    *
-   * @param {import('../api/auth.js').AuthTokens} sessionData
+   * @param {import('../api/auth.js').LoginResponseSchema} sessionData
    */
   const persistSession = useCallback((sessionData) => {
     Object.values(SESSION_KEYS).forEach((key) => {

@@ -8,7 +8,7 @@ import { z } from 'zod';
  * Matches the backend UserResponseDTO exactly.
  */
 export const UserResponseSchema = z.object({
-  uuid: z.string().uuid(),
+  uuid: z.string(),
   matricula: z.string().nullable().optional(),
   firstName: z.string(),
   lastNames: z.string(),

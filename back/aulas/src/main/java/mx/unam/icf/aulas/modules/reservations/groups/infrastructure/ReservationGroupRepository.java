@@ -1,6 +1,9 @@
 package mx.unam.icf.aulas.modules.reservations.groups.infrastructure;
 
 import mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroup;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -20,4 +23,21 @@ public interface ReservationGroupRepository extends JpaRepository<ReservationGro
 
     /** Returns all reservation groups belonging to a given user. */
     List<ReservationGroup> findByUserUuid(UUID userUuid);
+
+    /**
+     * Returns a page of all reservation groups with user and semester eagerly loaded.
+     * Used by the paginated admin listing endpoint.
+     */
+    @Override
+    @EntityGraph(attributePaths = {"user", "semester"})
+    Page<ReservationGroup> findAll(Pageable pageable);
+
+    /**
+     * Returns a page of reservation groups belonging to a given user.
+     *
+     * @param userUuid public UUID of the target user
+     * @param pageable pagination and sort criteria
+     */
+    @EntityGraph(attributePaths = {"user", "semester"})
+    Page<ReservationGroup> findByUserUuid(UUID userUuid, Pageable pageable);
 }

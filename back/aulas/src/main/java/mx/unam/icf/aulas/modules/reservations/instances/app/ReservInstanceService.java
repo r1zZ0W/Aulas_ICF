@@ -1,9 +1,12 @@
 package mx.unam.icf.aulas.modules.reservations.instances.app;
 
 import lombok.RequiredArgsConstructor;
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
+import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.kernel.infrastructure.services.NotificationService;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import mx.unam.icf.aulas.modules.academic.timeslots.domain.TimeSlot;
 import mx.unam.icf.aulas.modules.academic.timeslots.infrastructure.TimeSlotRepository;
@@ -67,14 +70,28 @@ public class ReservInstanceService {
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
+    /**
+     * Returns a page of all reservation instances in the system.
+     *
+     * @param pageable pagination and sort criteria
+     * @return a {@link PagedResultDTO} containing the requested page
+     */
     @Transactional(readOnly = true)
-    public List<ReservInstanceResponseDTO> findAll() {
-        return mapper.toDtoList(repository.findAll());
+    public PagedResultDTO<ReservInstanceResponseDTO> findAll(Pageable pageable) {
+        return PageMapper.toDto(repository.findAll(pageable), mapper::toDtoList);
     }
 
+    /**
+     * Returns a page of reservation instances awaiting review (status {@code PENDIENTE}).
+     *
+     * @param pageable pagination and sort criteria
+     * @return a {@link PagedResultDTO} containing the requested page
+     */
     @Transactional(readOnly = true)
-    public List<ReservInstanceResponseDTO> findPending() {
-        return mapper.toDtoList(repository.findByStatus(ReservInstanceStatus.PENDIENTE));
+    public PagedResultDTO<ReservInstanceResponseDTO> findPending(Pageable pageable) {
+        return PageMapper.toDto(
+                repository.findByStatus(ReservInstanceStatus.PENDIENTE, pageable),
+                mapper::toDtoList);
     }
 
     @Transactional(readOnly = true)
@@ -85,9 +102,16 @@ public class ReservInstanceService {
         );
     }
 
+    /**
+     * Returns a page of reservation instances belonging to a specific user.
+     *
+     * @param userUuid public UUID of the target user
+     * @param pageable pagination and sort criteria
+     * @return a {@link PagedResultDTO} containing the requested page
+     */
     @Transactional(readOnly = true)
-    public List<ReservInstanceResponseDTO> findByUser(UUID userUuid) {
-        return mapper.toDtoList(repository.findByUserUuid(userUuid));
+    public PagedResultDTO<ReservInstanceResponseDTO> findByUser(UUID userUuid, Pageable pageable) {
+        return PageMapper.toDto(repository.findByUserUuid(userUuid, pageable), mapper::toDtoList);
     }
 
     @Transactional(readOnly = true)

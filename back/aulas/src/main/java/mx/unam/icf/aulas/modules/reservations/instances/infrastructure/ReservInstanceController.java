@@ -2,7 +2,10 @@ package mx.unam.icf.aulas.modules.reservations.instances.infrastructure;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
 import mx.unam.icf.aulas.modules.reservations.instances.app.ReservInstanceService;
@@ -43,22 +46,36 @@ public class ReservInstanceController implements ResponseHandler {
     private final ReservInstanceService service;
 
     /**
-     * Retrieves all reservation instances in the system.
-     * GET /api/v1/reservations
+     * Retrieves all reservation instances in the system, paginated.
+     * GET /api/v1/reservations[?page=0&size=20&sort=date&direction=desc]
+     *
+     * <p>Allowed sort fields: {@code createdAt}, {@code date}, {@code status}.</p>
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ReservInstanceResponseDTO>>> findAll() {
-        return ok(service.findAll());
+    public ResponseEntity<ApiResponse<PagedResultDTO<ReservInstanceResponseDTO>>> findAll(
+            @SortWhitelist(
+                    value = {"createdAt", "date", "status"},
+                    defaultSort = "date",
+                    defaultDirection = "desc")
+            PageCriteria criteria) {
+        return ok(service.findAll(criteria.toPageable()));
     }
 
     /**
-     * Retrieves all reservation instances awaiting review. Requires ADMIN role.
-     * GET /api/v1/reservations/pending
+     * Retrieves all reservation instances awaiting review, paginated. Requires ADMIN role.
+     * GET /api/v1/reservations/pending[?page=0&size=20&sort=date&direction=desc]
+     *
+     * <p>Allowed sort fields: {@code createdAt}, {@code date}, {@code status}.</p>
      */
     @GetMapping("/pending")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ReservInstanceResponseDTO>>> findPending() {
-        return ok(service.findPending());
+    public ResponseEntity<ApiResponse<PagedResultDTO<ReservInstanceResponseDTO>>> findPending(
+            @SortWhitelist(
+                    value = {"createdAt", "date", "status"},
+                    defaultSort = "date",
+                    defaultDirection = "desc")
+            PageCriteria criteria) {
+        return ok(service.findPending(criteria.toPageable()));
     }
 
     /**
@@ -73,19 +90,26 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
-     * Retrieves all reservation instances for a specific user.
+     * Retrieves reservation instances for a specific user, paginated.
      * ADMIN users may query any user; a Maestro may only query their own reservations.
-     * GET /api/v1/reservations/user/{userUuid}
+     * GET /api/v1/reservations/user/{userUuid}[?page=0&size=20&sort=date&direction=desc]
+     *
+     * <p>Allowed sort fields: {@code createdAt}, {@code date}, {@code status}.</p>
      *
      * @throws AccessDeniedException when a non-admin attempts to view another user's reservations
      */
     @GetMapping("/user/{userUuid}")
-    public ResponseEntity<ApiResponse<List<ReservInstanceResponseDTO>>> findByUser(
+    public ResponseEntity<ApiResponse<PagedResultDTO<ReservInstanceResponseDTO>>> findByUser(
             @PathVariable UUID userUuid,
-            @AuthenticationPrincipal UserDetailsImp principal) {
+            @AuthenticationPrincipal UserDetailsImp principal,
+            @SortWhitelist(
+                    value = {"createdAt", "date", "status"},
+                    defaultSort = "date",
+                    defaultDirection = "desc")
+            PageCriteria criteria) {
         if (!"ADMIN".equals(principal.getRoleName()) && !userUuid.equals(principal.getUuid()))
             throw new AccessDeniedException("You can only view your own reservations");
-        return ok(service.findByUser(userUuid));
+        return ok(service.findByUser(userUuid, criteria.toPageable()));
     }
 
     /**

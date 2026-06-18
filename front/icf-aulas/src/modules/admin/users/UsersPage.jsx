@@ -1,27 +1,26 @@
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { Users, UserCheck, UserX, ShieldCheck, Plus, Pencil, Trash2 } from 'lucide-react';
 
-import { getUsers, createUser, updateUser, deactivateUser, getRoles } from '../../../api/users';
-import { UserCreateSchema, UserUpdateSchema } from '../../../schemas/index.js';
+import { useUsers }          from '../../../hooks/useUsers';
+import { useUsersForm }      from '../../../hooks/useUsersForm';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { DEFAULT_PAGE_SIZE } from '../../../utils/queryUtils';
-import { toast } from '../../../utils/toast.jsx';
-import { DISPLAY_ROLE } from '../../../utils/roles';
+import { DISPLAY_ROLE }      from '../../../utils/roles';
 
-import Button from '../../../components/Button/Button';
-import Card from '../../../components/Card/Card';
-import Buscador from '../../../components/Buscador/Buscador';
-import DataTable from '../../../components/DataTable/DataTable';
-import Badge from '../../../components/Badge/Badge';
-import EmptyState from '../../../components/EmptyState/EmptyState';
-import FormModal from '../../../components/FormModal/FormModal';
+import Button             from '../../../components/Button/Button';
+import Card               from '../../../components/Card/Card';
+import Buscador           from '../../../components/Buscador/Buscador';
+import DataTable          from '../../../components/DataTable/DataTable';
+import Badge              from '../../../components/Badge/Badge';
+import EmptyState         from '../../../components/EmptyState/EmptyState';
+import FormModal          from '../../../components/FormModal/FormModal';
 import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
-import Input from '../../../components/Input/Input';
-import Select from '../../../components/Select/Select';
+import Input              from '../../../components/Input/Input';
+import Select             from '../../../components/Select/Select';
 
 import './UsersPage.css';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Pure helpers ──────────────────────────────────────────────────────────────
 
 /** Returns initials (up to 2 chars) from firstName + lastNames. */
 function getInitials(user) {
@@ -39,69 +38,62 @@ function roleLabel(roleName) {
   return DISPLAY_ROLE[roleName] ?? roleName ?? '—';
 }
 
-// ── Empty form state ──────────────────────────────────────────────────────────
-
-const EMPTY_CREATE = {
-  firstName: '', lastNames: '', username: '', email: '',
-  password: '', departamento: '', roleId: '',
-};
-const EMPTY_UPDATE = {
-  firstName: '', lastNames: '', username: '', email: '',
-  departamento: '', roleId: '', isActive: true,
-};
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
-  const queryClient = useQueryClient();
+  // ── Search / pagination state ────────────────────────────────────────────────
+  const [searchInput, setSearchInput] = useState('');
+  const [page, setPage]               = useState(0);
 
-  // ── Remote data ────────────────────────────────────────────────────────────
-  const { data: users = [], isLoading: usersLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: getUsers,
+  // Debounced search sent to the server (avoids a fetch on every keystroke).
+  const search = useDebouncedValue(searchInput, 300);
+
+  // Reset to page 0 whenever the active search term changes.
+  useEffect(() => { setPage(0); }, [search]);
+
+  // ── Server state ─────────────────────────────────────────────────────────────
+  const {
+    users,
+    totalElements,
+    totalPages,
+    stats,
+    roles,
+    usersLoading,
+    createMutation,
+    updateMutation,
+    deactivateMutation,
+  } = useUsers({
+    search,
+    page,
+    size: DEFAULT_PAGE_SIZE,
+    sort:      'createdAt',
+    direction: 'desc',
   });
 
-  const { data: roles = [] } = useQuery({
-    queryKey: ['roles'],
-    queryFn: getRoles,
-  });
+  // ── Form / modal state ───────────────────────────────────────────────────────
+  const {
+    createOpen,
+    editUser,
+    deactivateTarget,
+    setDeactivateTarget,
+    createForm,
+    editForm,
+    formErrors,
+    openCreate,
+    closeCreate,
+    openEdit,
+    closeEdit,
+    handleCreateField,
+    handleEditField,
+    handleCreateSubmit,
+    handleEditSubmit,
+  } = useUsersForm({ roles, createMutation, updateMutation });
 
-  // ── Local state ────────────────────────────────────────────────────────────
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const safeTotalPages = Math.max(1, totalPages);
+  const isLastPage     = page >= safeTotalPages - 1;
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editUser, setEditUser] = useState(null);    // full user object or null
-  const [deactivateTarget, setDeactivateTarget] = useState(null);
-
-  const [createForm, setCreateForm] = useState(EMPTY_CREATE);
-  const [editForm, setEditForm]   = useState(EMPTY_UPDATE);
-  const [formErrors, setFormErrors] = useState({});
-
-  // ── Derived stats ──────────────────────────────────────────────────────────
-  const stats = useMemo(() => ({
-    total:   users.length,
-    active:  users.filter((u) => u.isActive).length,
-    inactive: users.filter((u) => !u.isActive).length,
-    admins:  users.filter((u) => u.roleName?.toUpperCase() === 'ADMIN').length,
-  }), [users]);
-
-  // ── Filtered + paginated rows ──────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter((u) =>
-      `${u.firstName} ${u.lastNames}`.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.username?.toLowerCase().includes(q)
-    );
-  }, [users, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / DEFAULT_PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages - 1);
-  const pageRows   = filtered.slice(safePage * DEFAULT_PAGE_SIZE, (safePage + 1) * DEFAULT_PAGE_SIZE);
-
-  // ── Role options for Select ────────────────────────────────────────────────
+  // ── Select options ───────────────────────────────────────────────────────────
   const roleOptions = roles.map((r) => ({
     value: String(r.id),
     label: DISPLAY_ROLE[r.name] ?? r.name,
@@ -112,104 +104,7 @@ export default function UsersPage() {
     { value: 'false', label: 'Inactivo' },
   ];
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
-  const createMutation = useMutation({
-    mutationFn: createUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Usuario creado correctamente.');
-      setCreateOpen(false);
-      setCreateForm(EMPTY_CREATE);
-      setFormErrors({});
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ uuid, payload }) => updateUser(uuid, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Usuario actualizado correctamente.');
-      setEditUser(null);
-      setFormErrors({});
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const deactivateMutation = useMutation({
-    mutationFn: deactivateUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Usuario desactivado correctamente.');
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  // ── Form helpers ───────────────────────────────────────────────────────────
-  function parseZodErrors(zodError) {
-    const out = {};
-    for (const issue of zodError.issues ?? []) {
-      const key = issue.path[0];
-      if (key && !out[key]) out[key] = issue.message;
-    }
-    return out;
-  }
-
-  function handleCreateField(field, value) {
-    setCreateForm((f) => ({ ...f, [field]: value }));
-    setFormErrors((e) => ({ ...e, [field]: undefined }));
-  }
-
-  function handleEditField(field, value) {
-    setEditForm((f) => ({ ...f, [field]: value }));
-    setFormErrors((e) => ({ ...e, [field]: undefined }));
-  }
-
-  function handleOpenEdit(user) {
-    setEditUser(user);
-    setEditForm({
-      firstName:    user.firstName,
-      lastNames:    user.lastNames,
-      username:     user.username ?? '',
-      email:        user.email,
-      departamento: user.departamento ?? '',
-      roleId:       String(roles.find((r) => r.name.toUpperCase() === user.roleName?.toUpperCase())?.id ?? ''),
-      isActive:     user.isActive,
-    });
-    setFormErrors({});
-  }
-
-  // ── Submit handlers ────────────────────────────────────────────────────────
-  function handleCreateSubmit() {
-    const payload = {
-      ...createForm,
-      roleId: createForm.roleId ? Number(createForm.roleId) : undefined,
-      departamento: createForm.departamento || undefined,
-    };
-    const result = UserCreateSchema.safeParse(payload);
-    if (!result.success) {
-      setFormErrors(parseZodErrors(result.error));
-      return;
-    }
-    createMutation.mutate(result.data);
-  }
-
-  function handleEditSubmit() {
-    const payload = {
-      ...editForm,
-      roleId:       Number(editForm.roleId),
-      isActive:     editForm.isActive === 'true' || editForm.isActive === true,
-      departamento: editForm.departamento || undefined,
-    };
-    const result = UserUpdateSchema.safeParse(payload);
-    if (!result.success) {
-      setFormErrors(parseZodErrors(result.error));
-      return;
-    }
-    updateMutation.mutate({ uuid: editUser.uuid, payload: result.data });
-  }
-
-  // ── Table columns ──────────────────────────────────────────────────────────
+  // ── Table columns ────────────────────────────────────────────────────────────
   const columns = [
     {
       key: 'usuario',
@@ -260,7 +155,7 @@ export default function UsersPage() {
             type="button"
             className="users-page__action-btn"
             title="Editar usuario"
-            onClick={() => handleOpenEdit(row)}
+            onClick={() => openEdit(row)}
           >
             <Pencil size={16} />
           </button>
@@ -278,7 +173,7 @@ export default function UsersPage() {
     },
   ];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="users-page">
 
@@ -293,13 +188,13 @@ export default function UsersPage() {
           size="small"
           iconLeft={<Plus size={18} />}
           iconSize={18}
-          onClick={() => { setCreateOpen(true); setCreateForm(EMPTY_CREATE); setFormErrors({}); }}
+          onClick={openCreate}
         >
           Nuevo Usuario
         </Button>
       </div>
 
-      {/* Stats */}
+      {/* Stats — sourced from GET /api/v1/users/stats (full corpus counts) */}
       <div className="users-page__stats">
         <Card className="users-page__stat-card">
           <span className="users-page__stat-icon users-page__stat-icon--blue">
@@ -344,8 +239,8 @@ export default function UsersPage() {
         {/* Toolbar */}
         <div className="users-page__table-toolbar">
           <Buscador
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Buscar usuarios por nombre, correo o usuario..."
             style={{ maxWidth: 448 }}
           />
@@ -354,16 +249,16 @@ export default function UsersPage() {
         {/* Table */}
         <DataTable
           columns={columns}
-          rows={pageRows}
+          rows={users}
           rowKey={(row) => row.uuid}
           loading={usersLoading}
           emptyState={
             <EmptyState
-              hasSearch={!!search}
+              hasSearch={!!searchInput}
               message="Aún no hay usuarios registrados en el sistema."
               searchMessage="No se encontraron usuarios que coincidan con la búsqueda."
               actionLabel="Nuevo Usuario"
-              onAction={() => setCreateOpen(true)}
+              onAction={openCreate}
             />
           }
         />
@@ -372,23 +267,23 @@ export default function UsersPage() {
         {!usersLoading && (
           <div className="users-page__pagination">
             <p className="users-page__pagination-info">
-              Mostrando {pageRows.length} de {filtered.length} usuario{filtered.length !== 1 ? 's' : ''}
-              {search && ` (filtrado de ${users.length})`}
+              Mostrando {users.length} de {totalElements} usuario{totalElements !== 1 ? 's' : ''}
+              {searchInput && ' (búsqueda activa)'}
             </p>
             <div className="users-page__pagination-controls">
               <button
                 type="button"
                 className="users-page__page-btn"
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={safePage === 0}
+                disabled={page === 0}
               >
                 Anterior
               </button>
               <button
                 type="button"
                 className="users-page__page-btn"
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                disabled={safePage >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+                disabled={isLastPage}
               >
                 Siguiente
               </button>
@@ -400,7 +295,7 @@ export default function UsersPage() {
       {/* ── Modal: Crear usuario ─────────────────────────────────────────── */}
       <FormModal
         open={createOpen}
-        onClose={() => { setCreateOpen(false); setFormErrors({}); }}
+        onClose={closeCreate}
         title="Nuevo Usuario"
         subtitle="Completa la información para registrar un nuevo acceso al sistema."
         submitLabel="Crear Usuario"
@@ -476,7 +371,7 @@ export default function UsersPage() {
       {/* ── Modal: Editar usuario ─────────────────────────────────────────── */}
       <FormModal
         open={!!editUser}
-        onClose={() => { setEditUser(null); setFormErrors({}); }}
+        onClose={closeEdit}
         title="Editar Usuario"
         subtitle={editUser ? `${editUser.firstName} ${editUser.lastNames}` : ''}
         submitLabel="Guardar cambios"

@@ -9,10 +9,15 @@ import mx.unam.icf.aulas.modules.access.roles.infrastructure.RoleRepository;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.RegisterRequestDTO;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.UserResponseDTO;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.UserSelfEditRequestDTO;
+import mx.unam.icf.aulas.modules.access.users.app.dtos.UserStatsDTO;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.UserUpdateRequestDTO;
 import mx.unam.icf.aulas.modules.access.users.app.mappers.UserMapper;
 import mx.unam.icf.aulas.modules.access.users.domain.User;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.UserRepository;
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
+import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -105,11 +110,38 @@ public class UserService {
     // ── Queries ───────────────────────────────────────────────────────────────
 
     /**
-     * Returns all users in the system. Restricted to ADMIN role.
+     * Returns a page of users in the system, optionally filtered by a search term.
+     *
+     * <p>When {@code search} is {@code null} or blank the full catalog is returned
+     * (backward-compatible with the no-search path). When provided, a case-insensitive
+     * {@code LIKE} match is performed on {@code firstName}, {@code lastNames},
+     * {@code email}, {@code username}, and {@code matricula}; {@code totalElements}
+     * reflects the filtered count, so the frontend paginador stays correct.</p>
+     *
+     * @param search   optional free-text filter (trimmed by the repository query)
+     * @param pageable pagination and sort criteria (validated by
+     *                 {@link mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteriaArgumentResolver})
+     * @return a {@link PagedResultDTO} containing the requested page of users
      */
     @Transactional(readOnly = true)
-    public List<UserResponseDTO> findAll() {
-        return userMapper.toDtoList(userRepository.findAll());
+    public PagedResultDTO<UserResponseDTO> findAll(String search, Pageable pageable) {
+        Page<User> page = (search == null || search.isBlank())
+                ? userRepository.findAll(pageable)
+                : userRepository.search(search.trim(), pageable);
+        return PageMapper.toDto(page, userMapper::toDtoList);
+    }
+
+    /**
+     * Returns aggregated user statistics for the admin dashboard.
+     *
+     * <p>Resolves all four counters (total, active, inactive, admins) in a single
+     * database round-trip without materializing the full user list.</p>
+     *
+     * @return a {@link UserStatsDTO} with the current counts
+     */
+    @Transactional(readOnly = true)
+    public UserStatsDTO getStats() {
+        return userRepository.fetchStats();
     }
 
     /**

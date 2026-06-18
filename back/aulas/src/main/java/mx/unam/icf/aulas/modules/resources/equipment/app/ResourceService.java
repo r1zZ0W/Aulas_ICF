@@ -7,6 +7,9 @@ import mx.unam.icf.aulas.modules.resources.equipment.app.dtos.ResourceDTO;
 import mx.unam.icf.aulas.modules.resources.equipment.app.mappers.ResourceMapper;
 import mx.unam.icf.aulas.modules.resources.equipment.domain.Resource;
 import mx.unam.icf.aulas.modules.resources.equipment.infrastructure.ResourceRepository;
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
+import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,12 +32,14 @@ public class ResourceService {
     private final ResourceMapper mapper;
 
     /**
-     * Returns all equipment resources in the catalog.
-     * GET /api/v1/resources
+     * Returns a page of equipment resources in the catalog.
+     *
+     * @param pageable pagination and sort criteria
+     * @return a {@link PagedResultDTO} containing the requested page
      */
     @Transactional(readOnly = true)
-    public List<ResourceDTO> findAll() {
-        return mapper.toDtoList(repository.findAll());
+    public PagedResultDTO<ResourceDTO> findAll(Pageable pageable) {
+        return PageMapper.toDto(repository.findAll(pageable), mapper::toDtoList);
     }
 
     /**

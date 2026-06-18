@@ -4,12 +4,16 @@ import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
 
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.access.users.app.UserService;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.RegisterRequestDTO;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.UserResponseDTO;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.UserSelfEditRequestDTO;
+import mx.unam.icf.aulas.modules.access.users.app.dtos.UserStatsDTO;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.UserUpdateRequestDTO;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
 
@@ -24,9 +28,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -57,13 +61,42 @@ public class UserController implements ResponseHandler {
     }
 
     /**
-     * Retrieves all user accounts. Requires ADMIN role.
-     * GET /api/v1/users
+     * Returns aggregated statistics for the admin dashboard. Requires ADMIN role.
+     * GET /api/v1/users/stats
+     *
+     * <p>Resolves total, active, inactive, and admin user counts in a single database
+     * round-trip. Spring MVC matches the literal path {@code /stats} before the
+     * template {@code /{uuid}}, so there is no route conflict.</p>
+     */
+    @GetMapping("/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserStatsDTO>> stats() {
+        return ok(userService.getStats());
+    }
+
+    /**
+     * Retrieves all user accounts, paginated. Requires ADMIN role.
+     * GET /api/v1/users[?search=text&page=0&size=20&sort=createdAt&direction=desc]
+     *
+     * <p>When {@code page} and {@code size} are omitted the response contains all users
+     * in a single page (format stays consistent: {@code { items, totalElements, ... }}).
+     * Allowed sort fields: {@code createdAt}, {@code email}, {@code username},
+     * {@code matricula}, {@code firstName}.</p>
+     *
+     * <p>When {@code search} is provided, a case-insensitive {@code LIKE} filter is
+     * applied over {@code firstName}, {@code lastNames}, {@code email}, {@code username},
+     * and {@code matricula}. {@code totalElements} reflects the filtered count.</p>
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<UserResponseDTO>>> findAll() {
-        return ok(userService.findAll());
+    public ResponseEntity<ApiResponse<PagedResultDTO<UserResponseDTO>>> findAll(
+            @RequestParam(value = "search", required = false) String search,
+            @SortWhitelist(
+                    value = {"createdAt", "email", "username", "matricula", "firstName"},
+                    defaultSort = "createdAt",
+                    defaultDirection = "desc")
+            PageCriteria criteria) {
+        return ok(userService.findAll(search, criteria.toPageable()));
     }
 
     /**

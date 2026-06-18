@@ -2,6 +2,9 @@ package mx.unam.icf.aulas.modules.reservations.instances.infrastructure;
 
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,6 +27,37 @@ public interface ReservInstanceRepository extends JpaRepository<ReservInstance, 
 
     /** Returns all reservation instances with the given status. */
     List<ReservInstance> findByStatus(ReservInstanceStatus status);
+
+    /**
+     * Returns a page of all reservation instances with associations eagerly loaded.
+     * Used by the paginated admin listing endpoint.
+     */
+    @Override
+    @EntityGraph(attributePaths = {"group", "group.user", "classroom"})
+    Page<ReservInstance> findAll(Pageable pageable);
+
+    /**
+     * Returns a page of reservation instances with the given status, with associations eagerly loaded.
+     * Used by the paginated pending-queue endpoint.
+     *
+     * @param status   the status to filter by (e.g. {@code PENDIENTE})
+     * @param pageable pagination and sort criteria
+     */
+    @EntityGraph(attributePaths = {"group", "group.user", "classroom"})
+    Page<ReservInstance> findByStatus(ReservInstanceStatus status, Pageable pageable);
+
+    /**
+     * Returns a page of reservation instances belonging to a given user, with associations eagerly loaded.
+     * A {@code countQuery} is required because the JOIN traversal would produce incorrect counts
+     * without it when Spring Data derives the count query automatically.
+     *
+     * @param userUuid public UUID of the owning user
+     * @param pageable pagination and sort criteria
+     */
+    @EntityGraph(attributePaths = {"group", "group.user", "classroom"})
+    @Query(value = "SELECT ri FROM ReservInstance ri WHERE ri.group.user.uuid = :userUuid",
+           countQuery = "SELECT COUNT(ri) FROM ReservInstance ri WHERE ri.group.user.uuid = :userUuid")
+    Page<ReservInstance> findByUserUuid(@Param("userUuid") UUID userUuid, Pageable pageable);
 
     /**
      * Returns approved reservation instances for a specific classroom within a date range.

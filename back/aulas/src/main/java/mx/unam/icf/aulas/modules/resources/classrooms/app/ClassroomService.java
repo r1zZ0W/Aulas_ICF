@@ -10,6 +10,9 @@ import mx.unam.icf.aulas.modules.resources.classrooms.app.mappers.ClassroomMappe
 import mx.unam.icf.aulas.modules.resources.classrooms.domain.Classroom;
 import mx.unam.icf.aulas.modules.resources.classrooms.infrastructure.ClassroomRepository;
 
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
+import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,22 +36,27 @@ public class ClassroomService {
     private final ClassroomRepository classroomRepository;
 
     /**
-     * Returns all classrooms in the system (active and inactive).
+     * Returns a page of all classrooms (active and inactive).
      * Intended for ADMIN users who need visibility into inactive rooms.
-     * GET /api/v1/classrooms
+     *
+     * @param pageable pagination and sort criteria
+     * @return a {@link PagedResultDTO} containing the requested page
      */
     @Transactional(readOnly = true)
-    public List<ClassroomResponseDTO> findAll() {
-        return classroomMapper.toDtoList(classroomRepository.findAll());
+    public PagedResultDTO<ClassroomResponseDTO> findAll(Pageable pageable) {
+        return PageMapper.toDto(classroomRepository.findAll(pageable), classroomMapper::toDtoList);
     }
 
     /**
-     * Returns only active classrooms.
+     * Returns a page of active classrooms only.
      * Used by non-admin users (Maestro) who should not see inactive rooms.
+     *
+     * @param pageable pagination and sort criteria
+     * @return a {@link PagedResultDTO} containing the requested page
      */
     @Transactional(readOnly = true)
-    public List<ClassroomResponseDTO> findAllActive() {
-        return classroomMapper.toDtoList(classroomRepository.findByIsActiveTrue());
+    public PagedResultDTO<ClassroomResponseDTO> findAllActive(Pageable pageable) {
+        return PageMapper.toDto(classroomRepository.findByIsActiveTrue(pageable), classroomMapper::toDtoList);
     }
 
     /**

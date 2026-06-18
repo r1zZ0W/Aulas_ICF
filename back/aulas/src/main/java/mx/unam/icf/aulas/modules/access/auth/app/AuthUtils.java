@@ -61,7 +61,7 @@ class AuthUtils {
         try {
             Authentication auth = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password)
-            );
+            );  
             loginAttemptService.reset(username);
             return auth;
         } catch (AuthenticationException e) {

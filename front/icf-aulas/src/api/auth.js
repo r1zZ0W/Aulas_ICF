@@ -112,7 +112,12 @@ export async function logout(token, refreshToken) {
     await api.post(
       `${BASE_PATH}/logout`,
       refreshToken ? { refreshToken } : null,
-      { headers: { Authorization: `Bearer ${token}` } },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        // Prevent the 401 interceptor from firing during logout — the server may
+        // return 401 if the token was already expired, but that's non-fatal here.
+        skipAuthRedirect: true,
+      },
     );
   } catch (error) {
     if (error instanceof HttpError) {

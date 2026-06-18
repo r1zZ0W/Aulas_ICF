@@ -14,6 +14,9 @@ import mx.unam.icf.aulas.modules.reservations.groups.app.mappers.ReservationGrou
 import mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroup;
 import mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroupStatus;
 import mx.unam.icf.aulas.modules.reservations.groups.infrastructure.ReservationGroupRepository;
+import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
+import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,22 +42,27 @@ public class ReservationGroupService {
     private final SemesterRepository semesterRepository;
 
     /**
-     * Returns all reservation groups in the system.
+     * Returns a page of all reservation groups in the system.
      * GET /api/v1/reservation-groups
+     *
+     * @param pageable pagination and sort criteria
+     * @return a {@link PagedResultDTO} containing the requested page
      */
     @Transactional(readOnly = true)
-    public List<ReservationGroupResponseDTO> findAll() {
-        return mapper.toDtoList(repository.findAll());
+    public PagedResultDTO<ReservationGroupResponseDTO> findAll(Pageable pageable) {
+        return PageMapper.toDto(repository.findAll(pageable), mapper::toDtoList);
     }
 
     /**
-     * Returns all reservation groups belonging to a specific user.
+     * Returns a page of reservation groups belonging to a specific user.
      *
      * @param userUuid public UUID of the target user
+     * @param pageable pagination and sort criteria
+     * @return a {@link PagedResultDTO} containing the requested page
      */
     @Transactional(readOnly = true)
-    public List<ReservationGroupResponseDTO> findByUser(UUID userUuid) {
-        return mapper.toDtoList(repository.findByUserUuid(userUuid));
+    public PagedResultDTO<ReservationGroupResponseDTO> findByUser(UUID userUuid, Pageable pageable) {
+        return PageMapper.toDto(repository.findByUserUuid(userUuid, pageable), mapper::toDtoList);
     }
 
     /**

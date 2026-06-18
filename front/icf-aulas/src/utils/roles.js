@@ -4,7 +4,7 @@
  */
 export const ROLES = {
   ADMIN: 'ADMIN',
-  MAESTRO: 'MAESTRO',
+  MAESTRO: 'TEACHER',
 };
 
 /**
