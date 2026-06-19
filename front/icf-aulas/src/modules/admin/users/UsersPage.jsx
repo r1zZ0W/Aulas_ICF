@@ -1,55 +1,30 @@
-import { useState, useEffect } from 'react';
 import { Users, ShieldCheck, Plus, Pencil, Trash2 } from 'lucide-react';
 
-import { useUsers }          from '../../../hooks/useUsers';
-import { useUsersForm }      from '../../../hooks/useUsersForm';
-import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { useUsers } from '../../../hooks/useUsers';
+import { useUsersForm } from '../../../hooks/useUsersForm';
+import { usePagination } from '../../../hooks/usePagination';
 import { DEFAULT_PAGE_SIZE } from '../../../utils/queryUtils';
-import { DISPLAY_ROLE }      from '../../../utils/roles';
+import { DISPLAY_ROLE, roleBadgeVariant, roleLabel } from '../../../utils/roles';
+import { getInitials } from '../../../utils/format';
 
-import Button             from '../../../components/Button/Button';
-import Card               from '../../../components/Card/Card';
-import Buscador           from '../../../components/Buscador/Buscador';
-import DataTable          from '../../../components/DataTable/DataTable';
-import Badge              from '../../../components/Badge/Badge';
-import EmptyState         from '../../../components/EmptyState/EmptyState';
-import FormModal          from '../../../components/FormModal/FormModal';
+import Button from '../../../components/Button/Button';
+import Card from '../../../components/Card/Card';
+import Buscador from '../../../components/Buscador/Buscador';
+import DataTable from '../../../components/DataTable/DataTable';
+import Badge from '../../../components/Badge/Badge';
+import EmptyState from '../../../components/EmptyState/EmptyState';
+import Pagination from '../../../components/Pagination/Pagination';
+import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
-import Input              from '../../../components/Input/Input';
-import Select             from '../../../components/Select/Select';
+import UserFormFields from './UserFormFields';
 
 import './UsersPage.css';
-
-// ── Pure helpers ──────────────────────────────────────────────────────────────
-
-/** Returns initials (up to 2 chars) from firstName + lastNames. */
-function getInitials(user) {
-  const parts = [user.firstName, user.lastNames].filter(Boolean);
-  return parts.map((p) => p[0]).join('').toUpperCase().slice(0, 2);
-}
-
-/** Returns badge variant by roleName from backend (ADMIN / MAESTRO). */
-function roleBadgeVariant(roleName) {
-  return roleName?.toUpperCase() === 'ADMIN' ? 'primary' : 'neutral';
-}
-
-/** Returns the spanish display label for a backend role name. */
-function roleLabel(roleName) {
-  return DISPLAY_ROLE[roleName] ?? roleName ?? '—';
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
-  // ── Search / pagination state ────────────────────────────────────────────────
-  const [searchInput, setSearchInput] = useState('');
-  const [page, setPage]               = useState(0);
-
-  // Debounced search sent to the server (avoids a fetch on every keystroke).
-  const search = useDebouncedValue(searchInput, 300);
-
-  // Reset to page 0 whenever the active search term changes.
-  useEffect(() => { setPage(0); }, [search]);
+  // ── Search / pagination state (URL-synced) ───────────────────────────────────
+  const { searchInput, setSearchInput, search, page, setPage } = usePagination({ debounce: 300 });
 
   // ── Server state ─────────────────────────────────────────────────────────────
   const {
@@ -61,12 +36,12 @@ export default function UsersPage() {
     usersLoading,
     createMutation,
     updateMutation,
-    deactivateMutation,
+    deleteMutation,
   } = useUsers({
     search,
     page,
     size: DEFAULT_PAGE_SIZE,
-    sort:      'createdAt',
+    sort: 'createdAt',
     direction: 'desc',
   });
 
@@ -74,8 +49,8 @@ export default function UsersPage() {
   const {
     createOpen,
     editUser,
-    deactivateTarget,
-    setDeactivateTarget,
+    deleteTarget,
+    setDeleteTarget,
     createForm,
     editForm,
     formErrors,
@@ -89,20 +64,11 @@ export default function UsersPage() {
     handleEditSubmit,
   } = useUsersForm({ roles, createMutation, updateMutation });
 
-  // ── Derived ──────────────────────────────────────────────────────────────────
-  const safeTotalPages = Math.max(1, totalPages);
-  const isLastPage     = page >= safeTotalPages - 1;
-
   // ── Select options ───────────────────────────────────────────────────────────
   const roleOptions = roles.map((r) => ({
     value: String(r.id),
     label: DISPLAY_ROLE[r.name] ?? r.name,
   }));
-
-  const statusOptions = [
-    { value: 'true',  label: 'Activo' },
-    { value: 'false', label: 'Inactivo' },
-  ];
 
   // ── Table columns ────────────────────────────────────────────────────────────
   const columns = [
@@ -135,32 +101,6 @@ export default function UsersPage() {
       ),
     },
     {
-      key: 'isActive',
-      header: 'Estado',
-      width: '12%',
-      render: (row) => (
-        <Badge variant={row.isActive ? 'success' : 'danger'}>
-          {row.isActive ? 'Activo' : 'Inactivo'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'createdAt',
-      header: 'Registro',
-      width: '16%',
-      render: (row) => {
-        if (!row.createdAt) return '—';
-        const date = new Date(row.createdAt);
-        return date.toLocaleDateString('es-MX', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-      },
-    },
-    {
       key: 'acciones',
       header: 'Acciones',
       width: '14%',
@@ -178,9 +118,8 @@ export default function UsersPage() {
           <button
             type="button"
             className="users-page__action-btn users-page__action-btn--danger"
-            title="Desactivar usuario"
-            onClick={() => setDeactivateTarget(row)}
-            disabled={!row.isActive}
+            title="Eliminar usuario"
+            onClick={() => setDeleteTarget(row)}
           >
             <Trash2 size={16} />
           </button>
@@ -210,27 +149,27 @@ export default function UsersPage() {
         </Button>
       </div>
 
-       {/* Stats — sourced from GET /api/v1/users/stats (full corpus counts) */}
-       <div className="users-page__stats">
-         <Card className="users-page__stat-card">
-           <span className="users-page__stat-icon users-page__stat-icon--blue">
-             <Users size={24} />
-           </span>
-           <div>
-             <p className="users-page__stat-label">Total de Usuarios</p>
-             <p className="users-page__stat-value">{stats.total}</p>
-           </div>
-         </Card>
-         <Card className="users-page__stat-card">
-           <span className="users-page__stat-icon users-page__stat-icon--purple">
-             <ShieldCheck size={24} />
-           </span>
-           <div>
-             <p className="users-page__stat-label">Total de Administradores</p>
-             <p className="users-page__stat-value">{stats.admins}</p>
-           </div>
-         </Card>
-       </div>
+      {/* Stats — sourced from GET /api/v1/users/stats (full corpus counts) */}
+      <div className="users-page__stats">
+        <Card className="users-page__stat-card">
+          <span className="users-page__stat-icon users-page__stat-icon--blue">
+            <Users size={24} />
+          </span>
+          <div>
+            <p className="users-page__stat-label">Total de Usuarios</p>
+            <p className="users-page__stat-value">{stats.total}</p>
+          </div>
+        </Card>
+        <Card className="users-page__stat-card">
+          <span className="users-page__stat-icon users-page__stat-icon--purple">
+            <ShieldCheck size={24} />
+          </span>
+          <div>
+            <p className="users-page__stat-label">Total de Administradores</p>
+            <p className="users-page__stat-value">{stats.admins}</p>
+          </div>
+        </Card>
+      </div>
 
       {/* Table card */}
       <div className="users-page__table-card">
@@ -250,6 +189,7 @@ export default function UsersPage() {
           rows={users}
           rowKey={(row) => row.uuid}
           loading={usersLoading}
+          loadingMessage="Cargando usuarios…"
           emptyState={
             <EmptyState
               hasSearch={!!searchInput}
@@ -263,30 +203,15 @@ export default function UsersPage() {
 
         {/* Pagination */}
         {!usersLoading && (
-          <div className="users-page__pagination">
-            <p className="users-page__pagination-info">
-              Mostrando {users.length} de {totalElements} usuario{totalElements !== 1 ? 's' : ''}
-              {searchInput && ' (búsqueda activa)'}
-            </p>
-            <div className="users-page__pagination-controls">
-              <button
-                type="button"
-                className="users-page__page-btn"
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-              >
-                Anterior
-              </button>
-              <button
-                type="button"
-                className="users-page__page-btn"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={isLastPage}
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            showing={users.length}
+            total={totalElements}
+            noun="usuario"
+            searchActive={!!searchInput}
+          />
         )}
       </div>
 
@@ -302,68 +227,13 @@ export default function UsersPage() {
         loading={createMutation.isPending}
         onSubmit={handleCreateSubmit}
       >
-        <div className="users-page__form-grid">
-          <Input
-            label="Nombre(s)"
-            value={createForm.firstName}
-            onChange={(e) => handleCreateField('firstName', e.target.value)}
-            placeholder="Ej. María"
-            error={formErrors.firstName}
-            required
-          />
-          <Input
-            label="Apellidos"
-            value={createForm.lastNames}
-            onChange={(e) => handleCreateField('lastNames', e.target.value)}
-            placeholder="Ej. García López"
-            error={formErrors.lastNames}
-            required
-          />
-          <Input
-            label="Nombre de usuario"
-            value={createForm.username}
-            onChange={(e) => handleCreateField('username', e.target.value)}
-            placeholder="Ej. mgarcia"
-            error={formErrors.username}
-            required
-          />
-          <Input
-            label="Correo institucional"
-            type="email"
-            value={createForm.email}
-            onChange={(e) => handleCreateField('email', e.target.value)}
-            placeholder="usuario@icf.unam.mx"
-            error={formErrors.email}
-            required
-          />
-          <Input
-            label="Contraseña"
-            type="password"
-            value={createForm.password}
-            onChange={(e) => handleCreateField('password', e.target.value)}
-            placeholder="Mín. 8 caracteres"
-            error={formErrors.password}
-            required
-          />
-          <Input
-            label="Departamento"
-            value={createForm.departamento}
-            onChange={(e) => handleCreateField('departamento', e.target.value)}
-            placeholder="Ej. Dirección"
-            error={formErrors.departamento}
-          />
-          <div className="users-page__form-grid--full">
-            <Select
-              label="Rol"
-              value={String(createForm.roleId)}
-              onChange={(v) => handleCreateField('roleId', v)}
-              options={roleOptions}
-              placeholder="Seleccionar rol..."
-              error={formErrors.roleId}
-              required
-            />
-          </div>
-        </div>
+        <UserFormFields
+          mode="create"
+          form={createForm}
+          onField={handleCreateField}
+          errors={formErrors}
+          roleOptions={roleOptions}
+        />
       </FormModal>
 
       {/* ── Modal: Editar usuario ─────────────────────────────────────────── */}
@@ -376,75 +246,27 @@ export default function UsersPage() {
         loading={updateMutation.isPending}
         onSubmit={handleEditSubmit}
       >
-        <div className="users-page__form-grid">
-          <Input
-            label="Nombre(s)"
-            value={editForm.firstName}
-            onChange={(e) => handleEditField('firstName', e.target.value)}
-            error={formErrors.firstName}
-            required
-          />
-          <Input
-            label="Apellidos"
-            value={editForm.lastNames}
-            onChange={(e) => handleEditField('lastNames', e.target.value)}
-            error={formErrors.lastNames}
-            required
-          />
-          <Input
-            label="Nombre de usuario"
-            value={editForm.username}
-            onChange={(e) => handleEditField('username', e.target.value)}
-            error={formErrors.username}
-            required
-          />
-          <Input
-            label="Correo electrónico"
-            type="email"
-            value={editForm.email}
-            onChange={(e) => handleEditField('email', e.target.value)}
-            error={formErrors.email}
-            required
-          />
-          <Input
-            label="Departamento"
-            value={editForm.departamento}
-            onChange={(e) => handleEditField('departamento', e.target.value)}
-            error={formErrors.departamento}
-          />
-          <Select
-            label="Estado"
-            value={String(editForm.isActive)}
-            onChange={(v) => handleEditField('isActive', v === 'true')}
-            options={statusOptions}
-            error={formErrors.isActive}
-          />
-          <div className="users-page__form-grid--full">
-            <Select
-              label="Rol"
-              value={String(editForm.roleId)}
-              onChange={(v) => handleEditField('roleId', v)}
-              options={roleOptions}
-              placeholder="Seleccionar rol..."
-              error={formErrors.roleId}
-              required
-            />
-          </div>
-        </div>
+        <UserFormFields
+          mode="edit"
+          form={editForm}
+          onField={handleEditField}
+          errors={formErrors}
+          roleOptions={roleOptions}
+        />
       </FormModal>
 
-      {/* ── Modal: Desactivar ──────────────────────────────────────────────── */}
+      {/* ── Modal: Eliminar ───────────────────────────────────────────────── */}
       <ConfirmDeleteModal
-        open={!!deactivateTarget}
-        onClose={() => setDeactivateTarget(null)}
-        onConfirm={() => deactivateMutation.mutateAsync(deactivateTarget?.uuid)}
-        title="¿Desactivar usuario?"
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
+        title="¿Eliminar usuario?"
         message={
-          deactivateTarget
-            ? `El acceso de ${deactivateTarget.firstName} ${deactivateTarget.lastNames} quedará deshabilitado. Podrás reactivarlo editando su perfil.`
-            : 'Esta acción deshabilitará el acceso del usuario.'
+          deleteTarget
+            ? `Se eliminará permanentemente a ${deleteTarget.firstName} ${deleteTarget.lastNames} junto con todas sus reservaciones. Esta acción no se puede deshacer.`
+            : 'Esta acción eliminará permanentemente al usuario y todas sus reservaciones.'
         }
-        confirmLabel="Desactivar"
+        confirmLabel="Eliminar"
         cancelLabel="Cancelar"
       />
     </div>

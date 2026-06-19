@@ -186,52 +186,7 @@
   color: var(--moon-chichi, #ff4e64);
 }
 
-/* Pagination ---------------------------------------------------------------- */
-
-.users-page__pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 24px;
-  border-top: 1px solid #e5e7eb;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.users-page__pagination-info {
-  font-size: 14px;
-  color: var(--moon-trunks, #6a7282);
-  margin: 0;
-}
-
-.users-page__pagination-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.users-page__page-btn {
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: var(--moon-font-sans);
-  color: #4a5565;
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
-}
-
-.users-page__page-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.users-page__page-btn:not(:disabled):hover {
-  background: var(--moon-gohan, #efefef);
-}
-
-/* Form errors --------------------------------------------------------------- */
+/* Form grid ----------------------------------------------------------------- */
 
 .users-page__form-grid {
   display: grid;

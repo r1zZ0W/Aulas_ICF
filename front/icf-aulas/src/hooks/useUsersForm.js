@@ -45,7 +45,7 @@ function parseZodErrors(zodError) {
  * @returns {{
  *   createOpen:         boolean,
  *   editUser:           object | null,
- *   deactivateTarget:   object | null,
+ *   deleteTarget:       object | null,
  *   createForm:         typeof EMPTY_CREATE,
  *   editForm:           typeof EMPTY_UPDATE,
  *   formErrors:         Record<string, string | undefined>,
@@ -53,7 +53,7 @@ function parseZodErrors(zodError) {
  *   closeCreate:        () => void,
  *   openEdit:           (user: object) => void,
  *   closeEdit:          () => void,
- *   setDeactivateTarget:(user: object | null) => void,
+ *   setDeleteTarget:    (user: object | null) => void,
  *   handleCreateField:  (field: string, value: any) => void,
  *   handleEditField:    (field: string, value: any) => void,
  *   handleCreateSubmit: () => void,
@@ -64,7 +64,7 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
   // ── Modal / target state ────────────────────────────────────────────────────
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ── Form data & validation errors ──────────────────────────────────────────
   const [createForm, setCreateForm] = useState(EMPTY_CREATE);
@@ -166,8 +166,8 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
     // modal state
     createOpen,
     editUser,
-    deactivateTarget,
-    setDeactivateTarget,
+    deleteTarget,
+    setDeleteTarget,
     // form data
     createForm,
     editForm,

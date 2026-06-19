@@ -130,17 +130,19 @@ export async function updateUser(uuid, payload) {
 }
 
 /**
- * Soft-deactivates a user account. ADMIN only.
+ * Permanently deletes a user account along with all their reservation data. ADMIN only.
+ * This operation is irreversible.
  * @param {string} uuid
  * @returns {Promise<void>}
  */
-export async function deactivateUser(uuid) {
+export async function deleteUser(uuid) {
   try {
-    await api.patch(`/api/v1/users/${uuid}/deactivate`);
+    await api.delete(`/api/v1/users/${uuid}`);
   } catch (error) {
     if (error instanceof HttpError) {
       throw new Error(resolveErrorMessage(error, {
-        403: 'No puedes desactivar tu propia cuenta.',
+        403: 'No puedes eliminar tu propia cuenta.',
+        404: 'El usuario solicitado no existe.',
       }));
     }
     throw error;

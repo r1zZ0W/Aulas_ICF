@@ -3,9 +3,9 @@
  * Users admin page: paginated + searchable user list, aggregated stats, roles,
  * and create/update/deactivate mutations via React Query.
  */
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { getUsers, getUserStats, createUser, updateUser, deactivateUser, getRoles } from '../api/users';
-import { toast } from '../utils/toast.jsx';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { getUsers, getUserStats, createUser, updateUser, deleteUser, getRoles } from '../api/users';
+import { useApiMutation } from './useApiMutation';
 
 /**
  * @typedef {import('../schemas/user/userResponse.js').UserResponseSchema} User
@@ -31,11 +31,10 @@ import { toast } from '../utils/toast.jsx';
  *   usersLoading:       boolean,
  *   createMutation:     import('@tanstack/react-query').UseMutationResult,
  *   updateMutation:     import('@tanstack/react-query').UseMutationResult,
- *   deactivateMutation: import('@tanstack/react-query').UseMutationResult,
+ *   deleteMutation:     import('@tanstack/react-query').UseMutationResult,
  * }}
  */
 export function useUsers({ search, page = 0, size = 20, sort, direction } = {}) {
-  const queryClient = useQueryClient();
 
   // ── Paginated user list ──────────────────────────────────────────────────────
   const {
@@ -64,34 +63,24 @@ export function useUsers({ search, page = 0, size = 20, sort, direction } = {}) 
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
-  // invalidateQueries({ queryKey: ['users'] }) covers both ['users','list',…]
-  // and ['users','stats'] so list and counts refresh after every write.
+  // ['users'] covers both ['users','list',…] and ['users','stats'] in one call.
 
-  const createMutation = useMutation({
+  const createMutation = useApiMutation({
     mutationFn: createUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Usuario creado correctamente.');
-    },
-    onError: (err) => toast.error(err.message),
+    invalidateKey: ['users'],
+    successMessage: 'Usuario creado correctamente.',
   });
 
-  const updateMutation = useMutation({
+  const updateMutation = useApiMutation({
     mutationFn: ({ uuid, payload }) => updateUser(uuid, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Usuario actualizado correctamente.');
-    },
-    onError: (err) => toast.error(err.message),
+    invalidateKey: ['users'],
+    successMessage: 'Usuario actualizado correctamente.',
   });
 
-  const deactivateMutation = useMutation({
-    mutationFn: deactivateUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Usuario desactivado correctamente.');
-    },
-    onError: (err) => toast.error(err.message),
+  const deleteMutation = useApiMutation({
+    mutationFn: deleteUser,
+    invalidateKey: ['users'],
+    successMessage: 'Usuario eliminado correctamente.',
   });
 
   return {
@@ -103,6 +92,6 @@ export function useUsers({ search, page = 0, size = 20, sort, direction } = {}) 
     usersLoading,
     createMutation,
     updateMutation,
-    deactivateMutation,
+    deleteMutation,
   };
 }
