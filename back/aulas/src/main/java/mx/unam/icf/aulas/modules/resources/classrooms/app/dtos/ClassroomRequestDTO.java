@@ -14,7 +14,7 @@ public record ClassroomRequestDTO(
         @NotBlank(message = "Name is required")
         @Size(min = 1, max = 100, message = "Name must be between 1 and 100 characters")
         @Pattern(
-                regexp = "^[\\w\\s\\-áéíóúÁÉÍÓÚñÑ\\.]+$",
+                regexp = "^[\\w\\s\\-áéíóúÁÉÍÓÚñÑ.]+$",
                 message = "Name contains invalid characters"
         )
         String name,

@@ -13,17 +13,19 @@ import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDet
 import mx.unam.icf.aulas.modules.resources.classrooms.app.ClassroomService;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomRequestDTO;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomResponseDTO;
+import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomStatsDTO;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -43,24 +45,41 @@ public class ClassroomController implements ResponseHandler {
     private final ClassroomService classroomService;
 
     /**
+     * Returns aggregated classroom statistics for the admin dashboard. Requires ADMIN role.
+     * GET /api/v1/classrooms/stats
+     *
+     * <p>Resolves total, available (active), and not-available (inactive/null) counts in a single
+     * database round-trip. Spring MVC matches the literal path {@code /stats} before the template
+     * {@code /{uuid}}, so there is no route conflict.</p>
+     */
+    @GetMapping("/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ClassroomStatsDTO>> stats() {
+        return ok(classroomService.getStats());
+    }
+
+    /**
      * Retrieves classrooms from the system, paginated.
      * ADMIN users receive all classrooms (active and inactive) for management purposes.
      * MAESTRO users receive only active classrooms (DFR §2.3).
-     * GET /api/v1/classrooms[?page=0&size=20&sort=name&direction=asc]
+     * GET /api/v1/classrooms[?search=text&page=0&size=20&sort=name&direction=asc]
      *
-     * <p>Allowed sort fields: {@code createdAt}, {@code name}, {@code capacity}.</p>
+     * <p>When {@code search} is provided, a case-insensitive {@code LIKE} filter is applied
+     * over {@code name} and {@code description}. {@code totalElements} reflects the filtered count.
+     * Allowed sort fields: {@code createdAt}, {@code name}, {@code capacity}.</p>
      */
     @GetMapping
     public ResponseEntity<ApiResponse<PagedResultDTO<ClassroomResponseDTO>>> findAll(
             @AuthenticationPrincipal UserDetailsImp principal,
+            @RequestParam(value = "search", required = false) String search,
             @SortWhitelist(
                     value = {"createdAt", "name", "capacity"},
                     defaultSort = "name",
                     defaultDirection = "asc")
             PageCriteria criteria) {
         if ("ADMIN".equals(principal.getRoleName()))
-            return ok(classroomService.findAll(criteria.toPageable()));
-        return ok(classroomService.findAllActive(criteria.toPageable()));
+            return ok(classroomService.findAll(search, criteria.toPageable()));
+        return ok(classroomService.findAllActive(search, criteria.toPageable()));
     }
 
     /**
@@ -102,17 +121,42 @@ public class ClassroomController implements ResponseHandler {
 
     /**
      * Deactivates a classroom (soft-delete) by its public UUID. Requires ADMIN role.
-     * The classroom is marked inactive and hidden from Maestro catalog but is never
-     * physically removed, preserving existing reservation history (DFR NFR / LFTAIP).
-     * DELETE /api/v1/classrooms/{uuid}
+     * The classroom is marked inactive and hidden from the Maestro catalog but is
+     * never physically removed, preserving reservation history (DFR NFR / LFTAIP).
+     *
+     * <p>All direct child classrooms that referenced this classroom as their parent
+     * are automatically unlinked ({@code linkedRoom = null}) before deactivation,
+     * preventing stale FK references (orphan cleanup, option A).</p>
+     *
+     * PATCH /api/v1/classrooms/{uuid}/deactivate
      *
      * @throws DomainException           when the UUID is null
      * @throws ResourceNotFoundException when the classroom is not found
      */
-    @DeleteMapping("/{uuid}")
+    @PatchMapping("/{uuid}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteByUuid(@PathVariable UUID uuid) {
-        classroomService.deleteByUuid(uuid);
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable UUID uuid) {
+        classroomService.deactivate(uuid);
         return ok("Classroom deactivated successfully");
+    }
+
+    /**
+     * Reactivates a previously deactivated classroom. Requires ADMIN role.
+     * The classroom is marked active again and re-appears in the Maestro catalog.
+     *
+     * <p>Child classrooms unlinked during a prior deactivation are <em>not</em>
+     * automatically re-linked; the administrator must update each child's parent
+     * explicitly if needed.</p>
+     *
+     * PATCH /api/v1/classrooms/{uuid}/reactivate
+     *
+     * @throws DomainException           when the UUID is null
+     * @throws ResourceNotFoundException when the classroom is not found
+     */
+    @PatchMapping("/{uuid}/reactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> reactivate(@PathVariable UUID uuid) {
+        classroomService.reactivate(uuid);
+        return ok("Classroom reactivated successfully");
     }
 }
