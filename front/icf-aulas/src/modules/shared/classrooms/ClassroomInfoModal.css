@@ -1,0 +1,132 @@
+.modal-content.classroom-info-modal {
+  width: 100%;
+  max-width: min(480px, calc(100vw - 48px));
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.classroom-info-modal__inner {
+  background: var(--moon-goku);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.classroom-info-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1.337px solid var(--moon-content-border);
+  background: var(--moon-goku);
+}
+
+.classroom-info-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--moon-content-text);
+  margin: 0;
+}
+
+.classroom-info-modal__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--moon-content-text-secondary);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+.classroom-info-modal__close:hover {
+  background: rgba(211, 48, 74, 0.12);
+  color: var(--moon-dodoria, #d3304a);
+}
+
+/* Body */
+.classroom-info-modal__body {
+  padding: 24px 32px;
+}
+
+.classroom-info-modal__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 0;
+}
+
+@media (max-width: 420px) {
+  .classroom-info-modal__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.classroom-info-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.classroom-info-modal__field--full {
+  grid-column: 1 / -1;
+}
+
+.classroom-info-modal__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--moon-trunks, #6a7282);
+  margin: 0;
+}
+
+.classroom-info-modal__value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--moon-bulma, #232222);
+  margin: 0;
+}
+
+.classroom-info-modal__value--description {
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--moon-content-text-secondary, #454e5f);
+}
+
+/* Muted value: used for "—" placeholders and "Padre no disponible" */
+.classroom-info-modal__value--muted {
+  color: var(--moon-trunks, #6a7282);
+  font-weight: 400;
+}
+
+/* Footer */
+.classroom-info-modal__footer {
+  padding: 16px 32px 24px;
+  border-top: 1.337px solid var(--moon-content-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.classroom-info-modal__btn-close {
+  height: 40px;
+  padding: 0 20px;
+  border: 1.5px solid var(--moon-content-border);
+  border-radius: 12px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moon-content-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.classroom-info-modal__btn-close:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: var(--moon-content-text);
+}
