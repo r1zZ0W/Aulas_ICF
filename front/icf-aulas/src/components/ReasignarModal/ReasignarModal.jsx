@@ -1,14 +1,22 @@
 import { useState, useEffect } from 'react';
-import { X, Info, Users, Monitor, Cast, Clock, ChevronDown, Plus } from 'lucide-react';
+import { X, Info, Users, Clock, ChevronDown, Plus } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import { useReservation } from '../../context/ReservationContext';
-import { SALAS, SALA_BY_ID } from '../../utils/salas';
+import { typeLabel } from '../../schemas/classroom';
 import '../ReservaModal/ReservaModal.css';
 import './ReasignarModal.css';
 
+/** @param {number} h @param {number} m @returns {number} */
 const toMins = (h, m) => h * 60 + m;
+
+/** @param {number} h @param {number} m @returns {string} */
 const fmt = (h, m) => `${h}:${String(m).padStart(2, '0')}`;
 
+/**
+ * Returns all possible start time slots (07:00 – 19:30 in 30-min increments).
+ *
+ * @returns {Array<{ h: number, m: number, label: string }>}
+ */
 function getAllStartSlots() {
   const slots = [];
   for (let h = 7; h <= 19; h++) {
@@ -20,6 +28,13 @@ function getAllStartSlots() {
   return slots;
 }
 
+/**
+ * Returns available end time slots given a start time.
+ *
+ * @param {number} startH
+ * @param {number} startM
+ * @returns {Array<{ h: number, m: number, label: string }>}
+ */
 function getEndSlots(startH, startM) {
   const startMins = toMins(startH, startM);
   const slots = [];
@@ -33,34 +48,51 @@ function getEndSlots(startH, startM) {
   return slots;
 }
 
+/**
+ * Formats a Date as a time label snapped to the nearest 30-minute slot.
+ *
+ * @param {Date|string|null} date
+ * @returns {string}
+ */
 function timeToLabel(date) {
   if (!date) return '';
   const d = date instanceof Date ? date : new Date(date);
   return fmt(d.getHours(), d.getMinutes() >= 30 ? 30 : 0);
 }
 
+/** Pre-computed full start-slot list (static, does not depend on current time). */
 const START_SLOTS = getAllStartSlots();
 
-export default function ReasignarModal({ open, onClose, reservation }) {
-  const { visibleSalas, updateReservation } = useReservation();
-  const availableSalas = SALAS.filter(s => visibleSalas.has(s.id));
+// ── Component ─────────────────────────────────────────────────────────────────
 
-  const [salaId, setSalaId] = useState('');
+/**
+ * Modal for rescheduling an existing reservation — allows changing the room
+ * and time without modifying the class name or recurrence settings.
+ *
+ * @param {{
+ *   open:        boolean,
+ *   onClose:     () => void,
+ *   reservation: object | null,
+ * }} props
+ */
+export default function ReasignarModal({ open, onClose, reservation }) {
+  const { rooms, visibleRooms, updateReservation } = useReservation();
+  const availableRooms = rooms.filter(r => visibleRooms.has(r.uuid));
+
+  const [roomId,     setRoomId]     = useState('');
   const [startLabel, setStartLabel] = useState('');
-  const [endLabel, setEndLabel] = useState('');
+  const [endLabel,   setEndLabel]   = useState('');
 
   useEffect(() => {
     if (!open || !reservation) return;
-    setSalaId(String(reservation.salaId ?? ''));
+    setRoomId(reservation.roomId ?? '');
     setStartLabel(timeToLabel(reservation.start));
     setEndLabel(timeToLabel(reservation.end));
   }, [open, reservation]);
 
   const startSlot = START_SLOTS.find(s => s.label === startLabel) ?? null;
-  const endSlots = startSlot ? getEndSlots(startSlot.h, startSlot.m) : [];
-  const sala = SALAS.find(s => String(s.id) === salaId) ?? null;
-
-  const handleSalaChange = val => setSalaId(val);;
+  const endSlots  = startSlot ? getEndSlots(startSlot.h, startSlot.m) : [];
+  const room      = rooms.find(r => r.uuid === roomId) ?? null;
 
   const handleStartChange = val => {
     setStartLabel(val);
@@ -70,10 +102,7 @@ export default function ReasignarModal({ open, onClose, reservation }) {
     if (!eSlots.find(s => s.label === endLabel)) setEndLabel(eSlots[0]?.label ?? '');
   };
 
-  const canSubmit =
-    Boolean(salaId) &&
-    Boolean(startLabel) &&
-    Boolean(endLabel)
+  const canSubmit = Boolean(roomId) && Boolean(startLabel) && Boolean(endLabel);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -86,13 +115,9 @@ export default function ReasignarModal({ open, onClose, reservation }) {
       : new Date(reservation.start);
 
     const newStart = new Date(base.getFullYear(), base.getMonth(), base.getDate(), sh, sm, 0);
-    const newEnd = new Date(base.getFullYear(), base.getMonth(), base.getDate(), eh, em, 0);
+    const newEnd   = new Date(base.getFullYear(), base.getMonth(), base.getDate(), eh, em, 0);
 
-    updateReservation(reservation.id, {
-      salaId: Number(salaId),
-      start: newStart,
-      end: newEnd,
-    });
+    updateReservation(reservation.id, { roomId, start: newStart, end: newEnd });
     onClose();
   };
 
@@ -114,38 +139,40 @@ export default function ReasignarModal({ open, onClose, reservation }) {
 
         <form onSubmit={handleSubmit} className="reserva-modal__body" noValidate>
 
+          {/* Room selector */}
           <div className="reserva-modal__field">
             <label className="reserva-modal__label">Seleccionar Sala*</label>
             <div className="reserva-modal__select-wrap">
               <select
                 className="reserva-modal__select"
-                value={salaId}
-                onChange={e => handleSalaChange(e.target.value)}
+                value={roomId}
+                onChange={e => setRoomId(e.target.value)}
                 required
               >
                 <option value="" />
-                {availableSalas.map(s => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
+                {availableRooms.map(r => (
+                  <option key={r.uuid} value={r.uuid}>{r.label}</option>
                 ))}
               </select>
               <ChevronDown size={18} className="reserva-modal__chevron" />
             </div>
           </div>
 
-          {sala && (
+          {/* Room info card */}
+          {room && (
             <div className="reserva-modal__sala-card">
               <div className="reserva-modal__sala-card-header">
                 <Info size={16} />
-                <span>Información del aula: {sala.label}</span>
+                <span>Información del aula: {room.label}</span>
               </div>
               <div className="reserva-modal__sala-card-details">
-                <span><Users size={15} /> Capacidad: {sala.capacidad} personas</span>
-                <span><Monitor size={15} /> Computadoras: {sala.computadoras}</span>
-                <span><Cast size={15} /> Proyectores: {sala.proyectores}</span>
+                <span><Users size={15} /> Capacidad: {room.capacity} personas</span>
+                <span>Tipo: {typeLabel(room.type)}</span>
               </div>
             </div>
           )}
 
+          {/* Time selectors */}
           <div className="reserva-modal__row">
             <div className="reserva-modal__field">
               <label className="reserva-modal__label">Hora de Inicio*</label>
@@ -199,7 +226,7 @@ export default function ReasignarModal({ open, onClose, reservation }) {
               disabled={!canSubmit}
             >
               <Plus size={20} />
-              Reservar Aula
+              Reasignar Aula
             </button>
           </footer>
         </form>

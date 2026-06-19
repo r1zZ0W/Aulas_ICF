@@ -1,24 +1,45 @@
-import { X, Info, Users, Monitor, Cast, Clock, Pencil, Repeat } from 'lucide-react';
+import { X, Info, Users, Clock, Pencil, Repeat } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../utils/roles';
-import { SALA_BY_ID } from '../../utils/salas';
+import { useReservation } from '../../context/ReservationContext';
+import { typeLabel } from '../../schemas/classroom';
 import '../ReservaModal/ReservaModal.css';
 import './ReservaInfoModal.css';
 
+/**
+ * Formats a Date as "H:MM".
+ *
+ * @param {Date|string|null} date
+ * @returns {string}
+ */
 function fmtTime(date) {
   if (!date) return '—';
   const d = date instanceof Date ? date : new Date(date);
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
+/**
+ * Read-only modal displaying the details of an existing reservation.
+ * Admins see an "Editar" button that opens the reschedule modal.
+ *
+ * @param {{
+ *   open:        boolean,
+ *   onClose:     () => void,
+ *   reservation: object | null,
+ *   onEdit:      () => void,
+ * }} props
+ */
 export default function ReservaInfoModal({ open, onClose, reservation, onEdit }) {
   const { user } = useAuth();
   const isAdmin = user?.role === ROLES.ADMIN;
+  const { roomById } = useReservation();
 
   if (!open || !reservation) return null;
 
-  const sala = SALA_BY_ID[reservation.salaId];
+  const room = roomById[reservation.roomId];
 
   return (
     <Modal open={open} className="reserva-info-modal">
@@ -44,6 +65,7 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
             </div>
           )}
 
+          {/* Class name (read-only) */}
           <div className="reserva-modal__field">
             <label className="reserva-modal__label">Nombre de la clase*</label>
             <input
@@ -54,20 +76,21 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
             />
           </div>
 
-          {sala && (
+          {/* Room info card */}
+          {room && (
             <div className="reserva-modal__sala-card">
               <div className="reserva-modal__sala-card-header">
                 <Info size={16} />
-                <span>Información del aula: {sala.label}</span>
+                <span>Información del aula: {room.label}</span>
               </div>
               <div className="reserva-modal__sala-card-details">
-                <span><Users size={15} /> Capacidad: {sala.capacidad} personas</span>
-                <span><Monitor size={15} /> Computadoras: {sala.computadoras}</span>
-                <span><Cast size={15} /> Proyectores: {sala.proyectores}</span>
+                <span><Users size={15} /> Capacidad: {room.capacity} personas</span>
+                <span>Tipo: {typeLabel(room.type)}</span>
               </div>
             </div>
           )}
 
+          {/* Time display (read-only) */}
           <div className="reserva-modal__row">
             <div className="reserva-modal__field">
               <label className="reserva-modal__label">Hora de Inicio*</label>

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Info, Users, Monitor, Cast, Clock, ChevronDown, Plus, ArrowLeft, Calendar, Repeat } from 'lucide-react';
+import { X, Info, Users, Clock, ChevronDown, Plus, ArrowLeft, Calendar, Repeat } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import { useReservation } from '../../context/ReservationContext';
+import { typeLabel } from '../../schemas/classroom';
 import './ReservaModal.css';
 
 const MONTHS_ES = [
@@ -10,14 +11,11 @@ const MONTHS_ES = [
 ];
 const WEEKDAYS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 
-const SALAS = [
-  { id: 1, nombre: 'Auditorio',            capacidad: 100, computadoras: 0,  proyectores: 2 },
-  { id: 2, nombre: 'Aula I - Multimodal',  capacidad: 30,  computadoras: 30, proyectores: 1 },
-  { id: 3, nombre: 'Aula II - Multimodal', capacidad: 25,  computadoras: 25, proyectores: 1 },
-  { id: 4, nombre: 'Aula III',             capacidad: 40,  computadoras: 0,  proyectores: 1 },
-  { id: 5, nombre: 'Aula IV',              capacidad: 35,  computadoras: 0,  proyectores: 1 },
-];
-
+/**
+ * @param {Date} a
+ * @param {Date} b
+ * @returns {boolean}
+ */
 function sameDay(a, b) {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -26,9 +24,19 @@ function sameDay(a, b) {
   );
 }
 
+/** @param {number} h @param {number} m @returns {number} */
 function toMins(h, m) { return h * 60 + m; }
+
+/** @param {number} h @param {number} m @returns {string} */
 function fmt(h, m) { return `${h}:${String(m).padStart(2, '0')}`; }
 
+/**
+ * Returns available start time slots for the given date.
+ * Slots before the current half-hour are excluded when the date is today.
+ *
+ * @param {Date} date
+ * @returns {Array<{ h: number, m: number, label: string }>}
+ */
 function getStartSlots(date) {
   const now = new Date();
   const isToday = sameDay(date, now);
@@ -46,6 +54,13 @@ function getStartSlots(date) {
   return slots;
 }
 
+/**
+ * Returns available end time slots given a start time.
+ *
+ * @param {number} startH
+ * @param {number} startM
+ * @returns {Array<{ h: number, m: number, label: string }>}
+ */
 function getEndSlots(startH, startM) {
   const startMins = toMins(startH, startM);
   const slots = [];
@@ -59,6 +74,14 @@ function getEndSlots(startH, startM) {
   return slots;
 }
 
+/**
+ * Finds the slot whose time matches the given Date (snapped to half-hour),
+ * or falls back to the first available slot.
+ *
+ * @param {Array<{ h: number, m: number, label: string }>} slots
+ * @param {Date|null} date
+ * @returns {{ h: number, m: number, label: string } | null}
+ */
 function snapSlot(slots, date) {
   if (!date || !slots.length) return slots[0] ?? null;
   const d = new Date(date);
@@ -66,14 +89,21 @@ function snapSlot(slots, date) {
   return slots.find(s => s.h === d.getHours() && s.m === m) ?? slots[0];
 }
 
+// ── DatePicker sub-component ──────────────────────────────────────────────────
+
+/**
+ * Inline month-grid date picker.
+ *
+ * @param {{ selectedDate: Date|null, onSelect: (date: Date) => void }} props
+ */
 function DatePicker({ selectedDate, onSelect }) {
   const today = new Date();
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  const daysInMonth   = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDay      = new Date(viewYear, viewMonth, 1).getDay();
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const daysInMonth    = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDay       = new Date(viewYear, viewMonth, 1).getDay();
+  const todayMidnight  = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
 
   const prevMonth = () => {
@@ -86,9 +116,9 @@ function DatePicker({ selectedDate, onSelect }) {
     else setViewMonth(m => m + 1);
   };
 
-  const isPast       = d => new Date(viewYear, viewMonth, d) < todayMidnight;
-  const isToday      = d => isCurrentMonth && d === today.getDate();
-  const isSelected   = d =>
+  const isPast     = d => new Date(viewYear, viewMonth, d) < todayMidnight;
+  const isToday    = d => isCurrentMonth && d === today.getDate();
+  const isSelected = d =>
     selectedDate &&
     selectedDate.getFullYear() === viewYear &&
     selectedDate.getMonth()    === viewMonth &&
@@ -135,10 +165,10 @@ function DatePicker({ selectedDate, onSelect }) {
             onClick={() => d && !isPast(d) && onSelect(new Date(viewYear, viewMonth, d))}
             className={[
               'date-picker__cell',
-              !d                                  ? 'date-picker__cell--empty'    : '',
-              d && isPast(d)                      ? 'date-picker__cell--past'     : '',
-              d && isToday(d) && !isSelected(d)   ? 'date-picker__cell--today'    : '',
-              d && isSelected(d)                  ? 'date-picker__cell--selected' : '',
+              !d                                 ? 'date-picker__cell--empty'    : '',
+              d && isPast(d)                     ? 'date-picker__cell--past'     : '',
+              d && isToday(d) && !isSelected(d)  ? 'date-picker__cell--today'    : '',
+              d && isSelected(d)                 ? 'date-picker__cell--selected' : '',
             ].filter(Boolean).join(' ')}
           >
             {d || ''}
@@ -149,37 +179,50 @@ function DatePicker({ selectedDate, onSelect }) {
   );
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
+/**
+ * Two-step modal for creating a new reservation.
+ * Step 1: date picker. Step 2: room + time + class name form.
+ *
+ * @param {{
+ *   open:         boolean,
+ *   onClose:      () => void,
+ *   initialStart: Date | null,
+ *   initialEnd:   Date | null,
+ * }} props
+ */
 export default function ReservaModal({ open, onClose, initialStart = null, initialEnd = null }) {
-  const { visibleSalas, addReservation } = useReservation();
-  const availableSalas   = SALAS.filter(s => visibleSalas.has(s.id));
+  const { rooms, visibleRooms, addReservation } = useReservation();
+  const availableRooms = rooms.filter(r => visibleRooms.has(r.uuid));
 
-  const [step,        setStep]        = useState(1);
-  const [pickedDate,  setPickedDate]  = useState(null);
-  const [salaId,      setSalaId]      = useState('');
-  const [nombre,      setNombre]      = useState('');
-  const [startLabel,  setStartLabel]  = useState('');
-  const [endLabel,    setEndLabel]    = useState('');
-  const [alumnos,     setAlumnos]     = useState('');
-  const [recurrente,  setRecurrente]  = useState(false);
+  const [step,       setStep]       = useState(1);
+  const [pickedDate, setPickedDate] = useState(null);
+  const [roomId,     setRoomId]     = useState('');
+  const [className,  setClassName]  = useState('');
+  const [startLabel, setStartLabel] = useState('');
+  const [endLabel,   setEndLabel]   = useState('');
+  const [attendees,  setAttendees]  = useState('');
+  const [recurring,  setRecurring]  = useState(false);
 
-  // Reset sala selection when it gets hidden from sidebar
+  // Reset room selection when the room gets hidden from the sidebar
   useEffect(() => {
-    if (salaId && !visibleSalas.has(Number(salaId))) {
-      setSalaId('');
-      setAlumnos('');
+    if (roomId && !visibleRooms.has(roomId)) {
+      setRoomId('');
+      setAttendees('');
     }
-  }, [visibleSalas, salaId]);
+  }, [visibleRooms, roomId]);
 
   useEffect(() => {
     if (!open) return;
 
-    setSalaId('');
-    setNombre('');
-    setAlumnos('');
-    setRecurrente(false);
+    setRoomId('');
+    setClassName('');
+    setAttendees('');
+    setRecurring(false);
 
     if (initialStart) {
-      const d         = new Date(initialStart);
+      const d          = new Date(initialStart);
       const startSlots = getStartSlots(d);
       const defStart   = snapSlot(startSlots, initialStart);
       const endSlots   = defStart ? getEndSlots(defStart.h, defStart.m) : [];
@@ -212,9 +255,9 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
   const startSlots = getStartSlots(forDate);
   const startSlot  = startSlots.find(s => s.label === startLabel) ?? null;
   const endSlots   = startSlot ? getEndSlots(startSlot.h, startSlot.m) : [];
-  const sala       = SALAS.find(s => String(s.id) === salaId) ?? null;
+  const room       = rooms.find(r => r.uuid === roomId) ?? null;
 
-  const handleSalaChange  = val => { setSalaId(val); setAlumnos(''); };
+  const handleRoomChange  = val => { setRoomId(val); setAttendees(''); };
   const handleStartChange = val => {
     setStartLabel(val);
     const slot = startSlots.find(s => s.label === val);
@@ -224,11 +267,11 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
   };
 
   const canSubmit =
-    Boolean(salaId) &&
-    nombre.trim().length > 0 &&
+    Boolean(roomId) &&
+    className.trim().length > 0 &&
     Boolean(startLabel) &&
     Boolean(endLabel) &&
-    Number(alumnos) >= 1;
+    Number(attendees) >= 1;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -240,18 +283,18 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
 
     const reservationsToCreate = [];
 
-    if (recurrente) {
+    if (recurring) {
       const currentStart = new Date(newStart);
-      const currentEnd = new Date(newEnd);
-      const limitDate = new Date(newStart.getFullYear(), 7, 31, 23, 59, 59);
+      const currentEnd   = new Date(newEnd);
+      const limitDate    = new Date(newStart.getFullYear(), 7, 31, 23, 59, 59);
 
       while (currentStart <= limitDate) {
         reservationsToCreate.push({
-          salaId: Number(salaId),
-          title: nombre,
-          start: new Date(currentStart),
-          end: new Date(currentEnd),
-          alumnos: Number(alumnos),
+          roomId,
+          title:      className,
+          start:      new Date(currentStart),
+          end:        new Date(currentEnd),
+          attendees:  Number(attendees),
           recurrente: true,
         });
         currentStart.setDate(currentStart.getDate() + 7);
@@ -261,12 +304,12 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
 
     if (reservationsToCreate.length === 0) {
       reservationsToCreate.push({
-        salaId: Number(salaId),
-        title: nombre,
-        start: newStart,
-        end: newEnd,
-        alumnos: Number(alumnos),
-        recurrente,
+        roomId,
+        title:      className,
+        start:      newStart,
+        end:        newEnd,
+        attendees:  Number(attendees),
+        recurrente: recurring,
       });
     }
 
@@ -274,7 +317,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
     onClose();
   };
 
-  const alumnosMax = sala?.capacidad ?? 0;
+  const maxAttendees = room?.capacity ?? 0;
 
   const formatDate = d =>
     d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -327,54 +370,53 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               </div>
             )}
 
-            {/* Seleccionar Sala */}
+            {/* Room selector */}
             <div className="reserva-modal__field">
               <label className="reserva-modal__label">Seleccionar Sala*</label>
               <div className="reserva-modal__select-wrap">
                 <select
                   className="reserva-modal__select"
-                  value={salaId}
-                  onChange={e => handleSalaChange(e.target.value)}
+                  value={roomId}
+                  onChange={e => handleRoomChange(e.target.value)}
                   required
                 >
                   <option value="" />
-                  {availableSalas.map(s => (
-                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                  {availableRooms.map(r => (
+                    <option key={r.uuid} value={r.uuid}>{r.label}</option>
                   ))}
                 </select>
                 <ChevronDown size={18} className="reserva-modal__chevron" />
               </div>
             </div>
 
-            {/* Sala info card */}
-            {sala && (
+            {/* Room info card */}
+            {room && (
               <div className="reserva-modal__sala-card">
                 <div className="reserva-modal__sala-card-header">
                   <Info size={16} />
-                  <span>Información del aula: {sala.nombre}</span>
+                  <span>Información del aula: {room.label}</span>
                 </div>
                 <div className="reserva-modal__sala-card-details">
-                  <span><Users size={15} /> Capacidad: {sala.capacidad} personas</span>
-                  <span><Monitor size={15} /> Computadoras: {sala.computadoras}</span>
-                  <span><Cast size={15} /> Proyectores: {sala.proyectores}</span>
+                  <span><Users size={15} /> Capacidad: {room.capacity} personas</span>
+                  <span>Tipo: {typeLabel(room.type)}</span>
                 </div>
               </div>
             )}
 
-            {/* Nombre de la clase */}
+            {/* Class name */}
             <div className="reserva-modal__field">
               <label className="reserva-modal__label">Nombre de la clase*</label>
               <input
                 type="text"
                 className="reserva-modal__input"
                 placeholder="Ej. Introducción a Mecánica de Fluidos"
-                value={nombre}
-                onChange={e => setNombre(e.target.value)}
+                value={className}
+                onChange={e => setClassName(e.target.value)}
                 required
               />
             </div>
 
-            {/* Hora Inicio / Hora Fin */}
+            {/* Start / End time */}
             <div className="reserva-modal__row">
               <div className="reserva-modal__field">
                 <label className="reserva-modal__label">Hora de Inicio*</label>
@@ -417,21 +459,21 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               </div>
             </div>
 
-            {/* Número de alumnos */}
+            {/* Attendee count */}
             <div className="reserva-modal__field">
               <label className="reserva-modal__label">Número de alumnos*</label>
               <div className="reserva-modal__select-wrap">
                 <select
                   className="reserva-modal__select"
-                  value={alumnos}
-                  onChange={e => setAlumnos(e.target.value)}
+                  value={attendees}
+                  onChange={e => setAttendees(e.target.value)}
                   required
-                  disabled={!sala}
+                  disabled={!room}
                 >
                   <option value="">
-                    {sala ? '' : 'Selecciona un aula primero'}
+                    {room ? '' : 'Selecciona un aula primero'}
                   </option>
-                  {Array.from({ length: alumnosMax }, (_, i) => i + 1).map(n => (
+                  {Array.from({ length: maxAttendees }, (_, i) => i + 1).map(n => (
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>
@@ -439,7 +481,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               </div>
             </div>
 
-            {/* Recurrente */}
+            {/* Recurring toggle */}
             <div className="reserva-modal__recurrente">
               <div className="reserva-modal__recurrente-info">
                 <span className="reserva-modal__recurrente-label">
@@ -453,9 +495,9 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               <button
                 type="button"
                 role="switch"
-                aria-checked={recurrente}
-                className={`reserva-modal__toggle${recurrente ? ' reserva-modal__toggle--on' : ''}`}
-                onClick={() => setRecurrente(r => !r)}
+                aria-checked={recurring}
+                className={`reserva-modal__toggle${recurring ? ' reserva-modal__toggle--on' : ''}`}
+                onClick={() => setRecurring(r => !r)}
               />
             </div>
 
