@@ -21,8 +21,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -36,7 +36,7 @@ import java.util.UUID;
 /**
  * REST controller for managing user account endpoints.
  *
- * <p>Registration, listing, admin update, and deactivation are restricted to the {@code ADMIN} role.
+ * <p>Registration, listing, admin update, and deletion are restricted to the {@code ADMIN} role.
  * The self-edit endpoint ({@code PUT /me}) is available to any authenticated user.
  * All endpoints are exposed under {@code /api/v1/users}.</p>
  */
@@ -75,7 +75,7 @@ public class UserController implements ResponseHandler {
     }
 
     /**
-     * Retrieves all user accounts, paginated. Requires ADMIN role.
+     * Retrieves all user accounts, paginated, excluding the authenticated admin's own profile.
      * GET /api/v1/users[?search=text&page=0&size=20&sort=createdAt&direction=desc]
      *
      * <p>When {@code page} and {@code size} are omitted the response contains all users
@@ -85,7 +85,9 @@ public class UserController implements ResponseHandler {
      *
      * <p>When {@code search} is provided, a case-insensitive {@code LIKE} filter is
      * applied over {@code firstName}, {@code lastNames}, {@code email}, {@code username},
-     * and {@code matricula}. {@code totalElements} reflects the filtered count.</p>
+     * and {@code matricula}. {@code totalElements} reflects the filtered count.
+     * The statistics endpoint ({@code GET /stats}) is intentionally unaffected and
+     * continues to count the full user corpus.</p>
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -95,8 +97,9 @@ public class UserController implements ResponseHandler {
                     value = {"createdAt", "email", "username", "matricula", "firstName"},
                     defaultSort = "createdAt",
                     defaultDirection = "desc")
-            PageCriteria criteria) {
-        return ok(userService.findAll(search, criteria.toPageable()));
+            PageCriteria criteria,
+            @AuthenticationPrincipal UserDetailsImp principal) {
+        return ok(userService.findAll(search, criteria.toPageable(), principal.getUuid()));
     }
 
     /**
@@ -130,19 +133,21 @@ public class UserController implements ResponseHandler {
     }
 
     /**
-     * Soft-deactivates a user account. Requires ADMIN role.
-     * PATCH /api/v1/users/{uuid}/deactivate
+     * Permanently deletes a user account together with all their reservation data
+     * (slots, instances, and groups). This operation is irreversible. Requires ADMIN role.
+     * DELETE /api/v1/users/{uuid}
      *
-     * @throws mx.unam.icf.aulas.kernel.domain.exceptions.DomainException when the admin attempts to deactivate their own account
+     * @throws mx.unam.icf.aulas.kernel.domain.exceptions.DomainException           when the admin attempts to delete their own account
+     * @throws mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException when the target user does not exist
      */
-    @PatchMapping("/{uuid}/deactivate")
+    @DeleteMapping("/{uuid}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(
+    public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable UUID uuid,
             @AuthenticationPrincipal UserDetailsImp principal
     ) {
-        userService.deactivate(uuid, principal.getUuid());
-        return ok("User deactivated successfully");
+        userService.delete(uuid, principal.getUuid());
+        return ok("User deleted successfully");
     }
 
     /**

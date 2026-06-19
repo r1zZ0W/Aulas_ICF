@@ -14,6 +14,9 @@ import mx.unam.icf.aulas.modules.access.users.app.dtos.UserUpdateRequestDTO;
 import mx.unam.icf.aulas.modules.access.users.app.mappers.UserMapper;
 import mx.unam.icf.aulas.modules.access.users.domain.User;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.UserRepository;
+import mx.unam.icf.aulas.modules.reservations.groups.infrastructure.ReservationGroupRepository;
+import mx.unam.icf.aulas.modules.reservations.instances.infrastructure.ReservInstanceRepository;
+import mx.unam.icf.aulas.modules.reservations.slots.infrastructure.ReservSlotRepository;
 import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
 import org.springframework.data.domain.Page;
@@ -31,7 +34,7 @@ import java.util.UUID;
  * Service managing the lifecycle of {@link User} entities.
  *
  * <p>Covers user registration (admin-only), profile retrieval, admin updates,
- * soft-deactivation, and self-service profile editing.</p>
+ * hard deletion with cascade removal of all reservation data, and self-service profile editing.</p>
  *
  * <p>On registration (DFR §3.1):</p>
  * <ul>
@@ -41,17 +44,20 @@ import java.util.UUID;
  * </ul>
  *
  * @author Ithera
- * @version 3.0
+ * @version 4.0
  */
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository         userRepository;
-    private final RoleRepository         roleRepository;
-    private final PasswordEncoder        passwordEncoder;
-    private final UserMapper             userMapper;
-    private final NotificationService    notificationService;
+    private final UserRepository              userRepository;
+    private final RoleRepository              roleRepository;
+    private final PasswordEncoder             passwordEncoder;
+    private final UserMapper                  userMapper;
+    private final NotificationService         notificationService;
+    private final ReservationGroupRepository  reservationGroupRepository;
+    private final ReservInstanceRepository    reservInstanceRepository;
+    private final ReservSlotRepository        reservSlotRepository;
 
     // ── Registration ─────────────────────────────────────────────────────────
 
@@ -110,24 +116,27 @@ public class UserService {
     // ── Queries ───────────────────────────────────────────────────────────────
 
     /**
-     * Returns a page of users in the system, optionally filtered by a search term.
+     * Returns a page of users in the system, excluding the authenticated admin's own profile,
+     * and optionally filtered by a search term.
      *
-     * <p>When {@code search} is {@code null} or blank the full catalog is returned
-     * (backward-compatible with the no-search path). When provided, a case-insensitive
+     * <p>The {@code currentUserUuid} exclusion is applied at the query level so that
+     * {@code totalElements} stays consistent with the returned items and server-side
+     * pagination remains correct. When {@code search} is {@code null} or blank the
+     * full catalog (minus the current user) is returned. When provided, a case-insensitive
      * {@code LIKE} match is performed on {@code firstName}, {@code lastNames},
-     * {@code email}, {@code username}, and {@code matricula}; {@code totalElements}
-     * reflects the filtered count, so the frontend paginador stays correct.</p>
+     * {@code email}, {@code username}, and {@code matricula}.</p>
      *
-     * @param search   optional free-text filter (trimmed by the repository query)
-     * @param pageable pagination and sort criteria (validated by
-     *                 {@link mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteriaArgumentResolver})
+     * @param search          optional free-text filter (trimmed by the repository query)
+     * @param pageable        pagination and sort criteria (validated by
+     *                        {@link mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteriaArgumentResolver})
+     * @param currentUserUuid public UUID of the authenticated admin; their row is excluded from results
      * @return a {@link PagedResultDTO} containing the requested page of users
      */
     @Transactional(readOnly = true)
-    public PagedResultDTO<UserResponseDTO> findAll(String search, Pageable pageable) {
+    public PagedResultDTO<UserResponseDTO> findAll(String search, Pageable pageable, UUID currentUserUuid) {
         Page<User> page = (search == null || search.isBlank())
-                ? userRepository.findAll(pageable)
-                : userRepository.search(search.trim(), pageable);
+                ? userRepository.findAllExcluding(currentUserUuid, pageable)
+                : userRepository.search(search.trim(), currentUserUuid, pageable);
         return PageMapper.toDto(page, userMapper::toDtoList);
     }
 
@@ -205,24 +214,47 @@ public class UserService {
     }
 
     /**
-     * Soft-deactivates a user account, preserving reservation history.
-     * Restricted to ADMIN role; an admin cannot deactivate their own account.
+     * Permanently deletes a user account along with all their reservation data
+     * (slots → instances → groups, in FK-safe order). This operation is irreversible.
      *
-     * @param uuid            public UUID of the user to deactivate
+     * <p>Deletion order (child before parent to respect NOT NULL FK constraints):</p>
+     * <ol>
+     *   <li>{@code reserv_slots} — deleted via bulk JPQL on the denormalized {@code user_id}.</li>
+     *   <li>{@code reserv_instances} — deleted via bulk JPQL scoped to the user's groups.</li>
+     *   <li>{@code reservation_group_days} + {@code reservation_groups} — deleted by entity so
+     *       Hibernate removes the element-collection rows before the group rows.</li>
+     *   <li>{@code users} — the user row itself.</li>
+     * </ol>
+     *
+     * <p>Restricted to ADMIN role; an admin cannot delete their own account
+     * (defence-in-depth: the listing endpoint already hides their own profile).</p>
+     *
+     * @param uuid            public UUID of the user to delete
      * @param currentUserUuid public UUID of the authenticated admin performing the action
-     * @throws DomainException           when the admin attempts to deactivate their own account
+     * @throws DomainException           when the admin attempts to delete their own account
      * @throws ResourceNotFoundException when the target user does not exist
      */
     @Transactional(rollbackFor = Exception.class)
-    public void deactivate(UUID uuid, UUID currentUserUuid) {
+    public void delete(UUID uuid, UUID currentUserUuid) {
         if (uuid.equals(currentUserUuid))
-            throw new DomainException("You cannot deactivate your own account");
+            throw new DomainException("You cannot delete your own account");
 
         User user = userRepository.findByUuid(uuid)
             .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uuid));
 
-        user.setIsActive(false);
-        userRepository.save(user);
+        // 1. Slots (references instance_id + denormalized user_id)
+        reservSlotRepository.deleteAllByUserId(user.getId());
+
+        // 2. Instances (reference group_id)
+        reservInstanceRepository.deleteAllByOwnerId(user.getId());
+
+        // 3. Groups + reservation_group_days element collection
+        //    deleteAll(entities) triggers per-entity DELETE so Hibernate cleans the
+        //    @ElementCollection rows first — a bulk JPQL DELETE would skip that and violate the FK.
+        reservationGroupRepository.deleteAll(reservationGroupRepository.findByUserUuid(uuid));
+
+        // 4. User row
+        userRepository.delete(user);
     }
 
     // ── Self-service ──────────────────────────────────────────────────────────

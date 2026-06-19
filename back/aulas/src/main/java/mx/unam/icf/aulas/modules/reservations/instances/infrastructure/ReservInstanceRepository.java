@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -110,4 +111,16 @@ public interface ReservInstanceRepository extends JpaRepository<ReservInstance, 
             @Param("status") ReservInstanceStatus status,
             @Param("excludeId") Long excludeId
     );
+
+    /**
+     * Bulk-deletes all reservation instances whose owning group belongs to the given user.
+     * Must be called <em>after</em> all {@code ReservSlot} rows have been removed (child before parent),
+     * and <em>before</em> the groups themselves are deleted.
+     *
+     * @param userId internal database PK of the user (not the public UUID)
+     */
+    @Modifying
+    @Query("DELETE FROM ReservInstance ri WHERE ri.group.id IN " +
+           "(SELECT g.id FROM ReservationGroup g WHERE g.user.id = :userId)")
+    void deleteAllByOwnerId(@Param("userId") Long userId);
 }

@@ -62,28 +62,43 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findAll(Pageable pageable);
 
     /**
-     * Full-text search across user-visible fields.
+     * Returns a page of all users <em>except</em> the one identified by {@code excludeUuid}.
+     * Used by the admin listing endpoint to hide the authenticated admin's own profile from
+     * the table without affecting the statistics counters.
+     *
+     * @param excludeUuid public UUID of the user to omit (the current admin)
+     * @param pageable    pagination and sort criteria
+     * @return a page of users excluding the specified account
+     */
+    @EntityGraph(attributePaths = "role")
+    @Query("SELECT u FROM User u WHERE u.uuid <> :excludeUuid")
+    Page<User> findAllExcluding(@Param("excludeUuid") UUID excludeUuid, Pageable pageable);
+
+    /**
+     * Full-text search across user-visible fields, excluding a specific account.
      *
      * <p>Performs a case-insensitive {@code LIKE} match on {@code firstName},
      * {@code lastNames}, {@code email}, {@code username}, and {@code matricula}.
      * The {@code role} association is eagerly joined to avoid N+1 reads when the
-     * mapper accesses {@code role.name}. Spring Data derives the count query
-     * automatically from the {@code SELECT} clause.</p>
+     * mapper accesses {@code role.name}. The {@code excludeUuid} filter ensures the
+     * authenticated admin's own profile is never returned.</p>
      *
-     * @param q        search term (already trimmed by the caller; never {@code null})
-     * @param pageable pagination and sort criteria
-     * @return a page of matching users
+     * @param q           search term (already trimmed by the caller; never {@code null})
+     * @param excludeUuid public UUID of the user to omit (the current admin)
+     * @param pageable    pagination and sort criteria
+     * @return a page of matching users, excluding the specified account
      */
     @EntityGraph(attributePaths = "role")
     @Query("""
             SELECT u FROM User u
-            WHERE LOWER(u.firstName) LIKE LOWER(CONCAT('%', :q, '%'))
-               OR LOWER(u.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
-               OR LOWER(u.email)     LIKE LOWER(CONCAT('%', :q, '%'))
-               OR LOWER(u.username)  LIKE LOWER(CONCAT('%', :q, '%'))
-               OR LOWER(u.matricula) LIKE LOWER(CONCAT('%', :q, '%'))
+            WHERE u.uuid <> :excludeUuid
+              AND (   LOWER(u.firstName) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(u.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(u.email)     LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(u.username)  LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(u.matricula) LIKE LOWER(CONCAT('%', :q, '%')))
             """)
-    Page<User> search(@Param("q") String q, Pageable pageable);
+    Page<User> search(@Param("q") String q, @Param("excludeUuid") UUID excludeUuid, Pageable pageable);
 
     /**
      * Returns a single-row aggregate with counts for the admin stats dashboard.
