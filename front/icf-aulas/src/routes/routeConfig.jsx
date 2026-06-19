@@ -32,7 +32,7 @@ export const PRIVATE_ROUTES = [
   {
     path: '/classrooms',
     element: <ClassroomsPage />,
-    allowedRoles: [ROLES.ADMIN],
+    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
     sidebar: { label: 'Aulas', icon: <School />, show: true },
   },
   {

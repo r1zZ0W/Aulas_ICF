@@ -114,6 +114,10 @@ export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = 
       // server-side 401 during logout doesn't re-trigger the redirect while the
       // local session is already being cleared.
       if ((response.status === 401 || response.status === 403) && storedToken && !skipAuthRedirect) {
+        // Signal the Login page to show the "session expired" modal after the
+        // hard reload. sessionStorage survives a same-tab location change but
+        // NOT a cross-tab or a new window, which is the desired scope.
+        sessionStorage.setItem('authReason', 'revoked');
         localStorage.clear();
         window.location.href = '/login';
         // Return a promise that never resolves so no downstream code runs while

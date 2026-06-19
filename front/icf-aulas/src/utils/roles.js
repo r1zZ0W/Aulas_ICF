@@ -15,6 +15,16 @@ export const ROLES = {
 export const DISPLAY_ROLE = {
   [ROLES.ADMIN]: 'Administrador',
   [ROLES.MAESTRO]: 'Maestro',
+};
+
+/** Returns the Spanish display label for a backend role name. */
+export function roleLabel(roleName) {
+  return DISPLAY_ROLE[roleName] ?? roleName ?? '—';
+}
+
+/** Returns the badge variant for a backend role name. */
+export function roleBadgeVariant(roleName) {
+  return roleName?.toUpperCase() === 'ADMIN' ? 'primary' : 'neutral';
 }
 
 /**

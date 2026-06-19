@@ -12,9 +12,10 @@ import Error404 from '../errors/Error404.jsx';
 export default function PrivateRouter() {
     const { isAuthenticated, user } = useAuth();
 
-    // Extra protection in case it renders without a session
+    // Extra protection in case it renders without a session.
+    // Redirects to /login (not /401) for consistency with the public router catch-all.
     if (!isAuthenticated)
-        return <Navigate to="/401" replace />;
+        return <Navigate to="/login" replace state={{ reason: 'no-session' }} />;
 
     const defaultRoute = getDashboardRoute(user.role);
 

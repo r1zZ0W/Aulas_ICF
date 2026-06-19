@@ -34,10 +34,19 @@ export default function PublicRouter() {
                 <Route path="/403" element={<Error403 />} />
                 <Route path="/404" element={<Error404 />} />
 
-                {/* Cualquier intento de entrar a una ruta sin sesión */}
+                {/* Cualquier intento de entrar a una ruta sin sesión:
+                    - Rutas privadas → /login (con motivo para mostrar el modal)
+                    - Rutas desconocidas → 404
+                    NOTA: usar /login aquí (no /401) elimina la carrera de prioridades del
+                    logout: aunque clearSession() gane al navigate(), el catch-all ya no
+                    muestra la pantalla de error porque ambos destinos son /login. */}
                 <Route
                     path="*"
-                    element={isAttemptingPrivate ? <Navigate to="/401" replace /> : <Error404 />}
+                    element={
+                        isAttemptingPrivate
+                            ? <Navigate to="/login" replace state={{ reason: 'no-session' }} />
+                            : <Error404 />
+                    }
                 />
             </Routes>
         </div>

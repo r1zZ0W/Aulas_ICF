@@ -10,8 +10,8 @@ import './PrivateLayout.css';
 function Layout() {
   const {
     modalOpen, closeModal, modalSlot,
-    infoModalOpen, selectedReservation, closeInfoModal, openReasignar,
-    reasignarOpen, closeReasignar,
+    infoModalOpen, selectedReservation, closeInfoModal, openReschedule,
+    rescheduleOpen, closeReschedule,
   } = useReservation();
 
   return (
@@ -32,12 +32,12 @@ function Layout() {
         open={infoModalOpen}
         onClose={closeInfoModal}
         reservation={selectedReservation}
-        onEdit={openReasignar}
+        onEdit={openReschedule}
       />
 
       <ReasignarModal
-        open={reasignarOpen}
-        onClose={closeReasignar}
+        open={rescheduleOpen}
+        onClose={closeReschedule}
         reservation={selectedReservation}
       />
 
