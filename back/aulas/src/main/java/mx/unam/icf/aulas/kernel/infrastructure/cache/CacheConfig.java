@@ -11,7 +11,6 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +45,6 @@ public class CacheConfig {
      * @return a configured {@link CaffeineCacheManager} for token blacklisting
      */
     @Bean
-    @Profile("!prod")
     public CacheManager cacheManager(@Value("${jwt.expiration:3600000}") long jwtExpirationMs) {
         CaffeineCacheManager manager = new CaffeineCacheManager("token-blacklist");
         manager.setCaffeine(

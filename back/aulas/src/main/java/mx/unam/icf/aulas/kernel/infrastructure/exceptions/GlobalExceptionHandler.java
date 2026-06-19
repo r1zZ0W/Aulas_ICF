@@ -103,7 +103,7 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("The provided token is invalid or has expired."));
     }
 
-    /** Handles tokens that were explicitly revoked (blacklisted in Redis after logout or password reset); returns 401. */
+    /** Handles tokens that were explicitly revoked (blacklisted after logout or password reset); returns 401. */
     @ExceptionHandler(TokenRevokedException.class)
     public ResponseEntity<ApiResponse<Void>> handleTokenRevoked(TokenRevokedException ex) {
         log.warn("Revoked token used: {}", ex.getMessage());

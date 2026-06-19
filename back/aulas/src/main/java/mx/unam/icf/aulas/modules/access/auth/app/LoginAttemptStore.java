@@ -8,8 +8,7 @@ package mx.unam.icf.aulas.modules.access.auth.app;
  *
  * @author Ithera
  * @version 1.0
- * @see LoginAttemptService  in-memory (non-prod) implementation
- * @see RedisLoginAttemptService distributed (prod) implementation
+ * @see LoginAttemptService  in-memory implementation
  */
 public interface LoginAttemptStore {
 

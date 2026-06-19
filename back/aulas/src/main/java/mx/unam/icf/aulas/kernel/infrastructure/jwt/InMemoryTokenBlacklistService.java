@@ -3,18 +3,17 @@ package mx.unam.icf.aulas.kernel.infrastructure.jwt;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
- * In-memory implementation of {@link TokenBlacklist} intended for non-production environments.
+ * In-memory implementation of {@link TokenBlacklist} backed by Caffeine via Spring's
+ * {@link CacheManager} abstraction.
  * <p>
- * This implementation leverages Spring's {@link CacheManager} abstraction (backed by Caffeine)
- * to store blacklisted identifiers locally within the application heap.
+ * Blacklisted identifiers live in the application heap and are automatically evicted
+ * once the corresponding JWT naturally expires.
  * </p>
  */
 @Service
-@Profile("!prod")
 @RequiredArgsConstructor
 public class InMemoryTokenBlacklistService implements TokenBlacklist {
 

@@ -1,7 +1,7 @@
 package mx.unam.icf.aulas.modules.access.auth.app.exceptions;
 
 /**
- * Thrown when a token's JTI (unique token ID) is found in the Redis blacklist,
+ * Thrown when a token's JTI (unique token ID) is found in the token blacklist,
  * indicating it was explicitly revoked via logout, token rotation, or a password reset.
  * Mapped to HTTP 401 by {@code GlobalExceptionHandler}.
  */

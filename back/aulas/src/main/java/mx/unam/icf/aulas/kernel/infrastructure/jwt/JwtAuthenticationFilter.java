@@ -31,7 +31,7 @@ import java.util.List;
  *
  * <p>Only tokens with {@code type="auth"} are accepted for API access. Refresh and reset tokens
  * are rejected here — they are validated explicitly in their respective service methods.
- * Revoked tokens (blacklisted by jti in Redis) are also rejected with 401.</p>
+ * Revoked tokens (blacklisted by jti) are also rejected with 401.</p>
  */
 @Component
 @RequiredArgsConstructor
