@@ -60,3 +60,10 @@
 .data-table__state {
   padding: 8px 0 16px;
 }
+
+/* Subtle dim while refetching with previous rows still visible (anti-flash). */
+.data-table--loading .data-table__body {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
