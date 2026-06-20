@@ -1,54 +1,52 @@
 /**
  * @fileoverview Local form and modal state for creating, editing, viewing, and
- * deleting classrooms. Mirrors the useUsersForm pattern.
+ * deactivating classrooms. Mirrors the useUsersForm pattern.
+ *
+ * Children assignment (edit mode):
+ *   `form.childUuids` holds the UUIDs of classrooms the current aula should contain.
+ *   On openEdit() it is pre-populated with the current direct children (via getChildren).
+ *   handleEditSubmit() diffs against `prevChildUuids` and calls `setChildrenMutation`
+ *   when the selection changed, using sequential PUTs (interino — see useClassrooms.js).
  */
 import { useState } from 'react';
 import { ClassroomRequestSchema } from '../schemas/classroom';
+import { getChildren } from '../utils/classroomTree';
 
 const DEFAULT_FORM = {
-  name:          '',
-  capacity:      20,
-  type:          'AULA',
-  description:   '',
+  name:           '',
+  capacity:       20,
+  type:           'AULA',
+  description:    '',
   linkedRoomUuid: null,
-  isActive:      true,
+  isActive:       true,
+  childUuids:     [],
 };
 
 /**
  * @param {{
- *   createMutation: import('@tanstack/react-query').UseMutationResult,
- *   updateMutation: import('@tanstack/react-query').UseMutationResult,
+ *   createMutation:      import('@tanstack/react-query').UseMutationResult,
+ *   updateMutation:      import('@tanstack/react-query').UseMutationResult,
+ *   setChildrenMutation: import('@tanstack/react-query').UseMutationResult,
+ *   allClassrooms:       object[],
  * }} deps
- *
- * @returns {{
- *   createOpen:          boolean,
- *   editTarget:          object | null,
- *   viewTarget:          object | null,
- *   deleteTarget:        object | null,
- *   form:                typeof DEFAULT_FORM,
- *   openCreate:          () => void,
- *   closeCreate:         () => void,
- *   openEdit:            (classroom: object) => void,
- *   closeEdit:           () => void,
- *   openView:            (classroom: object) => void,
- *   closeView:           () => void,
- *   setDeleteTarget:     (classroom: object | null) => void,
- *   onField:             (field: string, value: any) => void,
- *   handleCreateSubmit:  () => Promise<void>,
- *   handleEditSubmit:    () => Promise<void>,
- * }}
  */
-export function useClassroomsForm({ createMutation, updateMutation }) {
+export function useClassroomsForm({
+  createMutation,
+  updateMutation,
+  setChildrenMutation,
+  allClassrooms = [],
+}) {
   // ── Modal / target state ────────────────────────────────────────────────────
-  const [createOpen,   setCreateOpen]   = useState(false);
-  const [editTarget,   setEditTarget]   = useState(null);
-  const [viewTarget,   setViewTarget]   = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [createOpen,    setCreateOpen]    = useState(false);
+  const [editTarget,    setEditTarget]    = useState(null);
+  const [viewTarget,    setViewTarget]    = useState(null);
+  const [deleteTarget,  setDeleteTarget]  = useState(null);
 
   // ── Shared form data ────────────────────────────────────────────────────────
-  // A single form object is intentional: create and edit modals are never
-  // open at the same time, so sharing state avoids double synchronisation.
-  const [form, setForm] = useState(DEFAULT_FORM);
+  const [form,          setForm]          = useState(DEFAULT_FORM);
+  // Snapshot of children UUIDs when the edit modal was opened,
+  // used to diff against form.childUuids on submit.
+  const [prevChildUuids, setPrevChildUuids] = useState([]);
 
   // ── Modal helpers ───────────────────────────────────────────────────────────
   function openCreate() {
@@ -58,7 +56,9 @@ export function useClassroomsForm({ createMutation, updateMutation }) {
   function closeCreate() { setCreateOpen(false); }
 
   function openEdit(classroom) {
+    const currentChildren = getChildren(classroom.uuid, allClassrooms).map((c) => c.uuid);
     setEditTarget(classroom);
+    setPrevChildUuids(currentChildren);
     setForm({
       name:           classroom.name           ?? '',
       capacity:       classroom.capacity       ?? 1,
@@ -66,6 +66,7 @@ export function useClassroomsForm({ createMutation, updateMutation }) {
       description:    classroom.description    ?? '',
       linkedRoomUuid: classroom.linkedRoomUuid ?? null,
       isActive:       classroom.isActive       ?? true,
+      childUuids:     currentChildren,
     });
   }
   function closeEdit() { setEditTarget(null); }
@@ -83,15 +84,15 @@ export function useClassroomsForm({ createMutation, updateMutation }) {
     const payload = {
       ...form,
       capacity:       Number(form.capacity),
-      linkedRoomUuid: form.linkedRoomUuid || null, // normalise '' → null
+      linkedRoomUuid: form.linkedRoomUuid || null,
     };
     const result = ClassroomRequestSchema.safeParse(payload);
-    if (!result.success) return; // validation error — UI shows inline feedback in future
+    if (!result.success) return;
     try {
       await createMutation.mutateAsync(result.data);
       closeCreate();
     } catch {
-      // error already surfaced by useClassrooms onError (toast)
+      // error already surfaced by useApiMutation onError (toast)
     }
   }
 
@@ -99,16 +100,47 @@ export function useClassroomsForm({ createMutation, updateMutation }) {
     const payload = {
       ...form,
       capacity:       Number(form.capacity),
-      linkedRoomUuid: form.linkedRoomUuid || null, // normalise '' → null
+      linkedRoomUuid: form.linkedRoomUuid || null,
     };
     const result = ClassroomRequestSchema.safeParse(payload);
     if (!result.success) return;
+
+    // 1. Update the classroom's own fields
     try {
       await updateMutation.mutateAsync({ uuid: editTarget.uuid, payload: result.data });
-      closeEdit();
     } catch {
-      // error already surfaced by useClassrooms onError (toast)
+      // error already surfaced as a toast — abort without closing
+      return;
     }
+
+    // 2. Update children if the selection changed (interino sequential PUTs)
+    const newSet  = new Set(form.childUuids ?? []);
+    const prevSet = new Set(prevChildUuids ?? []);
+    const toAdd   = (form.childUuids ?? [])
+      .filter((u) => !prevSet.has(u))
+      .map((u) => allClassrooms.find((c) => c.uuid === u))
+      .filter(Boolean);
+    const toRemove = (prevChildUuids ?? [])
+      .filter((u) => !newSet.has(u))
+      .map((u) => allClassrooms.find((c) => c.uuid === u))
+      .filter(Boolean);
+
+    if (toAdd.length > 0 || toRemove.length > 0) {
+      try {
+        await setChildrenMutation.mutateAsync({
+          parentUuid: editTarget.uuid,
+          toAdd,
+          toRemove,
+        });
+      } catch {
+        // setChildrenMutation.onError already: invalidated cache + critical toast.
+        // Close the modal so the user sees the re-fetched (real) state when they reopen it.
+        closeEdit();
+        return;
+      }
+    }
+
+    closeEdit();
   }
 
   return {

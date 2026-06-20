@@ -10,14 +10,19 @@ import lombok.Setter;
 import mx.unam.icf.aulas.kernel.domain.entities.BaseEntity;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 /**
  * Entity class representing an academic semester.
  *
- * This entity defines the semester period and its active status.
+ * <p>A semester defines an academic period during which classroom reservations may be scheduled.
+ * Whether a semester is currently active is a <em>derived</em> concept computed by comparing
+ * a caller-supplied reference date against {@link #startDate} and {@link #endDate} — it is not
+ * persisted as a column. This keeps the entity pure and decoupled from the system clock,
+ * which makes unit-testing straightforward.</p>
  *
  * @author Ithera
- * @version 1.0
+ * @version 2.0
  */
 @Entity
 @Table(name = "semesters")
@@ -26,27 +31,31 @@ import java.time.LocalDate;
 public class Semester extends BaseEntity {
 
     /**
-     * Unique semester name (e.g., 2026-1).
+     * Public UUID exposed through external APIs.
+     * Not the primary key; never updated after creation.
+     */
+    @Column(name = "uuid", nullable = false, unique = true, updatable = false)
+    private UUID uuid = UUID.randomUUID();
+
+    /**
+     * Unique human-readable semester identifier (e.g., {@code "2026-1"}).
+     * Used as a display label and as a uniqueness constraint.
      */
     @Column(name = "name", nullable = false, unique = true)
     private String name;
 
     /**
-     * Semester start date.
+     * First day of the semester (inclusive).
+     * No reservation may be scheduled before this date for this semester.
      */
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
     /**
-     * Semester end date.
+     * Last day of the semester (inclusive).
+     * No reservation may be scheduled after this date for this semester.
      */
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
-
-    /**
-     * Flag that indicates if the semester is active.
-     */
-    @Column(name = "is_active")
-    private Boolean isActive;
 }
 

@@ -9,15 +9,17 @@
  * Its query key is nested under ['classrooms', …] so any mutation automatically
  * invalidates it alongside the paginated list.
  */
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   getClassrooms,
   getClassroomStats,
   createClassroom,
   updateClassroom,
-  deleteClassroom,
+  deactivateClassroom,
+  reactivateClassroom,
 } from '../api/classrooms';
 import { useApiMutation } from './useApiMutation';
+import { toast } from '../utils/toast.jsx';
 
 /**
  * @param {object} [params={}]
@@ -33,12 +35,15 @@ import { useApiMutation } from './useApiMutation';
  *   totalPages:     number,
  *   stats:          { total: number, available: number, notAvailable: number } | null,
  *   loading:        boolean,
- *   createMutation: import('@tanstack/react-query').UseMutationResult,
- *   updateMutation: import('@tanstack/react-query').UseMutationResult,
- *   deleteMutation: import('@tanstack/react-query').UseMutationResult,
+ *   createMutation:      import('@tanstack/react-query').UseMutationResult,
+ *   updateMutation:      import('@tanstack/react-query').UseMutationResult,
+ *   deactivateMutation:  import('@tanstack/react-query').UseMutationResult,
+ *   reactivateMutation:  import('@tanstack/react-query').UseMutationResult,
+ *   setChildrenMutation: import('@tanstack/react-query').UseMutationResult,
  * }}
  */
 export function useClassrooms({ search, page = 0, size = 10, sort, direction } = {}) {
+  const queryClient = useQueryClient();
 
   // ── Paginated classroom list ─────────────────────────────────────────────────
   const {
@@ -79,10 +84,65 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
     successMessage: 'Aula actualizada correctamente.',
   });
 
-  const deleteMutation = useApiMutation({
-    mutationFn: deleteClassroom,
+  const deactivateMutation = useApiMutation({
+    mutationFn: deactivateClassroom,
     invalidateKey: ['classrooms'],
     successMessage: 'Aula dada de baja correctamente.',
+  });
+
+  const reactivateMutation = useApiMutation({
+    mutationFn: reactivateClassroom,
+    invalidateKey: ['classrooms'],
+    successMessage: 'Aula reactivada correctamente.',
+  });
+
+  /**
+   * Assigns children to a parent classroom using sequential PUTs (one per child change).
+   *
+   * INTERINO: reemplazar por PUT /{uuid}/children (classrooms-children-array-request.md) —
+   * secuencial para evitar ObjectOptimisticLockingFailureException / deadlocks en JPA
+   * al modificar relaciones del mismo nodo padre en paralelo.
+   *
+   * @param {{ parentUuid: string, toAdd: object[], toRemove: object[] }} params
+   *   `toAdd`    — full classroom response objects to link to parentUuid
+   *   `toRemove` — full classroom response objects to unlink (set linkedRoomUuid = null)
+   */
+  const setChildrenMutation = useMutation({
+    mutationFn: async ({ parentUuid, toAdd, toRemove }) => {
+      for (const child of toAdd) {
+        await updateClassroom(child.uuid, {
+          name:           child.name,
+          capacity:       child.capacity,
+          type:           child.type,
+          description:    child.description ?? null,
+          linkedRoomUuid: parentUuid,
+          isActive:       child.isActive,
+        });
+      }
+      for (const child of toRemove) {
+        await updateClassroom(child.uuid, {
+          name:           child.name,
+          capacity:       child.capacity,
+          type:           child.type,
+          description:    child.description ?? null,
+          linkedRoomUuid: null,
+          isActive:       child.isActive,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      toast.success('Aulas hijas actualizadas.');
+    },
+    onError: async (err) => {
+      // Force resync: pull real DB state before showing the error,
+      // so reopening the modal reflects what actually persisted.
+      await queryClient.invalidateQueries({ queryKey: ['classrooms'] });
+      toast.error(
+        `⚠️ Fallo al actualizar las aulas hijas: ${err.message}. ` +
+        'El estado puede ser inconsistente — vuelve a abrir el aula para ver el estado real.'
+      );
+    },
   });
 
   return {
@@ -93,7 +153,9 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
     loading,
     createMutation,
     updateMutation,
-    deleteMutation,
+    deactivateMutation,
+    reactivateMutation,
+    setChildrenMutation,
   };
 }
 

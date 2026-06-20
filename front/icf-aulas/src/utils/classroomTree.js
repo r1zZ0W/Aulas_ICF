@@ -58,6 +58,63 @@ export function getChildren(uuid, allClassrooms) {
 }
 
 /**
+ * Returns the set of UUIDs that are ancestors of `uuid`
+ * (parent, grandparent, and so on — to any depth).
+ *
+ * Used by `buildChildOptions` to prevent cycles in the children selector:
+ * a classroom cannot be assigned as a child of one of its own ancestors
+ * (that would create a circular parent chain).
+ *
+ * The traversal guards against pre-existing cycles in the data (it won't loop
+ * infinitely even if the backend somehow contains a circular reference).
+ *
+ * @param {string} uuid - The classroom whose ancestors we want.
+ * @param {Array<{ uuid: string, linkedRoomUuid?: string | null }>} allClassrooms
+ * @returns {Set<string>} set of ancestor UUIDs (excludes `uuid` itself)
+ */
+export function getAncestorUuids(uuid, allClassrooms) {
+  const classroomMap = new Map(allClassrooms.map((c) => [c.uuid, c]));
+  const result = new Set();
+  let current = classroomMap.get(uuid);
+  while (current?.linkedRoomUuid) {
+    if (result.has(current.linkedRoomUuid)) break; // guard against existing cycles in DB data
+    result.add(current.linkedRoomUuid);
+    current = classroomMap.get(current.linkedRoomUuid);
+  }
+  return result;
+}
+
+/**
+ * Returns the list of classrooms eligible to be assigned as **children** of `selfUuid`.
+ *
+ * A classroom is eligible when it is:
+ *  1. Active (`isActive = true`)
+ *  2. Not the aula being edited (a room can't be its own child)
+ *  3. Not an ancestor of `selfUuid` (assigning an ancestor as a child creates a cycle)
+ *
+ * Note: a classroom that is ALREADY a child of a DIFFERENT parent is still eligible;
+ * the PUT on that classroom will reassign its `linkedRoomUuid` to `selfUuid`, taking it
+ * from its former parent (the backend allows this as long as no cycle results).
+ *
+ * @param {Array<{
+ *   uuid: string,
+ *   name: string,
+ *   isActive: boolean,
+ *   linkedRoomUuid?: string | null,
+ * }>} allClassrooms
+ * @param {{ selfUuid?: string | null }} [options]
+ * @returns {Array<{ uuid: string, name: string, linkedRoomUuid?: string | null, isActive: boolean }>}
+ */
+export function buildChildOptions(allClassrooms, { selfUuid = null } = {}) {
+  const ancestors = selfUuid ? getAncestorUuids(selfUuid, allClassrooms) : new Set();
+  return allClassrooms.filter(
+    (c) => c.isActive && c.uuid !== selfUuid && !ancestors.has(c.uuid)
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
  * Builds the `{value, label}` option list for the "Aula padre" selector in the
  * classroom create/edit form.
  *

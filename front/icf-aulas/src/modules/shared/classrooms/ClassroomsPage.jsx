@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Plus, Eye, Pencil, Trash2, Building2, CheckCircle2, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Eye, Pencil, Trash2, Building2, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 
 import { useAuth } from '../../../context/AuthContext';
 import { ROLES } from '../../../utils/roles';
@@ -8,11 +8,12 @@ import { useClassroomsForm } from '../../../hooks/useClassroomsForm';
 import { usePagination } from '../../../hooks/usePagination';
 import { DEFAULT_PAGE_SIZE } from '../../../utils/queryUtils';
 import { typeLabel } from '../../../schemas/classroom';
-import { buildParentOptions } from '../../../utils/classroomTree';
+import { buildParentOptions, buildChildOptions, getChildren } from '../../../utils/classroomTree';
 
 import Button from '../../../components/Button/Button';
 import Card from '../../../components/Card/Card';
 import Buscador from '../../../components/Buscador/Buscador';
+import Select from '../../../components/Select/Select';
 import DataTable from '../../../components/DataTable/DataTable';
 import Badge from '../../../components/Badge/Badge';
 import EmptyState from '../../../components/EmptyState/EmptyState';
@@ -21,8 +22,19 @@ import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
 import ClassroomFormFields from './ClassroomFormFields';
 import ClassroomInfoModal from './ClassroomInfoModal';
+import ActiveSemesterButton from '../semesters/ActiveSemesterButton';
 
 import './ClassroomsPage.css';
+
+// ── Status filter options ──────────────────────────────────────────────────────
+// Client-side filter (all classrooms are fetched from the server for ADMIN).
+// TODO: when GET /api/v1/classrooms accepts ?status=, remove client-side filter
+// and pass the param to useClassrooms (see classrooms-children-array-request.md §2).
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all',      label: 'Todas'      },
+  { value: 'active',   label: 'Activas'    },
+  { value: 'inactive', label: 'Inactivas'  },
+];
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -30,19 +42,24 @@ export default function ClassroomsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === ROLES.ADMIN;
 
-  // ── Pagination + search in the URL ──────────────────────────────────────────
+  // ── Pagination + search ───────────────────────────────────────────────────────
   const { searchInput, setSearchInput, search, page, setPage } = usePagination({ debounce: 300 });
+
+  // ── Client-side status filter (admin sees all, then filters locally) ──────────
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // ── Server state (paginated) ──────────────────────────────────────────────────
   const {
-    classrooms,
+    classrooms: rawClassrooms,
     totalElements,
     totalPages,
     stats,
     loading,
     createMutation,
     updateMutation,
-    deleteMutation,
+    deactivateMutation,
+    reactivateMutation,
+    setChildrenMutation,
   } = useClassrooms({
     search,
     page,
@@ -51,9 +68,17 @@ export default function ClassroomsPage() {
     direction: 'asc',
   });
 
-  // ── Full catalog (for parent selector + children list in InfoModal) ───────────
-  // Key under ['classrooms','all'] — invalidated automatically by any mutation.
+  // ── Full catalog (for parent/child selectors + InfoModal children list) ────────
   const { allClassrooms } = useAllClassrooms();
+
+  // ── Apply client-side status filter ──────────────────────────────────────────
+  // Only meaningful for admins (teachers already receive active-only from server).
+  const classrooms = useMemo(() => {
+    if (!isAdmin || statusFilter === 'all') return rawClassrooms;
+    if (statusFilter === 'active')   return rawClassrooms.filter((r) => r.isActive);
+    if (statusFilter === 'inactive') return rawClassrooms.filter((r) => !r.isActive);
+    return rawClassrooms;
+  }, [rawClassrooms, statusFilter, isAdmin]);
 
   // ── Modal / form state ────────────────────────────────────────────────────────
   const {
@@ -66,14 +91,29 @@ export default function ClassroomsPage() {
     onField,
     handleCreateSubmit,
     handleEditSubmit,
-  } = useClassroomsForm({ createMutation, updateMutation });
+  } = useClassroomsForm({
+    createMutation,
+    updateMutation,
+    setChildrenMutation,
+    allClassrooms,
+  });
 
-  // ── Parent options for the linked-room selector ───────────────────────────────
-  // For "create": no exclusion (no UUID yet).
-  // For "edit": exclude the aula being edited and all its descendants (anti-cycle).
+  // ── Parent options (cycles excluded) ─────────────────────────────────────────
   const parentOptions = useMemo(
     () => buildParentOptions(allClassrooms, { excludeUuid: editTarget?.uuid ?? null }),
     [allClassrooms, editTarget]
+  );
+
+  // ── Child options (ancestors and self excluded) ───────────────────────────────
+  const childOptions = useMemo(
+    () => buildChildOptions(allClassrooms, { selfUuid: editTarget?.uuid ?? null }),
+    [allClassrooms, editTarget]
+  );
+
+  // ── Deactivate modal — count direct children ──────────────────────────────────
+  const deleteTargetChildren = useMemo(
+    () => (deleteTarget ? getChildren(deleteTarget.uuid, allClassrooms) : []),
+    [deleteTarget, allClassrooms]
   );
 
   // ── Table columns ─────────────────────────────────────────────────────────────
@@ -126,6 +166,7 @@ export default function ClassroomsPage() {
       align: 'right',
       render:(r) => (
         <div className="classrooms__actions">
+          {/* Ver información — available to all */}
           <button
             type="button"
             className="classrooms__action-btn"
@@ -138,6 +179,7 @@ export default function ClassroomsPage() {
 
           {isAdmin && (
             <>
+              {/* Editar */}
               <button
                 type="button"
                 className="classrooms__action-btn"
@@ -148,15 +190,29 @@ export default function ClassroomsPage() {
                 <Pencil size={16} />
               </button>
 
-              <button
-                type="button"
-                className="classrooms__action-btn classrooms__action-btn--danger"
-                title={`Dar de baja ${r.name}`}
-                aria-label={`Dar de baja ${r.name}`}
-                onClick={() => setDeleteTarget(r)}
-              >
-                <Trash2 size={16} />
-              </button>
+              {/* Dar de baja (active only) / Reactivar (inactive only) */}
+              {r.isActive ? (
+                <button
+                  type="button"
+                  className="classrooms__action-btn classrooms__action-btn--danger"
+                  title={`Dar de baja ${r.name}`}
+                  aria-label={`Dar de baja ${r.name}`}
+                  onClick={() => setDeleteTarget(r)}
+                >
+                  <Trash2 size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="classrooms__action-btn classrooms__action-btn--success"
+                  title={`Reactivar ${r.name}`}
+                  aria-label={`Reactivar ${r.name}`}
+                  disabled={reactivateMutation.isPending}
+                  onClick={() => reactivateMutation.mutateAsync(r.uuid)}
+                >
+                  <RotateCcw size={16} />
+                </button>
+              )}
             </>
           )}
         </div>
@@ -181,21 +237,25 @@ export default function ClassroomsPage() {
           </p>
         </div>
 
-        {isAdmin && (
-          <Button
-            variant="primary"
-            size="small"
-            iconLeft={<Plus size={18} />}
-            onClick={openCreate}
-          >
-            Nueva Aula
-          </Button>
-        )}
+        <div className="classrooms-page__header-actions">
+          {/* Semester split-button — visible to all; edit/create gated by isAdmin inside */}
+          <ActiveSemesterButton isAdmin={isAdmin} />
+
+          {isAdmin && (
+            <Button
+              variant="primary"
+              size="small"
+              iconLeft={<Plus size={18} />}
+              onClick={openCreate}
+            >
+              Nueva Aula
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
       <div className="classrooms-page__stats">
-        {/* Total — from server meta (always accurate, even with search active) */}
         <Card className="classrooms-page__stat-card">
           <span className="classrooms-page__stat-icon classrooms-page__stat-icon--blue">
             <Building2 size={24} />
@@ -206,7 +266,6 @@ export default function ClassroomsPage() {
           </div>
         </Card>
 
-        {/* Available — from /stats endpoint; "—" while backend endpoint is pending */}
         <Card className="classrooms-page__stat-card">
           <span className="classrooms-page__stat-icon classrooms-page__stat-icon--green">
             <CheckCircle2 size={24} />
@@ -217,7 +276,6 @@ export default function ClassroomsPage() {
           </div>
         </Card>
 
-        {/* Unavailable — from /stats endpoint; "—" while backend endpoint is pending */}
         <Card className="classrooms-page__stat-card">
           <span className="classrooms-page__stat-icon classrooms-page__stat-icon--red">
             <XCircle size={24} />
@@ -239,6 +297,16 @@ export default function ClassroomsPage() {
             placeholder="Buscar aulas por nombre o descripción..."
             style={{ maxWidth: 448 }}
           />
+          {/* Status filter (admin only — teachers only see active, no filter needed) */}
+          {isAdmin && (
+            <Select
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={STATUS_FILTER_OPTIONS}
+              style={{ minWidth: 130 }}
+              aria-label="Filtrar por estado"
+            />
+          )}
         </div>
 
         {/* Table */}
@@ -310,7 +378,7 @@ export default function ClassroomsPage() {
             title="Editar Aula"
             subtitle={editTarget?.name ?? ''}
             submitLabel="Guardar cambios"
-            loading={updateMutation.isPending}
+            loading={updateMutation.isPending || setChildrenMutation.isPending}
             onSubmit={handleEditSubmit}
           >
             <ClassroomFormFields
@@ -318,6 +386,7 @@ export default function ClassroomsPage() {
               form={form}
               onField={onField}
               parentOptions={parentOptions}
+              childOptions={childOptions}
             />
           </FormModal>
 
@@ -325,11 +394,18 @@ export default function ClassroomsPage() {
           <ConfirmDeleteModal
             open={!!deleteTarget}
             onClose={() => setDeleteTarget(null)}
-            onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
+            onConfirm={() => deactivateMutation.mutateAsync(deleteTarget?.uuid)}
             title="¿Dar de baja esta aula?"
             message={
               deleteTarget
-                ? `Se desactivará "${deleteTarget.name}". El historial de reservaciones se conservará y el aula puede reactivarse editándola en cualquier momento.`
+                ? deleteTargetChildren.length > 0
+                  ? `Se desactivará "${deleteTarget.name}". ` +
+                    `⚠️ Esta aula es padre de ${deleteTargetChildren.length} aula${deleteTargetChildren.length !== 1 ? 's' : ''} ` +
+                    `(${deleteTargetChildren.map((c) => c.name).join(', ')}); ` +
+                    `al darla de baja quedarán desvinculadas pero seguirán activas. ` +
+                    `El historial de reservaciones se conservará.`
+                  : `Se desactivará "${deleteTarget.name}". El historial de reservaciones se conservará. ` +
+                    `Puedes reactivarla desde la tabla en cualquier momento.`
                 : 'Esta acción desactivará el aula seleccionada.'
             }
             confirmLabel="Dar de baja"

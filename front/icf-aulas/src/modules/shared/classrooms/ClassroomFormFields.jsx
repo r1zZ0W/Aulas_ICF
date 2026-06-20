@@ -13,15 +13,29 @@ const STATUS_OPTIONS = [
  *
  * @param {object}   props
  * @param {'create'|'edit'} props.mode
- * @param {object}   props.form           - Current form state.
+ * @param {object}   props.form           - Current form state (incl. `childUuids` in edit mode).
  * @param {function} props.onField        - (field: string, value: any) => void
  * @param {Array<{value: string, label: string}>} [props.parentOptions=[]]
- *   Options for the "Aula padre" selector. Computed by the parent component
- *   using `buildParentOptions` — already excludes the current aula and its
- *   descendants to prevent cycles.
+ *   Options for the "Aula padre" selector, already filtered to exclude cycles.
+ * @param {Array<{uuid: string, name: string, linkedRoomUuid?: string|null}>} [props.childOptions=[]]
+ *   Eligible classrooms for the "Aulas hijas" multi-checkbox (edit mode only).
+ *   Filtered by buildChildOptions to exclude self and ancestors. Active only.
  */
-export default function ClassroomFormFields({ mode, form, onField, parentOptions = [] }) {
+export default function ClassroomFormFields({
+  mode,
+  form,
+  onField,
+  parentOptions = [],
+  childOptions  = [],
+}) {
   const isCreate = mode === 'create';
+
+  function toggleChild(uuid, checked) {
+    const next = checked
+      ? [...(form.childUuids ?? []), uuid]
+      : (form.childUuids ?? []).filter((u) => u !== uuid);
+    onField('childUuids', next);
+  }
 
   return (
     <div className="classrooms-page__form-grid">
@@ -62,18 +76,60 @@ export default function ClassroomFormFields({ mode, form, onField, parentOptions
         />
       </div>
 
-      {/* Aula padre — shown only when options are available (catalog loaded) */}
+      {/* Aula padre — a qué aula pertenece o está contenida esta */}
       {parentOptions.length > 0 && (
         <div className="classrooms-page__form-grid--full">
           <Select
-            label="Aula vinculada (padre)"
+            label="Aula padre (a la que pertenece esta aula)"
             value={form.linkedRoomUuid ?? ''}
             onChange={(v) => onField('linkedRoomUuid', v || null)}
             options={parentOptions}
           />
           <span className="classrooms-page__form-help">
-            Si esta aula forma parte de otra (ej. un bloque o edificio), selecciona el aula padre.
+            Selecciona si esta aula está físicamente dentro de otra (ej. un laboratorio dentro
+            de un edificio). Deja en blanco si es independiente.
           </span>
+        </div>
+      )}
+
+      {/* Aulas hijas — qué aulas contiene esta (solo en modo edición) */}
+      {!isCreate && childOptions.length > 0 && (
+        <div className="classrooms-page__form-grid--full">
+          <fieldset className="classroom-children">
+            <legend className="classroom-children__legend">
+              Aulas hijas (contenidas en esta)
+              {(form.childUuids?.length ?? 0) > 0 && (
+                <span className="classroom-children__count">
+                  {' '}— {form.childUuids.length} seleccionada{form.childUuids.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </legend>
+            <p className="classrooms-page__form-help" style={{ marginTop: 2, marginBottom: 8 }}>
+              Marca las aulas que pertenecen a o están contenidas dentro de esta.
+              Al guardar, se actualizarán secuencialmente (interino — un PUT por hija).
+            </p>
+            <div className="classroom-children__list">
+              {childOptions.map((c) => {
+                const isChecked = (form.childUuids ?? []).includes(c.uuid);
+                const hasDifferentParent =
+                  c.linkedRoomUuid && c.linkedRoomUuid !== (form.uuid ?? '');
+                return (
+                  <label key={c.uuid} className="classroom-children__item">
+                    <input
+                      type="checkbox"
+                      className="classroom-children__checkbox"
+                      checked={isChecked}
+                      onChange={(e) => toggleChild(c.uuid, e.target.checked)}
+                    />
+                    <span className="classroom-children__name">{c.name}</span>
+                    {hasDifferentParent && !isChecked && (
+                      <span className="classroom-children__hint">(tiene otro padre)</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
         </div>
       )}
 

@@ -1,15 +1,26 @@
 /**
  * @fileoverview Validation schemas for academic semesters.
- * Enforces correct format (YYYY-1 or YYYY-2) and validates start and end dates.
+ * Mirrors SemesterRequestDTO.java and SemesterResponseDTO.java.
+ *
+ * Key design decisions:
+ *  - `isActive` is a DERIVED field computed by the backend (today >= startDate && today <= endDate).
+ *    It is NEVER sent in a create/update request; it lives only in the response schema.
+ *  - Dates use `z.string().date()` which validates both the YYYY-MM-DD format AND that the
+ *    calendar date actually exists (rejects "2026-02-31", "2026-09-35", etc.), preventing
+ *    Spring's LocalDate parser from throwing on invalid dates that passed a regex-only check.
+ *  - Cross-field validation (end > start) is a `.refine()` on the request schema only.
+ *  - Mode-conditional rules ("no past dates" for create, relaxed for concluded semesters in edit)
+ *    are enforced in useSemestersForm, not here, because they depend on runtime context.
  */
 import { z } from 'zod'
 
+// ── Request schema (create / update) ─────────────────────────────────────────
+
 /**
- * Schema for validating academic semester creation, updates, and responses.
- * Validates semester naming formats, ensures proper date formatting, and verifies that the
- * start date is chronologically before the end date.
+ * Validates the payload sent to POST /api/v1/semesters and PUT /api/v1/semesters/{uuid}.
+ * Mirrors SemesterRequestDTO.java.
  */
-export const SemesterSchema = z
+export const SemesterRequestSchema = z
   .object({
     name: z
       .string()
@@ -19,17 +30,40 @@ export const SemesterSchema = z
         /^\d{4}-[1-2]$/,
         'El formato del semestre debe ser YYYY-1 o YYYY-2 (ej: 2026-1)'
       ),
+
     startDate: z
       .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha de inicio debe tener formato YYYY-MM-DD'),
+      .date('La fecha de inicio es inválida — verifica que el día exista en el calendario (YYYY-MM-DD)'),
+
     endDate: z
       .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha de fin debe tener formato YYYY-MM-DD'),
-    isActive: z.boolean().default(true)
+      .date('La fecha de fin es inválida — verifica que el día exista en el calendario (YYYY-MM-DD)'),
   })
-  .refine(data => new Date(data.startDate) < new Date(data.endDate), {
-    message: 'La fecha de inicio debe ser anterior a la fecha de fin',
-    path: ['endDate']
-  })
+  .refine(
+    (data) => data.startDate < data.endDate,
+    {
+      message: 'La fecha de fin debe ser posterior a la fecha de inicio',
+      path: ['endDate'],
+    }
+  )
 
-export default SemesterSchema
+// ── Response schema ───────────────────────────────────────────────────────────
+
+/**
+ * Parses semester data received from API responses.
+ * Mirrors SemesterResponseDTO.java.
+ *
+ * `isActive` is included here (read-only, derived by backend) but must NEVER be
+ * sent back in a request payload.
+ */
+export const SemesterResponseSchema = z.object({
+  uuid:      z.string(),
+  name:      z.string(),
+  startDate: z.string(),
+  endDate:   z.string(),
+  isActive:  z.boolean(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+})
+
+export default SemesterRequestSchema

@@ -53,7 +53,6 @@ public class ClassroomController implements ResponseHandler {
      * {@code /{uuid}}, so there is no route conflict.</p>
      */
     @GetMapping("/stats")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ClassroomStatsDTO>> stats() {
         return ok(classroomService.getStats());
     }

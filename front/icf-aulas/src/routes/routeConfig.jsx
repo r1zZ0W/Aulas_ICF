@@ -40,5 +40,5 @@ export const PRIVATE_ROUTES = [
     element: <UsersPage />,
     allowedRoles: [ROLES.ADMIN],
     sidebar: { label: 'Usuarios', icon: <Users />, show: true },
-  },
+  }
 ];

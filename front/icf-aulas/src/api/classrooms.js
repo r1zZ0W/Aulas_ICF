@@ -21,6 +21,7 @@ function resolveErrorMessage(error, overrides = {}) {
     401: 'No autorizado.',
     403: 'No tienes permisos para realizar esta acción.',
     404: 'El aula solicitada no existe.',
+    405: 'Operación no permitida en este recurso.',
     409: serverMessage || 'Ya existe un aula con ese nombre.',
     500: 'Error interno del servidor. Intenta de nuevo más tarde.',
   };
@@ -113,13 +114,30 @@ export async function updateClassroom(uuid, payload) {
 }
 
 /**
- * Deactivates a classroom (soft-delete / baja lógica). ADMIN only.
- * The classroom is marked inactive — reservation history is preserved.
- * DELETE /api/v1/classrooms/{uuid}
+ * Deactivates a classroom (baja lógica). ADMIN only.
+ * Marks the classroom as inactive and automatically unlinks its direct children
+ * (orphan cleanup option A — see classrooms-status-endpoints.md).
+ * Reservation history is preserved (DFR NFR / LFTAIP).
+ * PATCH /api/v1/classrooms/{uuid}/deactivate
  */
-export async function deleteClassroom(uuid) {
+export async function deactivateClassroom(uuid) {
   try {
-    await api.delete(`/api/v1/classrooms/${uuid}`);
+    await api.patch(`/api/v1/classrooms/${uuid}/deactivate`);
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
+}
+
+/**
+ * Reactivates a previously deactivated classroom. ADMIN only.
+ * Child classrooms unlinked during the prior deactivation are NOT re-linked automatically;
+ * the administrator must update each child's parent explicitly if needed.
+ * PATCH /api/v1/classrooms/{uuid}/reactivate
+ */
+export async function reactivateClassroom(uuid) {
+  try {
+    await api.patch(`/api/v1/classrooms/${uuid}/reactivate`);
   } catch (error) {
     if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
     throw error;
