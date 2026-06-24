@@ -14,10 +14,15 @@ import java.util.UUID;
  * <p>Both the group and classroom are identified by their public UUIDs.
  * Audit timestamps are included for transparency in the admin interface.
  * The {@code timeSlots} list is always ordered by {@code startTime ASC} so
- * the frontend can derive event start/end times without sorting.</p>
+ * the frontend can derive event start/end times without sorting.
+ * User information (UUID, full name, and username) is included to identify
+ * who made the reservation.</p>
  *
  * @param uuid           public UUID of this reservation instance
  * @param groupUuid      public UUID of the parent reservation group
+ * @param userUuid       public UUID of the user who made the reservation
+ * @param userFullName   full name (firstName + lastNames) of the user
+ * @param userUsername   username of the user
  * @param classroomUuid  public UUID of the assigned classroom
  * @param classroomName  display name of the assigned classroom (calendar labels)
  * @param date           date of this occurrence
@@ -27,11 +32,14 @@ import java.util.UUID;
  * @param createdAt      timestamp when this record was created
  *
  * @author Ithera
- * @version 3.0
+ * @version 4.0
  */
 public record ReservInstanceResponseDTO(
         UUID uuid,
         UUID groupUuid,
+        UUID userUuid,
+        String userFullName,
+        String userUsername,
         UUID classroomUuid,
         String classroomName,
         LocalDate date,

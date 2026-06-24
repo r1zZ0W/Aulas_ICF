@@ -47,7 +47,7 @@ export const ClassroomRequestSchema = z.object({
     .max(500, 'La capacidad máxima admitida es de 500 personas'),
 
   type: z.enum(
-    /** @type {[string, ...string[]]} */(Object.keys(CLASSROOM_TYPES_MAP)),
+    (Object.keys(CLASSROOM_TYPES_MAP)),
     { errorMap: () => ({ message: 'Selecciona un tipo de aula válido' }) }
   ),
 

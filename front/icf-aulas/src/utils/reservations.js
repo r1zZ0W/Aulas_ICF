@@ -94,9 +94,12 @@ export function labelsToTimeSlotIds(catalog, startLabel, endLabel) {
  */
 export function instanceToEvent(instance, color = '#64748b') {
   const { start, end } = slotsToRange(instance.date, instance.timeSlots);
+  const title = instance.userFullName
+    ? `${instance.classroomName || '(Sin nombre)'} - ${instance.userFullName}`
+    : (instance.classroomName || '(Sin nombre)');
   return {
     id:              instance.uuid,
-    title:           instance.classroomName || '(Sin nombre)',
+    title,
     start,
     end,
     backgroundColor: color,

@@ -75,6 +75,14 @@ export function useCalendar({ onRangeChange } = {}) {
     if (currentView === 'dayGridMonth') {
       openModal(info.date);
     } else if (currentView === 'timeGridWeek') {
+      const now = new Date();
+      const mins = now.getMinutes() >= 30 ? 30 : 0;
+      const boundary = new Date(
+        now.getFullYear(), now.getMonth(), now.getDate(),
+        now.getHours(), mins, 0
+      );
+      if (info.date <= boundary) return;
+
       const startDate = new Date(info.date);
       const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
       openModal(startDate, endDate);
@@ -101,9 +109,11 @@ export function useCalendar({ onRangeChange } = {}) {
   };
 
   const handleMoreLinkClick = (info) => {
+    info.jsEvent?.preventDefault();
+    info.jsEvent?.stopPropagation();
     const evts = info.allSegs.map(seg => seg.event);
     setOverflowDay({ date: info.date, events: evts });
-    return false;
+    return 'stop';
   };
 
   /**
@@ -131,9 +141,9 @@ export function useCalendar({ onRangeChange } = {}) {
       const currentWeekStart = getStartOfCurrentWeek();
       setIsPrevDisabled(start <= currentWeekStart);
     } else {
-      setTitle(formatMonthTitle(start));
+      setTitle(formatMonthTitle(info.view.currentStart));
       const currentMonthStart = getStartOfCurrentMonth();
-      setIsPrevDisabled(start <= currentMonthStart);
+      setIsPrevDisabled(info.view.currentStart <= currentMonthStart);
     }
   };
 

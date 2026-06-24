@@ -195,6 +195,15 @@
   line-height: 1.5;
 }
 
+.reserva-modal__sala-card--danger {
+  background: #fff5f5;
+  border-color: #ffc9c9;
+}
+
+.reserva-modal__sala-card--danger .reserva-modal__sala-card-header {
+  color: #c92a2a;
+}
+
 .reserva-modal__sala-card-details {
   display: flex;
   gap: 20px;
@@ -454,7 +463,7 @@
   gap: 16px;
 }
 
-.reserva-modal__row > .reserva-modal__field {
+.reserva-modal__row>.reserva-modal__field {
   flex: 1;
   min-width: 0;
 }

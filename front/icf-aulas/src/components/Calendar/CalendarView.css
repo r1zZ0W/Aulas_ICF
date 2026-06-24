@@ -237,13 +237,44 @@
   height: 2rem;
 }
 
+/* Past days show not-allowed cursor, but exclude events */
+.fc .fc-day-past,
+.fc .fc-timegrid-col.fc-day-past {
+  cursor: not-allowed !important;
+}
+
+/* Make future/today columns show pointer on hover */
+.fc .fc-timegrid-col:not(.fc-day-past) {
+  cursor: pointer;
+}
+
+/* Highlight the hovered active day column for booking */
+.fc .fc-timegrid-col:not(.fc-day-past):hover {
+  background-color: rgba(0, 86, 135, 0.08) !important;
+}
+
+/* Disabled time slots styling */
+.fc .fc-bg-event.disabled-time-slot {
+  background: rgba(0, 0, 0, 0.04) !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+  pointer-events: auto !important;
+}
+
 /* Events */
 .fc .fc-event {
   border-radius: 6px;
   border: none;
   padding: 2px 5px;
   font-size: 0.75rem;
-  cursor: pointer;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fc .fc-event:hover {
+  filter: brightness(0.92);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
 }
 
 .fc .fc-event-title {

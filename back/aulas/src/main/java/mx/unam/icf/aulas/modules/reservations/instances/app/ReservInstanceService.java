@@ -80,7 +80,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReservInstanceService {
 
-    private final ReservInstanceRepository   repository;
+    private final ReservInstanceRepository   reservInstanceRepository;
     private final ReservInstanceMapper       mapper;
     private final ReservationGroupRepository groupRepository;
     private final ClassroomRepository        classroomRepository;
@@ -101,7 +101,7 @@ public class ReservInstanceService {
      */
     @Transactional(readOnly = true)
     public PagedResultDTO<ReservInstanceResponseDTO> findAll(Pageable pageable) {
-        return PageMapper.toDto(repository.findAll(pageable), mapper::toDtoList);
+        return PageMapper.toDto(reservInstanceRepository.findAll(pageable), mapper::toDtoList);
     }
 
     /**
@@ -113,7 +113,7 @@ public class ReservInstanceService {
     @Transactional(readOnly = true)
     public ReservInstanceResponseDTO findByUuid(UUID uuid) {
         return mapper.toDto(
-            repository.findByUuid(uuid)
+            reservInstanceRepository.findByUuid(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation instance not found: " + uuid))
         );
     }
@@ -127,7 +127,7 @@ public class ReservInstanceService {
      */
     @Transactional(readOnly = true)
     public PagedResultDTO<ReservInstanceResponseDTO> findByUser(UUID userUuid, Pageable pageable) {
-        return PageMapper.toDto(repository.findByUserUuid(userUuid, pageable), mapper::toDtoList);
+        return PageMapper.toDto(reservInstanceRepository.findByUserUuid(userUuid, pageable), mapper::toDtoList);
     }
 
     /**
@@ -145,8 +145,8 @@ public class ReservInstanceService {
     @Transactional(readOnly = true)
     public List<ReservInstanceResponseDTO> findAvailability(UUID classroomUuid, LocalDate from, LocalDate to) {
         List<ReservInstance> instances = (classroomUuid != null)
-            ? repository.findActiveByClassroomAndDateRange(classroomUuid, from, to, ReservInstanceStatus.ACTIVE)
-            : repository.findActiveByDateRange(from, to, ReservInstanceStatus.ACTIVE);
+            ? reservInstanceRepository.findActiveByClassroomAndDateRange(classroomUuid, from, to, ReservInstanceStatus.ACTIVE)
+            : reservInstanceRepository.findActiveByDateRange(from, to, ReservInstanceStatus.ACTIVE);
         return mapper.toDtoList(instances);
     }
 
@@ -293,7 +293,7 @@ public class ReservInstanceService {
             inst.setDate(d);
             toSave.add(inst);
         }
-        List<ReservInstance> saved = repository.saveAll(toSave);
+        List<ReservInstance> saved = reservInstanceRepository.saveAll(toSave);
 
         // 12. Batch-insert all slots (all-or-nothing via @Transactional)
         List<ReservSlot> allSlots = new ArrayList<>();
@@ -391,13 +391,13 @@ public class ReservInstanceService {
         }
 
         // Classroom double-booking check (backed by uk_reserv_slots_classroom_time)
-        if (repository.existsConflict(classroom.getId(), dto.date(), dto.timeSlotIds()))
+        if (reservInstanceRepository.existsConflict(classroom.getId(), dto.date(), dto.timeSlotIds()))
             throw new DomainException(
                 "The requested classroom already has a reservation for one or more of the selected time slots on " + dto.date());
 
         // User self-conflict check (backed by uk_reserv_slots_user_time)
         Long userId = group.getUser().getId();
-        if (repository.existsUserConflict(userId, dto.date(), dto.timeSlotIds()))
+        if (reservInstanceRepository.existsUserConflict(userId, dto.date(), dto.timeSlotIds()))
             throw new DomainException(
                 "You already have a reservation for one or more of the selected time slots on " + dto.date());
 
@@ -405,7 +405,7 @@ public class ReservInstanceService {
         instance.setGroup(group);
         instance.setClassroom(classroom);
         instance.setStatus(ReservInstanceStatus.ACTIVE);
-        ReservInstance saved = repository.save(instance);
+        ReservInstance saved = reservInstanceRepository.save(instance);
 
         for (TimeSlot ts : timeSlots) {
             ReservSlot slot = new ReservSlot();
@@ -459,7 +459,7 @@ public class ReservInstanceService {
             throw new DomainException("Reservation is already cancelled");
         instance.setStatus(ReservInstanceStatus.CANCELLED_BY_USER);
         slotRepository.deleteByInstance(instance);
-        ReservInstance saved = repository.save(instance);
+        ReservInstance saved = reservInstanceRepository.save(instance);
         historyService.register(saved, ReservationEvent.CANCELLED_BY_USER, "Cancelled by owner");
         return mapper.toDto(saved);
     }
@@ -481,7 +481,7 @@ public class ReservInstanceService {
             throw new DomainException("Reservation is already cancelled");
         instance.setStatus(ReservInstanceStatus.CANCELLED_BY_ADMIN);
         slotRepository.deleteByInstance(instance);
-        ReservInstance saved = repository.save(instance);
+        ReservInstance saved = reservInstanceRepository.save(instance);
         historyService.register(saved, ReservationEvent.CANCELLED_BY_ADMIN, "Cancelled by administrator");
         return mapper.toDto(saved);
     }
@@ -552,7 +552,7 @@ public class ReservInstanceService {
         }
 
         // 1. Classroom conflict re-check (self-excluding) — must run before any mutation
-        if (repository.existsConflictExcluding(
+        if (reservInstanceRepository.existsConflictExcluding(
                 destClassroom.getId(), instance.getDate(), destTimeSlotIds, instance.getId())) {
             throw new DomainException(
                 "The target classroom already has a reservation for one or more of the selected time slots on " + instance.getDate());
@@ -560,7 +560,7 @@ public class ReservInstanceService {
 
         // 2. User self-conflict re-check (self-excluding) — must run before any mutation
         Long userId = instance.getGroup().getUser().getId();
-        if (repository.existsUserConflictExcluding(userId, instance.getDate(), destTimeSlotIds, instance.getId())) {
+        if (reservInstanceRepository.existsUserConflictExcluding(userId, instance.getDate(), destTimeSlotIds, instance.getId())) {
             throw new DomainException(
                 "The teacher already has a reservation for one or more of the selected time slots on " + instance.getDate());
         }
@@ -595,7 +595,7 @@ public class ReservInstanceService {
             }
         }
 
-        ReservInstance saved = repository.save(instance);
+        ReservInstance saved = reservInstanceRepository.save(instance);
 
         // Record history
         historyService.register(saved, ReservationEvent.REASSIGNED, "Reassigned by administrator");
@@ -616,7 +616,7 @@ public class ReservInstanceService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ReservInstance getOrThrow(UUID uuid) {
-        return repository.findByUuid(uuid)
+        return reservInstanceRepository.findByUuid(uuid)
             .orElseThrow(() -> new ResourceNotFoundException("Reservation instance not found: " + uuid));
     }
 

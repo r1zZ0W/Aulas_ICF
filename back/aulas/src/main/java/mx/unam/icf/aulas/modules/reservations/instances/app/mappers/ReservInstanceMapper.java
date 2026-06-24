@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.reservations.instances.app.mappers;
 
 import mx.unam.icf.aulas.kernel.app.mappers.BaseMapper;
 import mx.unam.icf.aulas.modules.academic.timeslots.app.dtos.TimeSlotDTO;
+import mx.unam.icf.aulas.modules.access.users.domain.User;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
@@ -37,6 +38,9 @@ public interface ReservInstanceMapper extends BaseMapper<ReservInstance, ReservI
 
     @Override
     @Mapping(target = "groupUuid",      source = "group.uuid")
+    @Mapping(target = "userUuid",       source = "group.user.uuid")
+    @Mapping(target = "userFullName",   source = "group.user", qualifiedByName = "userToFullName")
+    @Mapping(target = "userUsername",   source = "group.user.username")
     @Mapping(target = "classroomUuid",  source = "classroom.uuid")
     @Mapping(target = "classroomName",  source = "classroom.name")
     @Mapping(target = "timeSlots",      source = "slots", qualifiedByName = "slotsToTimeSlotDtos")
@@ -76,5 +80,18 @@ public interface ReservInstanceMapper extends BaseMapper<ReservInstance, ReservI
                         s.getTimeSlot().getStartTime(),
                         s.getTimeSlot().getEndTime()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Extracts the full name from a {@link User} entity.
+     * Returns the result of {@code user.getFullName()} which concatenates
+     * firstName and lastNames with proper whitespace handling.
+     *
+     * @param user the user entity; {@code null} returns {@code null}
+     * @return the user's full name, or {@code null} if user is {@code null}
+     */
+    @Named("userToFullName")
+    default String userToFullName(User user) {
+        return user != null ? user.getFullName() : null;
     }
 }

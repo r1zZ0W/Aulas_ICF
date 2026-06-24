@@ -8,6 +8,7 @@ import { getTimeSlots } from '../../api/timeslots';
 import { labelsToTimeSlotIds } from '../../utils/reservations';
 import '../ReservaModal/ReservaModal.css';
 import './ReasignarModal.css';
+import { TriangleAlert } from 'lucide-react';
 
 /** @param {number} h @param {number} m @returns {number} */
 const toMins = (h, m) => h * 60 + m;
@@ -73,13 +74,13 @@ export default function ReasignarModal({ open, onClose, reservation }) {
   // Time-slot catalog (needed to convert labels → IDs for the API)
   const { data: timeslotCatalog = [] } = useQuery({
     queryKey: ['timeslots'],
-    queryFn:  getTimeSlots,
+    queryFn: getTimeSlots,
     staleTime: Infinity,
   });
 
-  const [roomId,     setRoomId]     = useState('');
+  const [roomId, setRoomId] = useState('');
   const [startLabel, setStartLabel] = useState('');
-  const [endLabel,   setEndLabel]   = useState('');
+  const [endLabel, setEndLabel] = useState('');
 
   useEffect(() => {
     if (!open || !reservation) return;
@@ -87,13 +88,13 @@ export default function ReasignarModal({ open, onClose, reservation }) {
     setRoomId(reservation.classroomUuid ?? '');
     // Derive labels from the first and last time slot in the ordered list
     const slots = reservation.timeSlots ?? [];
-    setStartLabel(slots.length > 0 ? timeToLabel(slots[0].startTime)       : '');
-    setEndLabel(slots.length > 0   ? timeToLabel(slots[slots.length - 1].endTime) : '');
+    setStartLabel(slots.length > 0 ? timeToLabel(slots[0].startTime) : '');
+    setEndLabel(slots.length > 0 ? timeToLabel(slots[slots.length - 1].endTime) : '');
   }, [open, reservation]);
 
   const startSlot = START_SLOTS.find(s => s.label === startLabel) ?? null;
-  const endSlots  = startSlot ? getEndSlots(startSlot.h, startSlot.m) : [];
-  const room      = rooms.find(r => r.uuid === roomId) ?? null;
+  const endSlots = startSlot ? getEndSlots(startSlot.h, startSlot.m) : [];
+  const room = rooms.find(r => r.uuid === roomId) ?? null;
 
   const handleStartChange = val => {
     setStartLabel(val);
@@ -117,13 +118,13 @@ export default function ReasignarModal({ open, onClose, reservation }) {
 
     // Detect what actually changed to avoid sending unchanged fields
     const currentClassroom = reservation.classroomUuid;
-    const currentSlots     = (reservation.timeSlots ?? []).map(s => s.id).join(',');
-    const newSlots         = newTimeSlotIds.join(',');
+    const currentSlots = (reservation.timeSlots ?? []).map(s => s.id).join(',');
+    const newSlots = newTimeSlotIds.join(',');
 
     const payload = {
       uuid: reservation.uuid,
       ...(roomId !== currentClassroom ? { newClassroomUuid: roomId } : {}),
-      ...(newSlots !== currentSlots   ? { newTimeSlotIds } : {}),
+      ...(newSlots !== currentSlots ? { newTimeSlotIds } : {}),
     };
 
     // Prevent a no-op call (nothing changed)
@@ -190,6 +191,20 @@ export default function ReasignarModal({ open, onClose, reservation }) {
               </div>
             </div>
           )}
+
+          {/* Important info card */}
+          <div className="reserva-modal__sala-card reserva-modal__sala-card--danger">
+            <div className="reserva-modal__sala-card-header">
+              <TriangleAlert size={16} />
+              <span>Información importante</span>
+            </div>
+            <div className="reserva-modal__sala-card-details">
+              <span>
+                Se le notificará por correo electrónico al maestro al que se le reasigne la reserva
+                y a todos <br /> los administradores del sistema.
+              </span>
+            </div>
+          </div>
 
           {/* Time selectors */}
           <div className="reserva-modal__row">

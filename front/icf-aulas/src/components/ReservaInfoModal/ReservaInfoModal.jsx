@@ -7,6 +7,7 @@ import { typeLabel } from '../../schemas/classroom';
 import { slotsToRange } from '../../utils/reservations';
 import '../ReservaModal/ReservaModal.css';
 import './ReservaInfoModal.css';
+import { TriangleAlert } from 'lucide-react';
 
 /**
  * Formats a local Date as "H:MM" (no seconds).
@@ -100,6 +101,17 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
               type="text"
               className="reserva-modal__input reserva-info-modal__readonly"
               value={reservation.classroomName || '—'}
+              readOnly
+            />
+          </div>
+
+          {/* Maestro (read-only) */}
+          <div className="reserva-modal__field">
+            <label className="reserva-modal__label">Maestro</label>
+            <input
+              type="text"
+              className="reserva-modal__input reserva-info-modal__readonly"
+              value={reservation.userFullName || '—'}
               readOnly
             />
           </div>

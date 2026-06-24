@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -15,11 +15,21 @@ import './CalendarView.css';
 
 const dayHeaderContent = (args) => {
   const wd = args.date
-    .toLocaleDateString('es-MX', { weekday: 'short' })
+    .toLocaleDateString('es-MX', { weekday: 'short', timeZone: 'UTC' })
     .replace('.', '')
     .toUpperCase()
     .slice(0, 3);
-  const day = args.date.getDate();
+
+  if (args.view?.type === 'dayGridMonth') {
+    return (
+      <div className="cal-day-header">
+        <span className="cal-day-header__wd">{wd}</span>
+      </div>
+    );
+  }
+
+  // En la vista semanal/diaria, mostramos el día de la semana y el número del día (en UTC para evitar desfases de zona horaria)
+  const day = args.date.getUTCDate();
   return (
     <div className="cal-day-header">
       <span className="cal-day-header__wd">{wd}</span>
@@ -64,18 +74,49 @@ export default function CalendarView() {
   // ── Availability query ────────────────────────────────────────────────────
   const { data: instances = [] } = useQuery({
     queryKey: ['reservations', 'availability', calendarRange.from, calendarRange.to],
-    queryFn:  () => getAvailability({ from: calendarRange.from, to: calendarRange.to }),
-    enabled:  Boolean(calendarRange.from && calendarRange.to),
+    queryFn: () => getAvailability({ from: calendarRange.from, to: calendarRange.to }),
+    enabled: Boolean(calendarRange.from && calendarRange.to),
     staleTime: 30_000,
   });
 
+  // ── Periodic update state for current time ────────────────────────────────
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   // ── Compute visible events from fetched instances ─────────────────────────
-  const visibleEvents = useMemo(() =>
-    instances
+  const visibleEvents = useMemo(() => {
+    const list = instances
       .filter(inst => visibleRooms.has(inst.classroomUuid))
-      .map(inst => instanceToEvent(inst, roomById[inst.classroomUuid]?.color ?? '#64748b')),
-    [instances, visibleRooms, roomById]
-  );
+      .map(inst => instanceToEvent(inst, roomById[inst.classroomUuid]?.color ?? '#64748b'));
+
+    if (currentView === 'timeGridWeek') {
+      const mins = now.getMinutes() >= 30 ? 30 : 0;
+      const boundary = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        now.getHours(),
+        mins,
+        0
+      );
+
+      list.push({
+        id: 'past-disabled-bg',
+        start: '2020-01-01T00:00:00',
+        end: boundary,
+        display: 'background',
+        classNames: ['disabled-time-slot'],
+      });
+    }
+
+    return list;
+  }, [instances, visibleRooms, roomById, now, currentView]);
 
   return (
     <div className="calendar-wrapper">

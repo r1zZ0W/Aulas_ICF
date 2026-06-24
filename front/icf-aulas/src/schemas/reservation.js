@@ -80,6 +80,9 @@ export const ReservInstanceRequestSchema = z.object({
 export const ReservInstanceResponseSchema = z.object({
   uuid: z.string(),
   groupUuid: z.string(),
+  userUuid: z.string(),
+  userFullName: z.string(),
+  userUsername: z.string(),
   classroomUuid: z.string(),
   classroomName: z.string().optional().default(''),
   date: z.string(),
