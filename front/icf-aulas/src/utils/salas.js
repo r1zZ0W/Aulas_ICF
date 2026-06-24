@@ -81,11 +81,11 @@ export function buildRoomsFromClassrooms(classrooms = []) {
   return classrooms
     .filter(c => c.isActive)
     .map(c => ({
-      uuid:     c.uuid,
-      label:    c.name,
+      uuid: c.uuid,
+      label: c.name,
       // Future: `c.color ?? roomColor(c.uuid)` once backend ships the color field.
-      color:    roomColor(c.uuid),
+      color: roomColor(c.uuid),
       capacity: c.capacity,
-      type:     c.type,
+      type: c.type,
     }));
 }

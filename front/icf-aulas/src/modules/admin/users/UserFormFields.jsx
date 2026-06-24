@@ -2,7 +2,7 @@ import Input from '../../../components/Input/Input';
 import Select from '../../../components/Select/Select';
 
 const STATUS_OPTIONS = [
-  { value: 'true',  label: 'Activo' },
+  { value: 'true', label: 'Activo' },
   { value: 'false', label: 'Inactivo' },
 ];
 
@@ -74,14 +74,6 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
           error={errors.isActive}
         />
       )}
-
-      <Input
-        label="Departamento"
-        value={form.departamento}
-        onChange={(e) => onField('departamento', e.target.value)}
-        placeholder={isCreate ? 'Ej. Dirección' : undefined}
-        error={errors.departamento}
-      />
 
       <div className="users-page__form-grid--full">
         <Select

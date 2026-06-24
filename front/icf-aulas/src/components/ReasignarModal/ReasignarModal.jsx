@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { X, Info, Users, Clock, ChevronDown, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import Modal from '../Modal/Modal';
 import { useReservation } from '../../context/ReservationContext';
 import { typeLabel } from '../../schemas/classroom';
+import { getTimeSlots } from '../../api/timeslots';
+import { labelsToTimeSlotIds } from '../../utils/reservations';
 import '../ReservaModal/ReservaModal.css';
 import './ReasignarModal.css';
 
@@ -12,11 +15,7 @@ const toMins = (h, m) => h * 60 + m;
 /** @param {number} h @param {number} m @returns {string} */
 const fmt = (h, m) => `${h}:${String(m).padStart(2, '0')}`;
 
-/**
- * Returns all possible start time slots (07:00 – 19:30 in 30-min increments).
- *
- * @returns {Array<{ h: number, m: number, label: string }>}
- */
+/** Returns all possible start time slots (07:00 – 19:30 in 30-min increments). */
 function getAllStartSlots() {
   const slots = [];
   for (let h = 7; h <= 19; h++) {
@@ -28,13 +27,7 @@ function getAllStartSlots() {
   return slots;
 }
 
-/**
- * Returns available end time slots given a start time.
- *
- * @param {number} startH
- * @param {number} startM
- * @returns {Array<{ h: number, m: number, label: string }>}
- */
+/** Returns available end time slots given a start time. */
 function getEndSlots(startH, startM) {
   const startMins = toMins(startH, startM);
   const slots = [];
@@ -49,25 +42,23 @@ function getEndSlots(startH, startM) {
 }
 
 /**
- * Formats a Date as a time label snapped to the nearest 30-minute slot.
- *
- * @param {Date|string|null} date
- * @returns {string}
+ * Formats a time-slot's startTime ("HH:MM:SS") as a label ("H:MM").
+ * Used to initialise the dropdowns from the reservation's current time slots.
  */
-function timeToLabel(date) {
-  if (!date) return '';
-  const d = date instanceof Date ? date : new Date(date);
-  return fmt(d.getHours(), d.getMinutes() >= 30 ? 30 : 0);
+function timeToLabel(hhmmss) {
+  if (!hhmmss) return '';
+  const [h, m] = hhmmss.split(':').map(Number);
+  return fmt(h, m);
 }
 
-/** Pre-computed full start-slot list (static, does not depend on current time). */
 const START_SLOTS = getAllStartSlots();
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 /**
  * Modal for rescheduling an existing reservation — allows changing the room
- * and time without modifying the class name or recurrence settings.
+ * and/or time block without touching the class name or recurrence settings.
+ * Calls `PATCH /api/v1/reservations/{uuid}/reassign`. ADMIN only.
  *
  * @param {{
  *   open:        boolean,
@@ -76,8 +67,15 @@ const START_SLOTS = getAllStartSlots();
  * }} props
  */
 export default function ReasignarModal({ open, onClose, reservation }) {
-  const { rooms, visibleRooms, updateReservation } = useReservation();
+  const { rooms, visibleRooms, reassignMutation } = useReservation();
   const availableRooms = rooms.filter(r => visibleRooms.has(r.uuid));
+
+  // Time-slot catalog (needed to convert labels → IDs for the API)
+  const { data: timeslotCatalog = [] } = useQuery({
+    queryKey: ['timeslots'],
+    queryFn:  getTimeSlots,
+    staleTime: Infinity,
+  });
 
   const [roomId,     setRoomId]     = useState('');
   const [startLabel, setStartLabel] = useState('');
@@ -85,9 +83,12 @@ export default function ReasignarModal({ open, onClose, reservation }) {
 
   useEffect(() => {
     if (!open || !reservation) return;
-    setRoomId(reservation.roomId ?? '');
-    setStartLabel(timeToLabel(reservation.start));
-    setEndLabel(timeToLabel(reservation.end));
+    // Pre-fill with current reservation values
+    setRoomId(reservation.classroomUuid ?? '');
+    // Derive labels from the first and last time slot in the ordered list
+    const slots = reservation.timeSlots ?? [];
+    setStartLabel(slots.length > 0 ? timeToLabel(slots[0].startTime)       : '');
+    setEndLabel(slots.length > 0   ? timeToLabel(slots[slots.length - 1].endTime) : '');
   }, [open, reservation]);
 
   const startSlot = START_SLOTS.find(s => s.label === startLabel) ?? null;
@@ -102,23 +103,41 @@ export default function ReasignarModal({ open, onClose, reservation }) {
     if (!eSlots.find(s => s.label === endLabel)) setEndLabel(eSlots[0]?.label ?? '');
   };
 
-  const canSubmit = Boolean(roomId) && Boolean(startLabel) && Boolean(endLabel);
+  const canSubmit =
+    Boolean(roomId) &&
+    Boolean(startLabel) &&
+    Boolean(endLabel) &&
+    !reassignMutation.isPending;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!canSubmit || !reservation) return;
 
-    const [sh, sm] = startLabel.split(':').map(Number);
-    const [eh, em] = endLabel.split(':').map(Number);
-    const base = reservation.start instanceof Date
-      ? reservation.start
-      : new Date(reservation.start);
+    const newTimeSlotIds = labelsToTimeSlotIds(timeslotCatalog, startLabel, endLabel);
 
-    const newStart = new Date(base.getFullYear(), base.getMonth(), base.getDate(), sh, sm, 0);
-    const newEnd   = new Date(base.getFullYear(), base.getMonth(), base.getDate(), eh, em, 0);
+    // Detect what actually changed to avoid sending unchanged fields
+    const currentClassroom = reservation.classroomUuid;
+    const currentSlots     = (reservation.timeSlots ?? []).map(s => s.id).join(',');
+    const newSlots         = newTimeSlotIds.join(',');
 
-    updateReservation(reservation.id, { roomId, start: newStart, end: newEnd });
-    onClose();
+    const payload = {
+      uuid: reservation.uuid,
+      ...(roomId !== currentClassroom ? { newClassroomUuid: roomId } : {}),
+      ...(newSlots !== currentSlots   ? { newTimeSlotIds } : {}),
+    };
+
+    // Prevent a no-op call (nothing changed)
+    if (!payload.newClassroomUuid && !payload.newTimeSlotIds) {
+      onClose();
+      return;
+    }
+
+    try {
+      await reassignMutation.mutateAsync(payload);
+      onClose();
+    } catch (_) {
+      // toast already shown by useApiMutation's onError handler
+    }
   };
 
   return (
@@ -226,7 +245,7 @@ export default function ReasignarModal({ open, onClose, reservation }) {
               disabled={!canSubmit}
             >
               <Plus size={20} />
-              Reasignar Aula
+              {reassignMutation.isPending ? 'Reasignando…' : 'Reasignar Aula'}
             </button>
           </footer>
         </form>

@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,13 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Long> {
      * @return an optional classroom when found
      */
     Optional<Classroom> findByUuid(UUID uuid);
+
+    /**
+     * It will delete the given classroom with that uuid.
+     * @param uuid the public id to search by.
+     * @return how many rows where affected by this change.
+     */
+    int deleteByUuid(UUID uuid);
 
     /** Finds a classroom by its unique name, used to enforce name uniqueness before saving. */
     Optional<Classroom> findByName(String name);
@@ -90,7 +98,7 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Long> {
      *
      * @param parentId internal database PK of the parent classroom (not the public UUID)
      */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Classroom c SET c.linkedRoom = null WHERE c.linkedRoom.id = :parentId")
     void unlinkChildren(@Param("parentId") Long parentId);
 
@@ -113,4 +121,22 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Long> {
             FROM Classroom c
             """)
     ClassroomStatsDTO fetchStats();
+
+    /**
+     * Bulk-fetches classrooms by a collection of public UUIDs in a single query.
+     * Used by the bulk children-assignment operation to avoid N+1 SELECT chains.
+     *
+     * @param uuids set of public UUIDs to load (duplicates ignored by the IN clause)
+     * @return classrooms whose UUID is contained in {@code uuids}
+     */
+    List<Classroom> findAllByUuidIn(Collection<UUID> uuids);
+
+    /**
+     * Returns all classrooms that currently reference the given classroom as their direct parent.
+     * Used to compute the set of children to unlink during a bulk children-assignment.
+     *
+     * @param parentId internal database PK of the parent classroom
+     * @return direct child classrooms (linkedRoom.id == parentId)
+     */
+    List<Classroom> findByLinkedRoom_Id(Long parentId);
 }

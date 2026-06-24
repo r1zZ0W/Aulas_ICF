@@ -16,8 +16,6 @@ import { z } from 'zod';
  */
 export const UserStatsSchema = z.object({
   total: z.number(),
-  active: z.number(),
-  inactive: z.number(),
   admins: z.number(),
 });
 

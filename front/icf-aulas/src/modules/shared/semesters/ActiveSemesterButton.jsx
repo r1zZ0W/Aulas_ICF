@@ -15,8 +15,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { CalendarDays, ChevronDown, Plus, Pencil } from 'lucide-react';
 
-import { useSemesters } from '../../../hooks/useSemesters';
-import { useSemestersForm } from '../../../hooks/useSemestersForm';
+import { useSemesters } from './hooks/useSemesters';
+import { useSemestersForm } from './hooks/useSemestersForm';
 import {
   deriveSemesterStatus,
   SEMESTER_STATUS_LABEL,
@@ -52,7 +52,7 @@ export default function ActiveSemesterButton({ isAdmin }) {
   }, [menuOpen]);
 
   // ── Derived display values ────────────────────────────────────────────────────
-  const hasActive    = !!activeSemester;
+  const hasActive = !!activeSemester;
   const activeStatus = hasActive ? deriveSemesterStatus(activeSemester) : null;
   const primaryLabel = hasActive ? `Semestre: ${activeSemester.name}` : 'Crear semestre';
 
@@ -60,7 +60,7 @@ export default function ActiveSemesterButton({ isAdmin }) {
   function handlePrimaryClick() {
     if (!isAdmin) return;
     if (hasActive) openEdit(activeSemester);
-    else           openCreate();
+    else openCreate();
   }
 
   function handleMenuEdit(semester) {
@@ -83,9 +83,9 @@ export default function ActiveSemesterButton({ isAdmin }) {
           className={`semester-btn__main${!isAdmin ? ' semester-btn__main--readonly' : ''}`}
           onClick={handlePrimaryClick}
           title={
-            !isAdmin        ? undefined :
-            hasActive       ? `Editar ${activeSemester.name}` :
-                              'Crear nuevo semestre'
+            !isAdmin ? undefined :
+              hasActive ? `Editar ${activeSemester.name}` :
+                'Crear nuevo semestre'
           }
         >
           {hasActive ? <CalendarDays size={15} /> : <Plus size={15} />}

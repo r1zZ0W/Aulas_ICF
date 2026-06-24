@@ -58,7 +58,7 @@ export default function DayEventsModal({ open, onClose, date, events = [], onCre
                 <div
                   key={i}
                   className="day-events-modal__event"
-                  onClick={() => onEventClick && onEventClick(evt.id)}
+                  onClick={() => onEventClick && onEventClick(evt)}
                 >
                   <span className="day-events-modal__event-dot" style={{ background: color }} />
                   <div className="day-events-modal__event-body">

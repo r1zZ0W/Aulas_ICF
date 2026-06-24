@@ -13,10 +13,8 @@ export const UserResponseSchema = z.object({
   firstName: z.string(),
   lastNames: z.string(),
   username: z.string(),
-  email: z.string().email(),
-  departamento: z.string().nullable().optional(),
+  email: z.string(),
   roleName: z.string(),
-  isActive: z.boolean(),
   createdAt: z.string(),
 });
 

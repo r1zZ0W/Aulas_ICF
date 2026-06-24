@@ -3,28 +3,22 @@ package mx.unam.icf.aulas.modules.reservations.instances.domain;
 /**
  * Lifecycle status of a {@link ReservInstance}.
  *
- * <p>Status transitions follow the approval workflow defined in the DFR:
- * a newly created instance starts as {@code PENDIENTE} and may be moved
- * to {@code APROBADA} or {@code RECHAZADA} by an administrator.
- * Both users and administrators may cancel an approved instance.</p>
+ * <p>A reservation is active ({@code ACTIVA}) from the moment it is created and occupies
+ * the classroom immediately — there is no pending or approval step. The only allowed
+ * transition is from {@code ACTIVA} to one of the cancelled states, which physically
+ * releases the reserved time slots so the classroom can be rebooked.</p>
  *
  * @author Ithera
- * @version 2.0
+ * @version 3.0
  */
 public enum ReservInstanceStatus {
 
-    /** Awaiting administrator review. Initial status on creation. */
-    PENDIENTE,
+    /** Active reservation; classroom is occupied for the specified date and time slots. */
+    ACTIVE,
 
-    /** Approved by an administrator; classroom is reserved. */
-    APROBADA,
+    /** Cancelled by the teacher who owned the reservation. Slots have been freed. */
+    CANCELLED_BY_USER,
 
-    /** Rejected by an administrator; classroom is not reserved. */
-    RECHAZADA,
-
-    /** Cancelled by the teacher who owned the reservation. */
-    CANCELADA_POR_MAESTRO,
-
-    /** Cancelled by an administrator. */
-    CANCELADA_POR_ADMIN
+    /** Cancelled by an administrator. Slots have been freed. */
+    CANCELLED_BY_ADMIN
 }

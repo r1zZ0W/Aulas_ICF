@@ -4,11 +4,11 @@
  * and create/update/deactivate mutations via React Query.
  */
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { getUsers, getUserStats, createUser, updateUser, deleteUser, getRoles } from '../api/users';
-import { useApiMutation } from './useApiMutation';
+import { getUsers, getUserStats, createUser, updateUser, deleteUser, getRoles } from '../../../../api/users.js';
+import { useApiMutation } from '../../../../hooks/useApiMutation.js';
 
 /**
- * @typedef {import('../schemas/user/userResponse.js').UserResponseSchema} User
+ * @typedef {import('../../../../schemas/user/userResponse.js').UserResponseSchema} User
  * @typedef {{ total: number, active: number, inactive: number, admins: number }} UserStats
  */
 
@@ -41,25 +41,25 @@ export function useUsers({ search, page = 0, size = 20, sort, direction } = {}) 
     data: pageData,
     isLoading: usersLoading,
   } = useQuery({
-    queryKey:        ['users', 'list', { search, page, size, sort, direction }],
-    queryFn:         () => getUsers({ search, page, size, sort, direction }),
+    queryKey: ['users', 'list', { search, page, size, sort, direction }],
+    queryFn: () => getUsers({ search, page, size, sort, direction }),
     placeholderData: keepPreviousData,
   });
 
-  const users         = pageData?.items         ?? [];
+  const users = pageData?.items ?? [];
   const totalElements = pageData?.totalElements ?? 0;
-  const totalPages    = pageData?.totalPages    ?? 1;
+  const totalPages = pageData?.totalPages ?? 1;
 
   // ── Aggregated stats (total / active / inactive / admins) ───────────────────
   const { data: stats = { total: 0, active: 0, inactive: 0, admins: 0 } } = useQuery({
     queryKey: ['users', 'stats'],
-    queryFn:  getUserStats,
+    queryFn: getUserStats,
   });
 
   // ── Roles catalogue (small, rarely changes) ──────────────────────────────────
   const { data: roles = [] } = useQuery({
     queryKey: ['roles'],
-    queryFn:  getRoles,
+    queryFn: getRoles,
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────

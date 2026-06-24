@@ -308,3 +308,29 @@
   background: var(--moon-piccolo);
   color: #fff;
 }
+
+/* 1. Reduce el espacio interno del contenedor del evento */
+.fc-timegrid-event .fc-event-main {
+  padding: 2px 4px !important;
+  /* Por defecto tiene más padding */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+/* 2. Achica la tipografía y el interlineado de la hora */
+.fc-timegrid-event .fc-event-time {
+  font-size: 11px !important;
+  line-height: 1.1 !important;
+  margin-bottom: 1px !important;
+  /* Reduce la separación con el título */
+}
+
+/* 3. Achica y compacta el título (el aula) */
+.fc-timegrid-event .fc-event-title {
+  font-size: 11px !important;
+  line-height: 1.1 !important;
+  font-weight: bold;
+  white-space: normal;
+  /* Permite que rompa en dos líneas si es necesario */
+}

@@ -1,15 +1,6 @@
 package mx.unam.icf.aulas.modules.reservations.instances.domain;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,12 +18,13 @@ import java.util.UUID;
 /**
  * Entity representing a single date occurrence of a recurring {@link ReservationGroup}.
  *
- * <p>Each instance corresponds to one day on which the group's pattern fires,
- * carrying its own approval status and the specific classroom assigned for that date.
- * Time-slot bookings are materialized as {@link ReservSlot} records linked to this entity.</p>
+ * <p>Each instance corresponds to one day on which the group's pattern fires. It is
+ * active ({@link ReservInstanceStatus#ACTIVE}) from the moment of creation and
+ * occupies the assigned classroom immediately. Time-slot bookings are materialized as
+ * {@link ReservSlot} records linked to this entity.</p>
  *
  * @author Ithera
- * @version 2.0
+ * @version 3.0
  * @see ReservationGroup
  * @see ReservSlot
  */
@@ -61,20 +53,17 @@ public class ReservInstance extends BaseEntity {
     @Column(name = "date", nullable = false)
     private LocalDate date;
 
-    /** Current approval status of this instance. */
+    /** Current lifecycle status of this instance; defaults to {@link ReservInstanceStatus#ACTIVE} on creation. */
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private ReservInstanceStatus status;
-
-    /** Purpose or reason for this reservation, as provided by the teacher. */
-    @Column(name = "motivo", nullable = false, length = 500)
-    private String motivo;
+    private ReservInstanceStatus status = ReservInstanceStatus.ACTIVE;
 
     /** Expected number of attendees for this session. */
-    @Column(name = "num_asistentes", nullable = false)
-    private Integer numAsistentes;
+    @Column(name = "attendee_count", nullable = false)
+    private Integer attendeeCount;
 
-    /** Individual 30-minute time-slot bookings for this instance. */
+    /** Individual 30-minute time-slot bookings for this instance, ordered by start time. */
     @OneToMany(mappedBy = "instance", fetch = FetchType.LAZY)
+    @OrderBy(value = "timeSlot.id ASC")
     private List<ReservSlot> slots;
 }

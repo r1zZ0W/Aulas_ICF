@@ -30,13 +30,13 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Service that generates PDF reports of approved classroom reservations (DFR §5.1).
+ * Service that generates PDF reports of active classroom reservations.
  *
  * <p>Supports two report periods ({@link ReportPeriod}) and an optional classroom filter.
  * The generated PDF contains a styled table with columns: Aula, Maestro, Fecha, Bloque, Estado, Motivo, Asistentes.</p>
  *
  * @author Ithera
- * @version 2.0
+ * @version 3.0
  */
 @Service
 @RequiredArgsConstructor
@@ -50,7 +50,7 @@ public class ReservationReportService {
     private final ReservInstanceRepository reservInstanceRepository;
 
     /**
-     * Generates a PDF report of approved reservations for the given period.
+     * Generates a PDF report of active reservations for the given period.
      *
      * @param period        {@link ReportPeriod#MES_EN_CURSO} or {@link ReportPeriod#MES_ANTERIOR}
      * @param classroomUuid optional classroom filter; {@code null} means all classrooms
@@ -63,7 +63,7 @@ public class ReservationReportService {
                 : YearMonth.now();
 
         LocalDate from = month.atDay(1);
-        // MES_EN_CURSO: cut off at today so future-dated approved instances are excluded
+        // MES_EN_CURSO: cut off at today so future-dated active instances are excluded
         LocalDate to = (period == ReportPeriod.MES_EN_CURSO)
                 ? month.atEndOfMonth().isAfter(LocalDate.now()) ? LocalDate.now() : month.atEndOfMonth()
                 : month.atEndOfMonth();
@@ -72,10 +72,10 @@ public class ReservationReportService {
         String title = "Reporte de Reservas — " + month.format(MONTH_FMT) + filterLabel;
 
         List<ReservInstance> instances = (classroomUuid != null)
-                ? reservInstanceRepository.findApprovedByClassroomAndDateRange(
-                        classroomUuid, from, to, ReservInstanceStatus.APROBADA)
-                : reservInstanceRepository.findApprovedByDateRange(
-                        from, to, ReservInstanceStatus.APROBADA);
+                ? reservInstanceRepository.findActiveByClassroomAndDateRange(
+                        classroomUuid, from, to, ReservInstanceStatus.ACTIVE)
+                : reservInstanceRepository.findActiveByDateRange(
+                        from, to, ReservInstanceStatus.ACTIVE);
 
         return buildPdf(title, from, to, instances);
     }
@@ -116,8 +116,7 @@ public class ReservationReportService {
                 addCell(table, ri.getDate().toString(),                   cellFont, bg);
                 addCell(table, deriveBloque(ri),                          cellFont, bg);
                 addCell(table, ri.getStatus().name(),                     cellFont, bg);
-                addCell(table, ri.getMotivo() != null ? ri.getMotivo() : "", cellFont, bg);
-                addCell(table, ri.getNumAsistentes() != null ? ri.getNumAsistentes().toString() : "", cellFont, bg);
+                addCell(table, ri.getAttendeeCount() != null ? ri.getAttendeeCount().toString() : "", cellFont, bg);
             }
 
             doc.add(table);
@@ -128,8 +127,8 @@ public class ReservationReportService {
 
     private @NonNull PdfPTable buildHeader(Font headerFont) {
         // Columns: Aula, Maestro, Fecha, Bloque, Estado, Motivo, Asistentes
-        String[] headers = {"Aula", "Maestro", "Fecha", "Bloque", "Estado", "Motivo", "Asistentes"};
-        float[]  widths  = { 2f,     2.5f,      1.5f,    2f,       2f,       3f,       1.2f};
+        String[] headers = {"Aula", "Maestro", "Fecha", "Bloque", "Estado", "Asistentes"};
+        float[]  widths  = { 2f,     2.5f,      1.5f,    2f,       2f,              1.2f};
 
         PdfPTable table = new PdfPTable(widths);
         table.setWidthPercentage(100);

@@ -31,7 +31,7 @@ public class ReportController {
     private final ReservationReportService reportService;
 
     /**
-     * Generates and downloads a PDF report of approved reservations for the requested period.
+     * Generates and downloads a PDF report of active reservations for the requested period.
      * GET /api/v1/reports/reservations?period=MES_EN_CURSO|MES_ANTERIOR[&classroomUuid=...]
      *
      * @param period        report period; defaults to {@code MES_EN_CURSO} when omitted

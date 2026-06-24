@@ -1,148 +1,81 @@
-import { useRef, useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { useQuery } from '@tanstack/react-query';
+
+import { useCalendar } from '../../hooks/useCalendar';
 import { useReservation } from '../../context/ReservationContext';
+import { getAvailability } from '../../api/reservations';
+import { instanceToEvent } from '../../utils/reservations';
 import DayEventsModal from './DayEventsModal';
 
 import './CalendarView.css';
 
-const MONTHS_ES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
-
-function formatWeekTitle(start, endExclusive) {
-  const s = new Date(start);
-  const e = new Date(endExclusive);
-  e.setDate(e.getDate() - 1);
-  if (s.getMonth() === e.getMonth()) {
-    return `${s.getDate()} – ${e.getDate()} de ${MONTHS_ES[s.getMonth()]}, ${s.getFullYear()}`;
-  }
-  return `${s.getDate()} ${MONTHS_ES[s.getMonth()]} – ${e.getDate()} ${MONTHS_ES[e.getMonth()]}, ${s.getFullYear()}`;
-}
-
-function formatMonthTitle(start) {
-  const s = new Date(start);
-  return `${MONTHS_ES[s.getMonth()]} ${s.getFullYear()}`;
-}
+const dayHeaderContent = (args) => {
+  const wd = args.date
+    .toLocaleDateString('es-MX', { weekday: 'short' })
+    .replace('.', '')
+    .toUpperCase()
+    .slice(0, 3);
+  const day = args.date.getDate();
+  return (
+    <div className="cal-day-header">
+      <span className="cal-day-header__wd">{wd}</span>
+      <span className={`cal-day-header__d${args.isToday ? ' cal-day-header__d--today' : ''}`}>
+        {day}
+      </span>
+    </div>
+  );
+};
 
 export default function CalendarView() {
-  const calRef = useRef(null);
-  const [currentView, setCurrentView] = useState('timeGridWeek');
-  const [title, setTitle] = useState('');
-  const { openModal, visibleEvents, openInfoModal } = useReservation();
+  const { visibleRooms, roomById } = useReservation();
 
-  const [overflowDay, setOverflowDay] = useState(null);
+  // ── Calendar date range (updated on every FullCalendar navigation) ──────────
+  // Kept LOCAL to this component: datesSet fires on every prev/next click, so
+  // putting this in global context would re-render the entire provider subtree.
+  const [calendarRange, setCalendarRange] = useState({ from: null, to: null });
 
-  const getStartOfCurrentWeek = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const day = today.getDay();
-    const diff = today.getDate() - (day === 0 ? 6 : day - 1);
-    const monday = new Date(today.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  };
+  const handleRangeChange = useCallback((range) => {
+    setCalendarRange(range);
+  }, []);
 
-  const getStartOfCurrentMonth = () => {
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1);
-  };
+  const {
+    calRef,
+    currentView,
+    title,
+    isPrevDisabled,
+    overflowDay,
+    setOverflowDay,
+    selectAllow,
+    handleSelect,
+    handleDateClick,
+    handleEventClick,
+    handleEventClickFromModal,
+    handleMoreLinkClick,
+    handleDatesSet,
+    goTo,
+    changeView,
+    openModal,
+  } = useCalendar({ onRangeChange: handleRangeChange });
 
-  const [isPrevDisabled, setIsPrevDisabled] = useState(false);
+  // ── Availability query ────────────────────────────────────────────────────
+  const { data: instances = [] } = useQuery({
+    queryKey: ['reservations', 'availability', calendarRange.from, calendarRange.to],
+    queryFn:  () => getAvailability({ from: calendarRange.from, to: calendarRange.to }),
+    enabled:  Boolean(calendarRange.from && calendarRange.to),
+    staleTime: 30_000,
+  });
 
-  const selectAllow = (info) => {
-    const now = new Date();
-    const mins = now.getMinutes() >= 30 ? 30 : 0;
-    const boundary = new Date(
-      now.getFullYear(), now.getMonth(), now.getDate(),
-      now.getHours(), mins, 0
-    );
-    return info.start > boundary;
-  };
-
-  const handleSelect = (info) => {
-    openModal(info.start, info.end);
-    calRef.current?.getApi().unselect();
-  };
-
-  const handleDateClick = (info) => {
-    const today = new Date();
-    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    if (info.date < todayMidnight) return;
-
-    if (currentView === 'dayGridMonth') {
-      openModal(info.date);
-    } else if (currentView === 'timeGridWeek') {
-      const startDate = new Date(info.date);
-      const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
-      openModal(startDate, endDate);
-    }
-  };
-
-  const handleEventClick = (info) => {
-    info.jsEvent.preventDefault();
-    openInfoModal(info.event.id);
-  };
-
-  const handleEventClickFromModal = (eventId) => {
-    setOverflowDay(null);
-    openInfoModal(eventId);
-  };
-
-  const handleMoreLinkClick = (info) => {
-    const evts = info.allSegs.map(seg => seg.event);
-    setOverflowDay({ date: info.date, events: evts });
-    return false;
-  };
-
-  const handleDatesSet = (info) => {
-    setCurrentView(info.view.type);
-    if (info.view.type === 'timeGridWeek') {
-      setTitle(formatWeekTitle(info.start, info.end));
-      const currentWeekStart = getStartOfCurrentWeek();
-      setIsPrevDisabled(info.start <= currentWeekStart);
-    } else {
-      setTitle(formatMonthTitle(info.start));
-      const currentMonthStart = getStartOfCurrentMonth();
-      setIsPrevDisabled(info.start <= currentMonthStart);
-    }
-  };
-
-  const goTo = (action) => {
-    if (action === 'prev' && isPrevDisabled) return;
-    const api = calRef.current?.getApi();
-    if (!api) return;
-    if (action === 'prev') api.prev();
-    else if (action === 'next') api.next();
-    else if (action === 'today') api.today();
-  };
-
-  const changeView = (viewName) => {
-    const api = calRef.current?.getApi();
-    if (!api) return;
-    api.changeView(viewName);
-    setCurrentView(viewName);
-  };
-
-  const dayHeaderContent = (args) => {
-    const wd = args.date
-      .toLocaleDateString('es-MX', { weekday: 'short' })
-      .replace('.', '')
-      .toUpperCase()
-      .slice(0, 3);
-    const day = args.date.getDate();
-    return (
-      <div className="cal-day-header">
-        <span className="cal-day-header__wd">{wd}</span>
-        <span className={`cal-day-header__d${args.isToday ? ' cal-day-header__d--today' : ''}`}>
-          {day}
-        </span>
-      </div>
-    );
-  };
+  // ── Compute visible events from fetched instances ─────────────────────────
+  const visibleEvents = useMemo(() =>
+    instances
+      .filter(inst => visibleRooms.has(inst.classroomUuid))
+      .map(inst => instanceToEvent(inst, roomById[inst.classroomUuid]?.color ?? '#64748b')),
+    [instances, visibleRooms, roomById]
+  );
 
   return (
     <div className="calendar-wrapper">

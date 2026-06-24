@@ -1,7 +1,7 @@
 import { Users, ShieldCheck, Plus, Pencil, Trash2 } from 'lucide-react';
 
-import { useUsers } from '../../../hooks/useUsers';
-import { useUsersForm } from '../../../hooks/useUsersForm';
+import { useUsers } from './hooks/useUsers';
+import { useUsersForm } from './hooks/useUsersForm';
 import { usePagination } from '../../../hooks/usePagination';
 import { DEFAULT_PAGE_SIZE } from '../../../utils/queryUtils';
 import { DISPLAY_ROLE, roleBadgeVariant, roleLabel } from '../../../utils/roles';
@@ -85,12 +85,6 @@ export default function UsersPage() {
           </div>
         </div>
       ),
-    },
-    {
-      key: 'departamento',
-      header: 'Departamento',
-      width: '16%',
-      render: (row) => row.departamento || '—',
     },
     {
       key: 'roleName',

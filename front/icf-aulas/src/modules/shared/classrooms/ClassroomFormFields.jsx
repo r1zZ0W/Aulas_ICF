@@ -106,7 +106,7 @@ export default function ClassroomFormFields({
             </legend>
             <p className="classrooms-page__form-help" style={{ marginTop: 2, marginBottom: 8 }}>
               Marca las aulas que pertenecen a o están contenidas dentro de esta.
-              Al guardar, se actualizarán secuencialmente (interino — un PUT por hija).
+              Los cambios se aplicarán al guardar el formulario.
             </p>
             <div className="classroom-children__list">
               {childOptions.map((c) => {

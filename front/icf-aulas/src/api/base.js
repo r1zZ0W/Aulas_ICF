@@ -1,7 +1,3 @@
-// ─── Custom HTTP Error ────────────────────────────────────────────────────────
-// Extiende Error para transportar el status y el cuerpo de la respuesta fallida,
-// permitiendo que el catch del consumidor distinga errores HTTP de errores de red.
-
 /**
  * Custom HTTP Error class that extends the native Error.
  * It carries the HTTP status code and response payload, allowing consumers

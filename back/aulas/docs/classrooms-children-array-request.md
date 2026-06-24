@@ -1,10 +1,10 @@
 # Aulas — Peticiones del Frontend (junio 2026)
 
-> **Estado:** ⏳ Pendientes de implementación en backend.
+> **Estado:** §1 implementado ✅ — §2 pendiente ⏳
 
 ---
 
-## 1. ⏳ Asignación en bloque de hijas `PUT /api/v1/classrooms/{uuid}/children`
+## 1. ✅ Asignación en bloque de hijas `PUT /api/v1/classrooms/{uuid}/children`
 
 ### Contexto
 
@@ -12,15 +12,9 @@ La relación padre/hija es un árbol auto-referenciado (`linked_room_id`): cada 
 **un solo padre**. Desde la interfaz, un administrador necesita poder asignar varias hijas al
 mismo padre en una sola operación (ej. asignar Aula 101, Aula 102 y Laboratorio B a "Edificio A").
 
-### Implementación actual del frontend (interina)
+### Implementación (backend — `ClassroomController` + `ClassroomService`)
 
-Mientras no exista este endpoint, el frontend asigna las hijas de forma **secuencial**
-(un `PUT /api/v1/classrooms/{childUuid}` por hija), para evitar colisiones optimistas / deadlocks
-de JPA en el pool de Tomcat. Esta estrategia **no es atómica**:
-si un PUT falla a mitad, el estado de la BD puede quedar inconsistente.
-El frontend muestra un toast de error crítico y fuerza un refetch antes de cerrar el modal.
-
-### Petición
+El endpoint reemplaza la estrategia interina secuencial que existía en el frontend.
 
 ```
 PUT /api/v1/classrooms/{uuid}/children
@@ -37,20 +31,23 @@ Rol: ADMIN
 
 **Semántica (transaccional):**
 
-1. Para cada UUID en `childUuids`: `UPDATE classrooms SET linked_room_id = <id del padre> WHERE uuid = <childUuid>`.
-2. Para cada hija directa preexistente cuyo UUID **no** esté en `childUuids`:
-   `UPDATE classrooms SET linked_room_id = NULL WHERE uuid = <childUuid>`.
-3. Todo en una sola transacción — si cualquier paso falla, hacer rollback completo.
-4. Validaciones:
-   - Cada UUID en `childUuids` debe corresponder a un aula activa (`400` si no existe o está inactiva).
-   - Reusar `assertNoCycle(parent, child)` para cada hija propuesta (`400` si forma ciclo).
-   - Ignorar silenciosamente UUIDs duplicados dentro del mismo array.
-5. **Respuesta `200`:** `{ "message": "Children updated successfully" }`.
-6. **Respuesta `400`:** `{ "message": "...", "error": true }` (ciclo, UUID inválido, etc.).
+1. Carga el padre; si no existe → `404`.
+2. Deduplica `childUuids` silenciosamente.
+3. Carga **todos** los hijos deseados en **una sola query** (`findAllByUuidIn`); si algún UUID
+   no existe → `400`.
+4. Precalcula el conjunto de ancestros del padre **una vez** (`collectAncestorIds`).
+5. Para cada hijo deseado (en memoria): valida `isActive`, valida ausencia de ciclo → `400`.
+6. Vincula los hijos deseados (`linkedRoom = parent`).
+7. Desvincula (`linkedRoom = null`) las hijas directas actuales ausentes del nuevo conjunto.
+8. `saveAll` de todas las entidades modificadas — una sola transacción.
+9. **Respuesta `200`:** `{ "message": "Children updated successfully" }`.
+10. **Respuesta `400`:** `{ "message": "...", "error": true }` (ciclo, UUID inválido, inactivo).
+11. **Respuesta `403`:** rol MAESTRO.
+12. **Respuesta `404`:** padre no encontrado.
 
-**Nota de migración del frontend:** al llegar este endpoint, reemplazar el bucle `for...of` de
-`setChildrenMutation` en `src/hooks/useClassrooms.js` por una única llamada a
-`api.put(\`/api/v1/classrooms/\${parentUuid}/children\`, { childUuids })`.
+**Frontend migrado:** `src/hooks/useClassrooms.js` → `setChildrenMutation` ya llama a
+`setClassroomChildren(parentUuid, childUuids)` (un único PUT).
+`src/hooks/useClassroomsForm.js` → `handleEditSubmit` envía el conjunto completo deseado.
 
 ---
 
@@ -84,7 +81,7 @@ filtrado por estado.
 ## Confirmación: deactivate/reactivate ya implementados ✅
 
 Los endpoints `PATCH /deactivate` y `PATCH /reactivate` están **implementados y disponibles**
-(`ClassroomController.java:135-160`). El frontend ya los cablea en esta versión.
+(`ClassroomController.java:127-152`). El frontend ya los cablea en esta versión.
 
 ```
 PATCH /api/v1/classrooms/{uuid}/deactivate   →  isActive = false, unlinks children (orphan A)
@@ -92,3 +89,26 @@ PATCH /api/v1/classrooms/{uuid}/reactivate   →  isActive = true
 ```
 
 No se requiere ninguna acción adicional en backend para estas operaciones.
+
+---
+
+## Confirmación: DELETE ya implementado ✅ (con advertencia de arquitectura)
+
+`DELETE /api/v1/classrooms/{uuid}` — elimina el aula y **en cascada** todos sus datos dependientes.
+
+> ⚠️ **Trade-off de arquitectura.** Esta operación rompe la NFR "nada se elimina físicamente"
+> y los requisitos de auditoría LFTAIP: destruye el histórico de reservas, asignaciones de
+> equipos y trazabilidad académica del aula eliminada. Las alternativas más robustas —
+> FKs `NULLABLE` con `SET NULL`, o soft-delete real (`@SQLDelete`/`@Where`) — están fuera
+> de alcance por decisión del propietario del proyecto y deben re-evaluarse antes de
+> un despliegue en entorno regulado.
+
+**Orden de eliminación (child-before-parent):**
+1. Se capturan los `group_id` afectados (antes de borrar instancias).
+2. Se desvinculan hijas directas (`linked_room_id = NULL`).
+3. `DELETE reserv_slots WHERE classroom_id = ?`
+4. `DELETE reserv_instances WHERE classroom_id = ?`
+5. `DELETE classroom_resources WHERE classroom_id = ?`
+6. Se eliminan los `ReservationGroup` que quedan sin instancias (grupos huérfanos);
+   la eliminación es per-entity para que Hibernate limpie `reservation_group_days`.
+7. `DELETE classrooms WHERE id = ?`

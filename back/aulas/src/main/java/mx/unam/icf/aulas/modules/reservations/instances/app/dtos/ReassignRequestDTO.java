@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Request payload for reassigning an approved reservation to a different classroom
- * and/or a different set of 30-minute time slots (DFR §4.3).
+ * Request payload for reassigning an active reservation to a different classroom
+ * and/or a different set of 30-minute time slots.
  *
  * <p>Both fields are optional, but at least one must be non-null. Validation is
  * enforced in the service layer via {@link mx.unam.icf.aulas.kernel.domain.exceptions.DomainException}.</p>
@@ -14,7 +14,7 @@ import java.util.UUID;
  * @param newTimeSlotIds   ordered list of destination slot IDs (1–26, 07:00–20:00); {@code null} to keep current
  *
  * @author Ithera
- * @version 1.0
+ * @version 2.0
  */
 public record ReassignRequestDTO(
         UUID newClassroomUuid,

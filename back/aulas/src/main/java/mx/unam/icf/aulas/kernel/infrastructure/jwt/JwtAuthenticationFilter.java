@@ -39,7 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider            jwtProvider;
     private final UserDetailsServiceImpl userDetailsService;
-    private final TokenBlacklist          blacklistService;
+    private final TokenBlacklist         blacklistService;
     private final FilterResponseWriter   filterResponseWriter;
 
     @Override

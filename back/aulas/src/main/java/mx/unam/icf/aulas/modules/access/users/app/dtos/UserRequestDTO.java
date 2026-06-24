@@ -16,7 +16,6 @@ import jakarta.validation.constraints.Size;
  * @param email     unique email address used as the login identifier
  * @param password  plain-text password to be hashed before storage
  * @param roleId    internal identifier of the role to assign
- * @param isActive  whether the user account should be active
  *
  * @author Ithera
  * @version 2.0
@@ -40,7 +39,5 @@ public record UserRequestDTO(
         String password,
 
         @NotNull(message = "Role id is required")
-        Long roleId,
-
-        Boolean isActive
+        Long roleId
 ) {}

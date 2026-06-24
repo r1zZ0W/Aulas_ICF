@@ -14,8 +14,8 @@ import {
   getSemesters,
   createSemester,
   updateSemester,
-} from '../api/semesters';
-import { useApiMutation } from './useApiMutation';
+} from '../../../../api/semesters';
+import { useApiMutation } from '../../../../hooks/useApiMutation';
 
 /**
  * @returns {{
@@ -29,9 +29,9 @@ import { useApiMutation } from './useApiMutation';
 export function useSemesters() {
   // ── Active semester (single object or null on 404) ───────────────────────────
   const { data: activeSemester = null, isFetching: loading } = useQuery({
-    queryKey:  ['semesters', 'active'],
-    queryFn:   getActiveSemester,
-    retry:     false,   // don't retry 404 (expected when no semester is active)
+    queryKey: ['semesters', 'active'],
+    queryFn: getActiveSemester,
+    retry: false,   // don't retry 404 (expected when no semester is active)
     staleTime: 60_000,
   });
 
@@ -39,8 +39,8 @@ export function useSemesters() {
   // Intentionally NOT used to decide create-vs-edit on the primary action,
   // to avoid blocking the admin from creating new periods when history exists.
   const { data: semesters = [] } = useQuery({
-    queryKey:  ['semesters', 'list'],
-    queryFn:   getSemesters,
+    queryKey: ['semesters', 'list'],
+    queryFn: getSemesters,
     staleTime: 60_000,
   });
 
@@ -48,14 +48,14 @@ export function useSemesters() {
   // ['semesters'] as invalidateKey covers both 'active' and 'list' in one call.
 
   const createMutation = useApiMutation({
-    mutationFn:     createSemester,
-    invalidateKey:  ['semesters'],
+    mutationFn: createSemester,
+    invalidateKey: ['semesters'],
     successMessage: 'Semestre creado correctamente.',
   });
 
   const updateMutation = useApiMutation({
-    mutationFn:     ({ uuid, payload }) => updateSemester(uuid, payload),
-    invalidateKey:  ['semesters'],
+    mutationFn: ({ uuid, payload }) => updateSemester(uuid, payload),
+    invalidateKey: ['semesters'],
     successMessage: 'Semestre actualizado correctamente.',
   });
 

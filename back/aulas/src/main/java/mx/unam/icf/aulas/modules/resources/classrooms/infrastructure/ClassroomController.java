@@ -11,6 +11,7 @@ import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.ClassroomService;
+import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomChildrenRequestDTO;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomRequestDTO;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomResponseDTO;
 import mx.unam.icf.aulas.modules.resources.classrooms.app.dtos.ClassroomStatsDTO;
@@ -18,15 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
@@ -119,43 +112,69 @@ public class ClassroomController implements ResponseHandler {
     }
 
     /**
-     * Deactivates a classroom (soft-delete) by its public UUID. Requires ADMIN role.
-     * The classroom is marked inactive and hidden from the Maestro catalog but is
-     * never physically removed, preserving reservation history (DFR NFR / LFTAIP).
+     * Toggles the active status of a classroom. Requires ADMIN role.
      *
-     * <p>All direct child classrooms that referenced this classroom as their parent
-     * are automatically unlinked ({@code linkedRoom = null}) before deactivation,
-     * preventing stale FK references (orphan cleanup, option A).</p>
+     * <p>Flips {@code isActive}: an active classroom becomes inactive (hidden from the
+     * Maestro catalog and unable to accept new reservations), and an inactive or
+     * null-status classroom becomes active. Child classrooms are not affected —
+     * the parent–child link is preserved regardless of the parent's status.
+     * The classroom is never physically removed (DFR NFR / LFTAIP).</p>
      *
-     * PATCH /api/v1/classrooms/{uuid}/deactivate
+     * PATCH /api/v1/classrooms/{uuid}/toggle-status
      *
      * @throws DomainException           when the UUID is null
      * @throws ResourceNotFoundException when the classroom is not found
+     * @return the updated classroom with its new {@code isActive} value
      */
-    @PatchMapping("/{uuid}/deactivate")
+    @PatchMapping("/{uuid}/toggle-status")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable UUID uuid) {
-        classroomService.deactivate(uuid);
-        return ok("Classroom deactivated successfully");
+    public ResponseEntity<ApiResponse<ClassroomResponseDTO>> toggleStatus(@PathVariable UUID uuid) {
+        return ok(classroomService.toggleStatus(uuid));
     }
 
     /**
-     * Reactivates a previously deactivated classroom. Requires ADMIN role.
-     * The classroom is marked active again and re-appears in the Maestro catalog.
+     * Permanently deletes a classroom and all its dependents (cascade).
      *
-     * <p>Child classrooms unlinked during a prior deactivation are <em>not</em>
-     * automatically re-linked; the administrator must update each child's parent
-     * explicitly if needed.</p>
+     * <p>This operation removes the classroom row together with all associated
+     * {@code ReservSlot}, {@code ReservInstance}, {@code ClassroomResource} rows
+     * and any orphan {@code ReservationGroup}s (groups whose every instance was in
+     * this classroom). All data loss is irreversible. See
+     * {@link ClassroomService#delete} for the full deletion order and the
+     * ⚠️ architecture warning regarding the NFR trade-off.</p>
      *
-     * PATCH /api/v1/classrooms/{uuid}/reactivate
+     * DELETE /api/v1/classrooms/{uuid}
      *
+     * @param uuid public UUID of the classroom to delete
      * @throws DomainException           when the UUID is null
      * @throws ResourceNotFoundException when the classroom is not found
      */
-    @PatchMapping("/{uuid}/reactivate")
+    @DeleteMapping("/{uuid}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> reactivate(@PathVariable UUID uuid) {
-        classroomService.reactivate(uuid);
-        return ok("Classroom reactivated successfully");
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID uuid) {
+        classroomService.delete(uuid);
+        return ok("Classroom deleted.");
+    }
+
+    /**
+     * Atomically assigns a set of direct child classrooms to the given parent. Requires ADMIN role.
+     *
+     * <p>The body contains the <em>desired full set</em> of children. Classrooms in the list
+     * are linked; classrooms currently linked but absent are unlinked. An empty list removes
+     * all children. All changes are applied in a single transaction.</p>
+     *
+     * PUT /api/v1/classrooms/{uuid}/children
+     *
+     * @param uuid public UUID of the parent classroom
+     * @param dto  body containing the desired list of child UUIDs
+     * @throws ResourceNotFoundException when the parent classroom is not found
+     * @throws DomainException           when a child UUID is missing, inactive, or would form a cycle
+     */
+    @PutMapping("/{uuid}/children")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> setChildren(
+            @PathVariable UUID uuid,
+            @Valid @RequestBody ClassroomChildrenRequestDTO dto) {
+        classroomService.setChildren(uuid, dto.childUuids());
+        return ok("Children updated successfully");
     }
 }

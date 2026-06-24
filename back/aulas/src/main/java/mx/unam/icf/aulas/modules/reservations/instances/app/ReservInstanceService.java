@@ -6,15 +6,24 @@ import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.kernel.infrastructure.services.NotificationService;
+import mx.unam.icf.aulas.modules.reservations.history.app.ReservationHistoryService;
+import mx.unam.icf.aulas.modules.reservations.history.domain.ReservationEvent;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
+import mx.unam.icf.aulas.modules.academic.semesters.domain.Semester;
+import mx.unam.icf.aulas.modules.academic.semesters.infrastructure.SemesterRepository;
 import mx.unam.icf.aulas.modules.academic.timeslots.domain.TimeSlot;
 import mx.unam.icf.aulas.modules.academic.timeslots.infrastructure.TimeSlotRepository;
+import mx.unam.icf.aulas.modules.access.users.domain.User;
+import mx.unam.icf.aulas.modules.access.users.infrastructure.UserRepository;
 import mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroup;
+import mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroupStatus;
 import mx.unam.icf.aulas.modules.reservations.groups.infrastructure.ReservationGroupRepository;
+import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.BookingRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReassignRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
+import mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException;
 import mx.unam.icf.aulas.modules.reservations.instances.app.mappers.ReservInstanceMapper;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
@@ -24,49 +33,63 @@ import mx.unam.icf.aulas.modules.reservations.slots.domain.ReservSlotId;
 import mx.unam.icf.aulas.modules.reservations.slots.infrastructure.ReservSlotRepository;
 import mx.unam.icf.aulas.modules.resources.classrooms.domain.Classroom;
 import mx.unam.icf.aulas.modules.resources.classrooms.infrastructure.ClassroomRepository;
-import mx.unam.icf.aulas.modules.access.users.infrastructure.UserRepository;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * Service managing the full lifecycle of {@link ReservInstance} entities.
  *
- * <p>Business rules enforced on creation (DFR §4.1):</p>
+ * <p>Business rules enforced on creation:</p>
  * <ul>
- *   <li>Classroom must be active.</li>
+ *   <li>Classroom must be active ({@code isActive = true}).</li>
  *   <li>Date must not be in the past and must not fall on a Sunday.</li>
+ *   <li>Date must fall within the semester's inclusive {@code [startDate, endDate]} range.</li>
+ *   <li>Date's day-of-week must be among the group's scheduled {@code daysOfWeek}.</li>
  *   <li>When the reservation is for the current day, the earliest requested slot
  *       must start at least 15 minutes from now.</li>
- *   <li>No approved slot conflicts may exist for the same classroom on the same date.</li>
+ *   <li>No active slot conflicts may exist for the same classroom on the same date
+ *       (backed by {@code uk_reserv_slots_classroom_time}).</li>
+ *   <li>The authenticated user must not already hold a slot on the same date and
+ *       time-slot combination (backed by {@code uk_reserv_slots_user_time}).</li>
  *   <li>The authenticated principal must own the reservation group (BOLA/IDOR protection).</li>
  * </ul>
  *
- * <p>Reassignment (DFR §4.3) supports changing the classroom, the time-slot block, or both.
- * Conflict re-check excludes the instance being reassigned to avoid false self-conflicts.</p>
+ * <p>Cancellation physically deletes the reservation's {@link ReservSlot} rows so the
+ * classroom slots are immediately available for new bookings.</p>
+ *
+ * <p>Reassignment supports changing the classroom, the time-slot block, or both.
+ * Conflict checks run before any slot mutation; the slot delete is explicitly flushed
+ * before the re-insert to satisfy the UNIQUE constraints during the same transaction.</p>
  *
  * @author Ithera
- * @version 3.0
+ * @version 4.0
  */
 @Service
 @RequiredArgsConstructor
 public class ReservInstanceService {
 
-    private final ReservInstanceRepository repository;
-    private final ReservInstanceMapper     mapper;
+    private final ReservInstanceRepository   repository;
+    private final ReservInstanceMapper       mapper;
     private final ReservationGroupRepository groupRepository;
-    private final ClassroomRepository      classroomRepository;
-    private final TimeSlotRepository       timeSlotRepository;
-    private final ReservSlotRepository     slotRepository;
-    private final UserRepository           userRepository;
-    private final NotificationService      notificationService;
+    private final ClassroomRepository        classroomRepository;
+    private final TimeSlotRepository         timeSlotRepository;
+    private final ReservSlotRepository       slotRepository;
+    private final UserRepository             userRepository;
+    private final SemesterRepository         semesterRepository;
+    private final NotificationService        notificationService;
+    private final ReservationHistoryService  historyService;
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -82,18 +105,11 @@ public class ReservInstanceService {
     }
 
     /**
-     * Returns a page of reservation instances awaiting review (status {@code PENDIENTE}).
+     * Returns a single reservation instance by its public UUID.
      *
-     * @param pageable pagination and sort criteria
-     * @return a {@link PagedResultDTO} containing the requested page
+     * @param uuid public UUID of the instance
+     * @throws ResourceNotFoundException when the instance is not found
      */
-    @Transactional(readOnly = true)
-    public PagedResultDTO<ReservInstanceResponseDTO> findPending(Pageable pageable) {
-        return PageMapper.toDto(
-                repository.findByStatus(ReservInstanceStatus.PENDIENTE, pageable),
-                mapper::toDtoList);
-    }
-
     @Transactional(readOnly = true)
     public ReservInstanceResponseDTO findByUuid(UUID uuid) {
         return mapper.toDto(
@@ -114,21 +130,211 @@ public class ReservInstanceService {
         return PageMapper.toDto(repository.findByUserUuid(userUuid, pageable), mapper::toDtoList);
     }
 
+    /**
+     * Returns all active reservation instances within a date range.
+     *
+     * <p>When {@code classroomUuid} is provided, results are filtered to that classroom only
+     * (used when the calendar shows a single-room view). When {@code null}, all active
+     * classrooms are returned so the calendar can display every room at once.</p>
+     *
+     * @param classroomUuid public UUID of the classroom, or {@code null} for all classrooms
+     * @param from          start of the date range (inclusive)
+     * @param to            end of the date range (inclusive)
+     * @return list of active instances with time slots eagerly loaded (no N+1)
+     */
     @Transactional(readOnly = true)
     public List<ReservInstanceResponseDTO> findAvailability(UUID classroomUuid, LocalDate from, LocalDate to) {
-        return mapper.toDtoList(
-            repository.findApprovedByClassroomAndDateRange(classroomUuid, from, to, ReservInstanceStatus.APROBADA)
-        );
+        List<ReservInstance> instances = (classroomUuid != null)
+            ? repository.findActiveByClassroomAndDateRange(classroomUuid, from, to, ReservInstanceStatus.ACTIVE)
+            : repository.findActiveByDateRange(from, to, ReservInstanceStatus.ACTIVE);
+        return mapper.toDtoList(instances);
     }
 
     // ── Creation ──────────────────────────────────────────────────────────────
 
     /**
-     * Creates a new reservation instance with status {@code PENDIENTE}.
+     * Atomically creates a {@link ReservationGroup} and all its {@link ReservInstance} +
+     * {@link ReservSlot} rows in a single database transaction.
      *
-     * <p>The {@code principalUuid} must match the owner of the reservation group to prevent
+     * <p>The frontend sends the booking <em>intent</em> once (classroom, time block,
+     * optional recurrence pattern); the backend generates every date occurrence.
+     * No client-side loops; no partial saves on error.</p>
+     *
+     * <p>Business rules (enforced in order):</p>
+     * <ol>
+     *   <li>Classroom must be active.</li>
+     *   <li>A semester must be active for {@code startDate}.</li>
+     *   <li>{@code repeatUntil}, if set, must not exceed {@code semester.endDate} (400 if it does —
+     *       no silent truncation).</li>
+     *   <li>Every target date must not be in the past, not be a Sunday, and fall within the
+     *       semester window.</li>
+     *   <li>Two bulk conflict queries (total 2 SELECTs regardless of the number of dates):
+     *       one for classroom double-booking, one for user schedule conflicts. The first
+     *       conflict found is returned as a structured 409 payload.</li>
+     * </ol>
+     *
+     * @param dto           atomic booking request
+     * @param principalUuid public UUID of the authenticated user making the request
+     * @return list of created instances (one per target date), each with time slots populated
+     * @throws ResourceNotFoundException       when the classroom or user is not found
+     * @throws DomainException                 when a business rule is violated (400)
+     * @throws ReservationConflictException    when a slot is already taken (→ 409)
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public List<ReservInstanceResponseDTO> createBooking(BookingRequestDTO dto, UUID principalUuid) {
+
+        // 1. Resolve classroom
+        Classroom classroom = classroomRepository.findByUuid(dto.classroomUuid())
+            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + dto.classroomUuid()));
+        if (!Boolean.TRUE.equals(classroom.getIsActive()))
+            throw new DomainException("The requested classroom is inactive and cannot be reserved");
+
+        // 2. Resolve user
+        User user = userRepository.findByUuid(principalUuid)
+            .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found: " + principalUuid));
+
+        // 3. Resolve active semester for the start date
+        Semester semester = semesterRepository.findCurrent(dto.startDate())
+            .orElseThrow(() -> new DomainException(
+                "No active semester covers the requested start date " + dto.startDate()));
+
+        // 4. Resolve target weekdays
+        Set<DayOfWeek> days = (dto.daysOfWeek() == null || dto.daysOfWeek().isEmpty())
+            ? Set.of(dto.startDate().getDayOfWeek())
+            : new HashSet<>(dto.daysOfWeek());
+
+        // 5. Strict overflow check — no silent truncation
+        if (dto.repeatUntil() != null && dto.repeatUntil().isAfter(semester.getEndDate()))
+            throw new DomainException(
+                "The recurrence end date " + dto.repeatUntil() +
+                " exceeds the semester period (" + semester.getStartDate() +
+                " – " + semester.getEndDate() + ")");
+
+        // 6. Create and persist the group (owns all generated instances)
+        ReservationGroup group = new ReservationGroup();
+        group.setUser(user);
+        group.setSemester(semester);
+        group.setDaysOfWeek(days);
+        group.setStatus(ReservationGroupStatus.ACTIVE);
+        group = groupRepository.save(group);
+
+        // 7. Build target dates in memory
+        LocalDate endDate = dto.repeatUntil() != null ? dto.repeatUntil() : dto.startDate();
+        List<LocalDate> targetDates = new ArrayList<>();
+
+        for (LocalDate d = dto.startDate(); !d.isAfter(endDate); d = d.plusDays(1))
+            if (days.contains(d.getDayOfWeek()))
+                targetDates.add(d);
+
+
+        if (targetDates.isEmpty())
+            throw new DomainException(
+                "No valid dates found between " + dto.startDate() + " and " + endDate +
+                " for the specified weekdays");
+
+        // 8. Load time slots (validate IDs exist)
+        List<TimeSlot> timeSlots = dto.timeSlotIds().stream()
+            .map(id -> timeSlotRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found: " + id)))
+            .toList();
+
+        // 9. Per-date in-memory validations (no DB round-trips here)
+        LocalDate today    = LocalDate.now();
+        LocalTime nowTime  = LocalTime.now();
+        for (LocalDate d : targetDates) {
+            if (d.isBefore(today))
+                throw new DomainException("Date " + d + " is in the past");
+
+            if (d.getDayOfWeek() == DayOfWeek.SUNDAY)
+                throw new DomainException("Reservations cannot be made on Sundays (date: " + d + ")");
+
+            if (d.isBefore(semester.getStartDate()) || d.isAfter(semester.getEndDate()))
+                throw new DomainException(
+                    "Date " + d + " falls outside the semester period " +
+                    semester.getStartDate() + " – " + semester.getEndDate());
+
+            if (d.equals(today)) {
+                LocalTime cutoff = nowTime.plusMinutes(15);
+                TimeSlot earliest = timeSlots.stream()
+                    .min(Comparator.comparing(TimeSlot::getStartTime))
+                    .orElseThrow();
+
+                if (earliest.getStartTime().isBefore(cutoff))
+                    throw new DomainException(
+                        "Reservation must be made at least 15 minutes in advance");
+
+            }
+
+        }
+
+        // 10. Bulk conflict detection — exactly 2 SELECTs regardless of how many dates
+        List<ReservSlot> classroomConflicts = slotRepository.findClassroomConflicts(
+            classroom.getId(), dto.timeSlotIds(), targetDates);
+        if (!classroomConflicts.isEmpty()) {
+            ReservSlot first = classroomConflicts.getFirst();
+            throw new ReservationConflictException(first.getDate(), first.getTimeSlot().getId());
+        }
+
+        List<ReservSlot> userConflicts = slotRepository.findUserConflicts(
+            user.getId(), dto.timeSlotIds(), targetDates);
+        if (!userConflicts.isEmpty()) {
+            ReservSlot first = userConflicts.getFirst();
+            throw new ReservationConflictException(first.getDate(), first.getTimeSlot().getId());
+        }
+
+        // 11. Batch-insert all instances
+        List<ReservInstance> toSave = new ArrayList<>();
+        for (LocalDate d : targetDates) {
+            ReservInstance inst = new ReservInstance();
+            inst.setGroup(group);
+            inst.setClassroom(classroom);
+            inst.setStatus(ReservInstanceStatus.ACTIVE);
+            inst.setAttendeeCount(dto.attendeeCount());
+            inst.setDate(d);
+            toSave.add(inst);
+        }
+        List<ReservInstance> saved = repository.saveAll(toSave);
+
+        // 12. Batch-insert all slots (all-or-nothing via @Transactional)
+        List<ReservSlot> allSlots = new ArrayList<>();
+        for (ReservInstance inst : saved) {
+            for (TimeSlot ts : timeSlots) {
+                ReservSlot slot = new ReservSlot();
+                slot.setId(new ReservSlotId(inst.getId(), ts.getId()));
+                slot.setInstance(inst);
+                slot.setTimeSlot(ts);
+                slot.setClassroomId(classroom.getId());
+                slot.setUserId(user.getId());
+                slot.setDate(inst.getDate());
+                allSlots.add(slot);
+            }
+        }
+        slotRepository.saveAll(allSlots);
+
+        // 13. Record history for every created instance in a single batch
+        historyService.registerAll(saved, ReservationEvent.CREATED, "Reservation created");
+
+        // 14. Single notification for the whole booking (not one per instance)
+        List<String> adminEmails = userRepository.findByRoleName("ADMIN")
+            .stream().map(User::getEmail).collect(Collectors.toList());
+        notificationService.notifyReservationCreated(
+            user.getEmail(),
+            user.getFullName(),
+            classroom.getName(),
+            saved.getFirst().getDate(),
+            adminEmails
+        );
+
+        return mapper.toDtoList(saved);
+    }
+
+    /**
+     * Creates a new reservation instance with status {@link ReservInstanceStatus#ACTIVE}.
+     *
+     * <p>The instance occupies the classroom immediately — no admin approval is needed.
+     * The {@code principalUuid} must match the owner of the reservation group to prevent
      * a Maestro from creating reservations on behalf of another user (BOLA/IDOR protection).</p>
-     * <p>After persisting, notifies the Maestro and all active administrators by email (DFR §4.1).</p>
+     * <p>After persisting, notifies the Maestro and all active administrators by email.</p>
      *
      * @param dto           creation payload including time slot IDs
      * @param principalUuid public UUID of the authenticated user making the request
@@ -147,7 +353,8 @@ public class ReservInstanceService {
         Classroom classroom = classroomRepository.findByUuid(dto.classroomUuid())
             .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + dto.classroomUuid()));
 
-        if (Boolean.FALSE.equals(classroom.getIsActive()))
+        // Classroom must be explicitly active (null treated as inactive)
+        if (!Boolean.TRUE.equals(classroom.getIsActive()))
             throw new DomainException("The requested classroom is inactive and cannot be reserved");
 
         if (dto.date().isBefore(LocalDate.now()))
@@ -155,6 +362,19 @@ public class ReservInstanceService {
 
         if (dto.date().getDayOfWeek() == DayOfWeek.SUNDAY)
             throw new DomainException("Reservations cannot be made on Sundays");
+
+        // Date must fall within the semester's active window
+        var semester = group.getSemester();
+        if (dto.date().isBefore(semester.getStartDate()) || dto.date().isAfter(semester.getEndDate()))
+            throw new DomainException(
+                "Reservation date " + dto.date() + " falls outside the semester period " +
+                semester.getStartDate() + " – " + semester.getEndDate());
+
+        // Date's day-of-week must match the group's scheduled pattern
+        if (!group.getDaysOfWeek().contains(dto.date().getDayOfWeek()))
+            throw new DomainException(
+                "The group is not scheduled on " + dto.date().getDayOfWeek().name().toLowerCase() +
+                "s. Scheduled days: " + group.getDaysOfWeek());
 
         List<TimeSlot> timeSlots = dto.timeSlotIds().stream()
             .map(id -> timeSlotRepository.findById(id)
@@ -170,16 +390,23 @@ public class ReservInstanceService {
                 throw new DomainException("Reservation must be made at least 15 minutes in advance");
         }
 
-        if (repository.existsConflict(classroom.getId(), dto.date(), dto.timeSlotIds(), ReservInstanceStatus.APROBADA))
-            throw new DomainException("The requested classroom already has an approved reservation for one or more of the selected time slots on " + dto.date());
+        // Classroom double-booking check (backed by uk_reserv_slots_classroom_time)
+        if (repository.existsConflict(classroom.getId(), dto.date(), dto.timeSlotIds()))
+            throw new DomainException(
+                "The requested classroom already has a reservation for one or more of the selected time slots on " + dto.date());
+
+        // User self-conflict check (backed by uk_reserv_slots_user_time)
+        Long userId = group.getUser().getId();
+        if (repository.existsUserConflict(userId, dto.date(), dto.timeSlotIds()))
+            throw new DomainException(
+                "You already have a reservation for one or more of the selected time slots on " + dto.date());
 
         ReservInstance instance = mapper.toEntity(dto);
         instance.setGroup(group);
         instance.setClassroom(classroom);
-        instance.setStatus(ReservInstanceStatus.PENDIENTE);
+        instance.setStatus(ReservInstanceStatus.ACTIVE);
         ReservInstance saved = repository.save(instance);
 
-        Long userId = group.getUser().getId();
         for (TimeSlot ts : timeSlots) {
             ReservSlot slot = new ReservSlot();
             slot.setId(new ReservSlotId(saved.getId(), ts.getId()));
@@ -191,13 +418,16 @@ public class ReservInstanceService {
             slotRepository.save(slot);
         }
 
-        // DFR §4.1: notify Maestro and all active admins (best-effort).
-        List<String> adminEmails = userRepository.findByRole_NameAndIsActiveTrue("ADMIN")
-            .stream().map(u -> u.getEmail()).collect(Collectors.toList());
+        // Record history for this single instance
+        historyService.register(saved, ReservationEvent.CREATED, "Reservation created");
+
+        // Notify Maestro and all active admins (best-effort)
+        List<String> adminEmails = userRepository.findByRoleName("ADMIN")
+            .stream().map(User::getEmail).collect(Collectors.toList());
         var owner = saved.getGroup().getUser();
         notificationService.notifyReservationCreated(
                 owner.getEmail(),
-                owner.getFirstName() + " " + owner.getLastNames(),
+                owner.getFullName(),
                 saved.getClassroom().getName(),
                 saved.getDate(),
                 adminEmails
@@ -206,30 +436,14 @@ public class ReservInstanceService {
         return mapper.toDto(saved);
     }
 
-    // ── Admin status mutations ────────────────────────────────────────────────
-
-    @Transactional(rollbackFor = Exception.class)
-    public ReservInstanceResponseDTO approve(UUID uuid) {
-        ReservInstance instance = getOrThrow(uuid);
-        if (instance.getStatus() != ReservInstanceStatus.PENDIENTE)
-            throw new DomainException("Only PENDIENTE reservations can be approved");
-        instance.setStatus(ReservInstanceStatus.APROBADA);
-        return mapper.toDto(repository.save(instance));
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public ReservInstanceResponseDTO reject(UUID uuid) {
-        ReservInstance instance = getOrThrow(uuid);
-        if (instance.getStatus() != ReservInstanceStatus.PENDIENTE)
-            throw new DomainException("Only PENDIENTE reservations can be rejected");
-        instance.setStatus(ReservInstanceStatus.RECHAZADA);
-        return mapper.toDto(repository.save(instance));
-    }
-
     // ── Cancellation ──────────────────────────────────────────────────────────
 
     /**
-     * Cancels a reservation instance as the owning teacher (DFR §4.2).
+     * Cancels a reservation instance as the owning teacher.
+     *
+     * <p>Sets the status to {@link ReservInstanceStatus#CANCELLED_BY_USER} and
+     * physically removes all associated {@link ReservSlot} rows so the classroom
+     * time slots become immediately available for new bookings.</p>
      *
      * @param uuid          public UUID of the instance
      * @param principalUuid public UUID of the authenticated user
@@ -243,34 +457,52 @@ public class ReservInstanceService {
             throw new AccessDeniedException("You can only cancel your own reservations");
         if (isCancelled(instance))
             throw new DomainException("Reservation is already cancelled");
-        instance.setStatus(ReservInstanceStatus.CANCELADA_POR_MAESTRO);
-        return mapper.toDto(repository.save(instance));
+        instance.setStatus(ReservInstanceStatus.CANCELLED_BY_USER);
+        slotRepository.deleteByInstance(instance);
+        ReservInstance saved = repository.save(instance);
+        historyService.register(saved, ReservationEvent.CANCELLED_BY_USER, "Cancelled by owner");
+        return mapper.toDto(saved);
     }
 
+    /**
+     * Cancels a reservation instance as an administrator. Requires ADMIN role.
+     *
+     * <p>Sets the status to {@link ReservInstanceStatus#CANCELLED_BY_ADMIN} and
+     * physically removes all associated {@link ReservSlot} rows so the classroom
+     * time slots become immediately available for new bookings.</p>
+     *
+     * @param uuid public UUID of the instance to cancel
+     * @throws DomainException when the reservation is already cancelled
+     */
     @Transactional(rollbackFor = Exception.class)
     public ReservInstanceResponseDTO cancelByAdmin(UUID uuid) {
         ReservInstance instance = getOrThrow(uuid);
         if (isCancelled(instance))
             throw new DomainException("Reservation is already cancelled");
-        instance.setStatus(ReservInstanceStatus.CANCELADA_POR_ADMIN);
-        return mapper.toDto(repository.save(instance));
+        instance.setStatus(ReservInstanceStatus.CANCELLED_BY_ADMIN);
+        slotRepository.deleteByInstance(instance);
+        ReservInstance saved = repository.save(instance);
+        historyService.register(saved, ReservationEvent.CANCELLED_BY_ADMIN, "Cancelled by administrator");
+        return mapper.toDto(saved);
     }
 
-    // ── Reassignment (DFR §4.3) ───────────────────────────────────────────────
+    // ── Reassignment ──────────────────────────────────────────────────────────
 
     /**
-     * Reassigns an approved reservation to a different classroom and/or a different set of time slots.
+     * Reassigns an active reservation to a different classroom and/or a different set of time slots.
      * Restricted to ADMIN role.
      *
-     * <p>At least one of {@code dto.newClassroomUuid()} or {@code dto.newTimeSlotIds()} must be non-null.
-     * A conflict re-check (excluding the instance itself) is performed before applying changes.
-     * When only the classroom changes, existing {@link ReservSlot} rows are updated in place.
-     * When the time slots change, all slots are deleted and recreated.</p>
-     * <p>The Maestro is notified by email after a successful reassignment (best-effort, DFR §4.3).</p>
+     * <p>At least one of {@code dto.newClassroomUuid()} or {@code dto.newTimeSlotIds()} must be
+     * non-null. Both conflict checks ({@link ReservInstanceRepository#existsConflictExcluding} and
+     * {@link ReservInstanceRepository#existsUserConflictExcluding}) run <em>before</em> any slot
+     * mutation so a controlled {@link DomainException} fires instead of a raw constraint violation.
+     * When slots are replaced, the deletion is explicitly flushed before the re-insert to satisfy
+     * the UNIQUE constraints within the same transaction.</p>
+     * <p>The Maestro is notified by email after a successful reassignment (best-effort).</p>
      *
      * @param uuid public UUID of the instance to reassign
      * @param dto  reassignment request (classroom and/or time slots)
-     * @throws DomainException           when the instance is not APROBADA, or neither field is supplied
+     * @throws DomainException           when the instance is not active, or neither field is supplied
      * @throws ResourceNotFoundException when the new classroom or a time slot is not found
      * @throws DomainException           when the target classroom is inactive or a conflict exists
      */
@@ -281,15 +513,15 @@ public class ReservInstanceService {
 
         ReservInstance instance = getOrThrow(uuid);
 
-        if (instance.getStatus() != ReservInstanceStatus.APROBADA)
-            throw new DomainException("Only APROBADA reservations can be reassigned");
+        if (instance.getStatus() != ReservInstanceStatus.ACTIVE)
+            throw new DomainException("Only active reservations can be reassigned");
 
         // Resolve destination classroom
         Classroom destClassroom;
         if (dto.newClassroomUuid() != null) {
             destClassroom = classroomRepository.findByUuid(dto.newClassroomUuid())
                 .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + dto.newClassroomUuid()));
-            if (Boolean.FALSE.equals(destClassroom.getIsActive()))
+            if (!Boolean.TRUE.equals(destClassroom.getIsActive()))
                 throw new DomainException("The target classroom is inactive");
         } else {
             destClassroom = instance.getClassroom();
@@ -319,11 +551,18 @@ public class ReservInstanceService {
             slotsChanging = false;
         }
 
-        // Conflict re-check (excluding self to prevent false self-conflict)
+        // 1. Classroom conflict re-check (self-excluding) — must run before any mutation
         if (repository.existsConflictExcluding(
-                destClassroom.getId(), instance.getDate(), destTimeSlotIds,
-                ReservInstanceStatus.APROBADA, instance.getId())) {
-            throw new DomainException("The target classroom already has an approved reservation for one or more of the selected time slots on " + instance.getDate());
+                destClassroom.getId(), instance.getDate(), destTimeSlotIds, instance.getId())) {
+            throw new DomainException(
+                "The target classroom already has a reservation for one or more of the selected time slots on " + instance.getDate());
+        }
+
+        // 2. User self-conflict re-check (self-excluding) — must run before any mutation
+        Long userId = instance.getGroup().getUser().getId();
+        if (repository.existsUserConflictExcluding(userId, instance.getDate(), destTimeSlotIds, instance.getId())) {
+            throw new DomainException(
+                "The teacher already has a reservation for one or more of the selected time slots on " + instance.getDate());
         }
 
         String oldClassroomName = instance.getClassroom().getName();
@@ -332,10 +571,11 @@ public class ReservInstanceService {
         instance.setClassroom(destClassroom);
 
         if (slotsChanging) {
-            // Delete existing slots and recreate with new time slot set
+            // 3. Delete existing slots, flush immediately so the DB sees the DELETEs before the INSERTs
             slotRepository.deleteByInstance(instance);
             slotRepository.flush();
-            Long userId = instance.getGroup().getUser().getId();
+
+            // 4. Recreate with the new time-slot set
             for (TimeSlot ts : destTimeSlots) {
                 ReservSlot slot = new ReservSlot();
                 slot.setId(new ReservSlotId(instance.getId(), ts.getId()));
@@ -357,11 +597,14 @@ public class ReservInstanceService {
 
         ReservInstance saved = repository.save(instance);
 
-        // DFR §4.3: notify Maestro (best-effort)
+        // Record history
+        historyService.register(saved, ReservationEvent.REASSIGNED, "Reassigned by administrator");
+
+        // Notify Maestro (best-effort)
         var reassignedOwner = saved.getGroup().getUser();
         notificationService.notifyReservationReassigned(
                 reassignedOwner.getEmail(),
-                reassignedOwner.getFirstName() + " " + reassignedOwner.getLastNames(),
+                reassignedOwner.getFullName(),
                 saved.getDate(),
                 oldClassroomName,
                 saved.getClassroom().getName()
@@ -378,7 +621,7 @@ public class ReservInstanceService {
     }
 
     private boolean isCancelled(ReservInstance instance) {
-        return instance.getStatus() == ReservInstanceStatus.CANCELADA_POR_MAESTRO
-            || instance.getStatus() == ReservInstanceStatus.CANCELADA_POR_ADMIN;
+        return instance.getStatus() == ReservInstanceStatus.CANCELLED_BY_USER
+            || instance.getStatus() == ReservInstanceStatus.CANCELLED_BY_ADMIN;
     }
 }

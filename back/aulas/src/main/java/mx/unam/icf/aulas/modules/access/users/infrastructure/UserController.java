@@ -5,6 +5,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
+import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
@@ -137,8 +139,8 @@ public class UserController implements ResponseHandler {
      * (slots, instances, and groups). This operation is irreversible. Requires ADMIN role.
      * DELETE /api/v1/users/{uuid}
      *
-     * @throws mx.unam.icf.aulas.kernel.domain.exceptions.DomainException           when the admin attempts to delete their own account
-     * @throws mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException when the target user does not exist
+     * @throws DomainException when the admin attempts to delete their own account
+     * @throws ResourceNotFoundException when the target user does not exist
      */
     @DeleteMapping("/{uuid}")
     @PreAuthorize("hasRole('ADMIN')")

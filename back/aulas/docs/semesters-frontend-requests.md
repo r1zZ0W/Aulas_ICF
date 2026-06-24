@@ -451,5 +451,4 @@ las acciones de edición y creación están gated por la prop `isAdmin` internam
 | Reescrito  | `…/academic/semesters/app/SemesterService.java` |
 | Modificado | `…/academic/semesters/infrastructure/SemesterRepository.java` |
 | Reescrito  | `…/academic/semesters/infrastructure/SemesterController.java` |
-| Creado     | `docs/semesters.sql` (script SQL manual para `DROP COLUMN is_active`) |
 | Creado     | `docs/semesters-frontend-requests.md` (este archivo) |

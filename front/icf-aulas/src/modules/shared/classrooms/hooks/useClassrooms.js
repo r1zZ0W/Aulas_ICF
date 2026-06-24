@@ -1,7 +1,7 @@
 /**
  * @fileoverview Custom hook that encapsulates all server-state logic for the
- * Classrooms page: paginated list, aggregated stats, and create/update/delete
- * mutations via React Query.
+ * Classrooms page: paginated list, aggregated stats, and create/update/delete/
+ * toggle-status mutations via React Query.
  *
  * Also exports `useAllClassrooms` — a lightweight hook that fetches the full
  * classroom catalog (unpaginated, up to 500 results) for use in selectors such
@@ -15,11 +15,12 @@ import {
   getClassroomStats,
   createClassroom,
   updateClassroom,
-  deactivateClassroom,
-  reactivateClassroom,
-} from '../api/classrooms';
-import { useApiMutation } from './useApiMutation';
-import { toast } from '../utils/toast.jsx';
+  toggleClassroomStatus,
+  deleteClassroom,
+  setClassroomChildren,
+} from '../../../../api/classrooms.js';
+import { useApiMutation } from '../../../../hooks/useApiMutation.js';
+import { toast } from '../../../../utils/toast.jsx';
 
 /**
  * @param {object} [params={}]
@@ -30,15 +31,15 @@ import { toast } from '../utils/toast.jsx';
  * @param {'asc'|'desc'} [params.direction] - Sort direction.
  *
  * @returns {{
- *   classrooms:     object[],
- *   totalElements:  number,
- *   totalPages:     number,
- *   stats:          { total: number, available: number, notAvailable: number } | null,
- *   loading:        boolean,
+ *   classrooms:          object[],
+ *   totalElements:       number,
+ *   totalPages:          number,
+ *   stats:               { total: number, available: number, notAvailable: number } | null,
+ *   loading:             boolean,
  *   createMutation:      import('@tanstack/react-query').UseMutationResult,
  *   updateMutation:      import('@tanstack/react-query').UseMutationResult,
- *   deactivateMutation:  import('@tanstack/react-query').UseMutationResult,
- *   reactivateMutation:  import('@tanstack/react-query').UseMutationResult,
+ *   toggleStatusMutation: import('@tanstack/react-query').UseMutationResult,
+ *   deleteMutation:      import('@tanstack/react-query').UseMutationResult,
  *   setChildrenMutation: import('@tanstack/react-query').UseMutationResult,
  * }}
  */
@@ -50,23 +51,23 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
     data: pageData,
     isFetching: loading,
   } = useQuery({
-    queryKey:        ['classrooms', 'list', { search, page, size, sort, direction }],
-    queryFn:         () => getClassrooms({ search, page, size, sort, direction }),
+    queryKey: ['classrooms', 'list', { search, page, size, sort, direction }],
+    queryFn: () => getClassrooms({ search, page, size, sort, direction }),
     placeholderData: keepPreviousData,
   });
 
-  const classrooms    = pageData?.items         ?? [];
+  const classrooms = pageData?.items ?? [];
   const totalElements = pageData?.totalElements ?? 0;
-  const totalPages    = pageData?.totalPages    ?? 1;
+  const totalPages = pageData?.totalPages ?? 1;
 
   // ── Aggregated stats (total / available / notAvailable) ─────────────────────
   // Returns null until the backend implements GET /api/v1/classrooms/stats;
   // the UI shows "—" for the breakdown cards in the meantime.
   const { data: stats = null } = useQuery({
-    queryKey:     ['classrooms', 'stats'],
-    queryFn:      getClassroomStats,
-    retry:        false, // don't retry on 404 (endpoint not yet deployed)
-    staleTime:    60_000,
+    queryKey: ['classrooms', 'stats'],
+    queryFn: getClassroomStats,
+    retry: false, // don't retry on 404 (endpoint not yet deployed)
+    staleTime: 60_000,
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
@@ -84,52 +85,37 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
     successMessage: 'Aula actualizada correctamente.',
   });
 
-  const deactivateMutation = useApiMutation({
-    mutationFn: deactivateClassroom,
+  const deleteMutation = useApiMutation({
+    mutationFn: (uuid) => deleteClassroom(uuid),
     invalidateKey: ['classrooms'],
-    successMessage: 'Aula dada de baja correctamente.',
-  });
-
-  const reactivateMutation = useApiMutation({
-    mutationFn: reactivateClassroom,
-    invalidateKey: ['classrooms'],
-    successMessage: 'Aula reactivada correctamente.',
+    successMessage: 'Aula eliminada correctamente.',
   });
 
   /**
-   * Assigns children to a parent classroom using sequential PUTs (one per child change).
+   * Toggles the active status of a classroom via a single PATCH request.
+   * Replaces the separate deactivate/reactivate mutations.
+   * On success the list and stats are invalidated so the table refreshes automatically.
+   */
+  const toggleStatusMutation = useApiMutation({
+    mutationFn: (uuid) => toggleClassroomStatus(uuid),
+    invalidateKey: ['classrooms'],
+    successMessage: 'Estado del aula actualizado correctamente.',
+  });
+
+  /**
+   * Bulk-assigns the desired set of child classrooms to a parent using a single
+   * atomic PUT /api/v1/classrooms/{parentUuid}/children request.
    *
-   * INTERINO: reemplazar por PUT /{uuid}/children (classrooms-children-array-request.md) —
-   * secuencial para evitar ObjectOptimisticLockingFailureException / deadlocks en JPA
-   * al modificar relaciones del mismo nodo padre en paralelo.
+   * The backend receives the full desired set and handles the diff (link new children,
+   * unlink removed ones) inside a single transaction — no partial-failure risk.
    *
-   * @param {{ parentUuid: string, toAdd: object[], toRemove: object[] }} params
-   *   `toAdd`    — full classroom response objects to link to parentUuid
-   *   `toRemove` — full classroom response objects to unlink (set linkedRoomUuid = null)
+   * @param {{ parentUuid: string, childUuids: string[] }} params
+   *   `parentUuid` — UUID of the parent classroom
+   *   `childUuids` — full desired set of child UUIDs (empty array removes all children)
    */
   const setChildrenMutation = useMutation({
-    mutationFn: async ({ parentUuid, toAdd, toRemove }) => {
-      for (const child of toAdd) {
-        await updateClassroom(child.uuid, {
-          name:           child.name,
-          capacity:       child.capacity,
-          type:           child.type,
-          description:    child.description ?? null,
-          linkedRoomUuid: parentUuid,
-          isActive:       child.isActive,
-        });
-      }
-      for (const child of toRemove) {
-        await updateClassroom(child.uuid, {
-          name:           child.name,
-          capacity:       child.capacity,
-          type:           child.type,
-          description:    child.description ?? null,
-          linkedRoomUuid: null,
-          isActive:       child.isActive,
-        });
-      }
-    },
+    mutationFn: ({ parentUuid, childUuids }) =>
+      setClassroomChildren(parentUuid, childUuids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       toast.success('Aulas hijas actualizadas.');
@@ -139,8 +125,8 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
       // so reopening the modal reflects what actually persisted.
       await queryClient.invalidateQueries({ queryKey: ['classrooms'] });
       toast.error(
-        `⚠️ Fallo al actualizar las aulas hijas: ${err.message}. ` +
-        'El estado puede ser inconsistente — vuelve a abrir el aula para ver el estado real.'
+        `Error al actualizar las aulas hijas: ${err.message}. ` +
+        'Vuelve a abrir el aula para ver el estado actual.'
       );
     },
   });
@@ -153,8 +139,8 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
     loading,
     createMutation,
     updateMutation,
-    deactivateMutation,
-    reactivateMutation,
+    deleteMutation,
+    toggleStatusMutation,
     setChildrenMutation,
   };
 }
@@ -172,7 +158,7 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
 export function useAllClassrooms() {
   const { data } = useQuery({
     queryKey: ['classrooms', 'all'],
-    queryFn:  () => getClassrooms({ size: 500, sort: 'name', direction: 'asc' }),
+    queryFn: () => getClassrooms({ size: 500, sort: 'name', direction: 'asc' }),
     staleTime: 60_000,
   });
 

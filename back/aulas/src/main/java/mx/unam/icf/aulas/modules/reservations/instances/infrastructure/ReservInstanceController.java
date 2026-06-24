@@ -5,10 +5,12 @@ import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteriaArgumentResolver;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
 import mx.unam.icf.aulas.modules.reservations.instances.app.ReservInstanceService;
+import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.BookingRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReassignRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
@@ -32,10 +34,11 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * REST controller for managing classroom reservation instance endpoints.
+ * REST controller for classroom reservation instance endpoints.
  *
- * <p>Read operations are available to any authenticated user.
- * Approval, rejection, admin cancellation, and reassignment require the {@code ADMIN} role.
+ * <p>Reservations are created in the {@link mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus#ACTIVA}
+ * state and occupy the classroom immediately — there is no approval step.
+ * Cancellation and reassignment require the ADMIN role (except user self-cancellation).
  * All endpoints are exposed under the base path {@code /api/v1/reservations}.</p>
  */
 @RestController
@@ -46,10 +49,13 @@ public class ReservInstanceController implements ResponseHandler {
     private final ReservInstanceService service;
 
     /**
-     * Retrieves all reservation instances in the system, paginated.
+     * Retrieves a paginated list of reservation instances.
      * GET /api/v1/reservations[?page=0&size=20&sort=date&direction=desc]
      *
      * <p>Allowed sort fields: {@code createdAt}, {@code date}, {@code status}.</p>
+     *
+     * @param criteria pagination and sorting criteria, resolved and validated by {@link PageCriteriaArgumentResolver}
+     * @return paginated list of all reservation instances
      */
     @GetMapping
     public ResponseEntity<ApiResponse<PagedResultDTO<ReservInstanceResponseDTO>>> findAll(
@@ -59,23 +65,6 @@ public class ReservInstanceController implements ResponseHandler {
                     defaultDirection = "desc")
             PageCriteria criteria) {
         return ok(service.findAll(criteria.toPageable()));
-    }
-
-    /**
-     * Retrieves all reservation instances awaiting review, paginated. Requires ADMIN role.
-     * GET /api/v1/reservations/pending[?page=0&size=20&sort=date&direction=desc]
-     *
-     * <p>Allowed sort fields: {@code createdAt}, {@code date}, {@code status}.</p>
-     */
-    @GetMapping("/pending")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<PagedResultDTO<ReservInstanceResponseDTO>>> findPending(
-            @SortWhitelist(
-                    value = {"createdAt", "date", "status"},
-                    defaultSort = "date",
-                    defaultDirection = "desc")
-            PageCriteria criteria) {
-        return ok(service.findPending(criteria.toPageable()));
     }
 
     /**
@@ -113,12 +102,15 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
-     * Returns approved reservations for a classroom within a date range (availability calendar).
-     * GET /api/v1/reservations/availability?classroomUuid=...&from=...&to=...
+     * Returns active reservations within a date range (availability calendar).
+     * GET /api/v1/reservations/availability?from=...&to=...[&classroomUuid=...]
+     *
+     * <p>When {@code classroomUuid} is omitted the response includes active instances for
+     * <em>all</em> classrooms — used when the calendar displays every room at once.</p>
      */
     @GetMapping("/availability")
     public ResponseEntity<ApiResponse<List<ReservInstanceResponseDTO>>> findAvailability(
-            @RequestParam UUID classroomUuid,
+            @RequestParam(required = false) UUID classroomUuid,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
@@ -126,7 +118,26 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
-     * Creates a new reservation instance with status {@code PENDIENTE}.
+     * Atomically creates a reservation group and all its instances in a single transaction.
+     * POST /api/v1/reservations/booking
+     *
+     * <p>The frontend sends the booking intent once (classroom, time block, optional recurrence);
+     * the backend generates every date occurrence. No client-side weekly loop is needed.</p>
+     *
+     * @return list of created instances (one per target date)
+     * @throws mx.unam.icf.aulas.kernel.domain.exceptions.DomainException             on rule violations (400)
+     * @throws mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException on slot conflict (409)
+     */
+    @PostMapping("/booking")
+    public ResponseEntity<ApiResponse<List<ReservInstanceResponseDTO>>> createBooking(
+            @Valid @RequestBody BookingRequestDTO dto,
+            @AuthenticationPrincipal UserDetailsImp principal) {
+        return created(service.createBooking(dto, principal.getUuid()));
+    }
+
+    /**
+     * Creates a new reservation instance with status {@code ACTIVA}.
+     * The classroom is occupied immediately — no admin approval is required.
      * The authenticated user must own the reservation group referenced in the payload.
      * POST /api/v1/reservations
      *
@@ -141,28 +152,8 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
-     * Approves a pending reservation. Requires ADMIN role.
-     * PATCH /api/v1/reservations/{uuid}/approve
-     */
-    @PatchMapping("/{uuid}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ReservInstanceResponseDTO>> approve(@PathVariable UUID uuid) {
-        return ok(service.approve(uuid));
-    }
-
-    /**
-     * Rejects a pending reservation. Requires ADMIN role.
-     * PATCH /api/v1/reservations/{uuid}/reject
-     */
-    @PatchMapping("/{uuid}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ReservInstanceResponseDTO>> reject(@PathVariable UUID uuid) {
-        return ok(service.reject(uuid));
-    }
-
-    /**
      * Cancels a reservation as the owning teacher.
-     * Only the Maestro who owns the reservation may cancel it (DFR §4.2).
+     * Only the Maestro who owns the reservation may cancel it.
      * PATCH /api/v1/reservations/{uuid}/cancel
      *
      * @throws AccessDeniedException when the authenticated user does not own the reservation
@@ -185,11 +176,11 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
-     * Reassigns an approved reservation to a different classroom and/or time-slot block. Requires ADMIN role.
+     * Reassigns an active reservation to a different classroom and/or time-slot block.
+     * Requires ADMIN role.
      * PATCH /api/v1/reservations/{uuid}/reassign
      *
-     * <p>At least one of {@code newClassroomUuid} or {@code newTimeSlotIds} must be provided.
-     * This replaces the previous query-param contract (DFR §4.3 — aula y/o bloque).</p>
+     * <p>At least one of {@code newClassroomUuid} or {@code newTimeSlotIds} must be provided.</p>
      */
     @PatchMapping("/{uuid}/reassign")
     @PreAuthorize("hasRole('ADMIN')")

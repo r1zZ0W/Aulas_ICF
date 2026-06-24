@@ -17,7 +17,6 @@ import jakarta.validation.constraints.Size;
  * @param username  unique login username
  * @param email     unique email address
  * @param roleId    internal identifier of the role to assign
- * @param isActive  optional override for the account active flag
  *
  * @author Ithera
  * @version 2.0
@@ -45,11 +44,5 @@ public record UserUpdateRequestDTO(
         String email,
 
         @NotNull(message = "Role is required")
-        Long roleId,
-
-        Boolean isActive,
-
-        /** Department or area the user belongs to (optional). */
-        @Size(max = 100, message = "Department must be at most 100 characters")
-        String departamento
+        Long roleId
 ) {}

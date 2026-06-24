@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.kernel.infrastructure.services.NotificationService;
+import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteriaArgumentResolver;
 import mx.unam.icf.aulas.modules.access.roles.domain.Role;
 import mx.unam.icf.aulas.modules.access.roles.infrastructure.RoleRepository;
 import mx.unam.icf.aulas.modules.access.users.app.dtos.RegisterRequestDTO;
@@ -27,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -90,15 +90,23 @@ public class UserService {
         }
 
         User user = new User();
-        user.setFirstName(request.firstName());
-        user.setLastNames(request.lastNames());
-        user.setUsername(request.username());
-        user.setEmail(request.email());
+
+        if (request.firstName() != null)
+            user.setFirstName(request.firstName());
+
+        if (request.lastNames() != null)
+            user.setLastNames(request.lastNames());
+
+        if (request.username() != null)
+            user.setUsername(request.username());
+
+        if (request.email() != null)
+            user.setEmail(request.email());
+
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setRole(role);
-        user.setIsActive(true);
-        user.setMatricula(generateMatricula());
-        user.setDepartamento(request.departamento());
+
+        user.setInstitutionalId(generateMatricula());
 
         userRepository.save(user);
 
@@ -106,9 +114,8 @@ public class UserService {
         notificationService.notifyNewUserCredentials(
                 user.getEmail(),
                 user.getFirstName() + " " + user.getLastNames(),
-                user.getMatricula(),
+                user.getInstitutionalId(),
                 user.getUsername(),
-                user.getDepartamento(),
                 request.password()
         );
     }
@@ -128,7 +135,7 @@ public class UserService {
      *
      * @param search          optional free-text filter (trimmed by the repository query)
      * @param pageable        pagination and sort criteria (validated by
-     *                        {@link mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteriaArgumentResolver})
+     *                        {@link PageCriteriaArgumentResolver})
      * @param currentUserUuid public UUID of the authenticated admin; their row is excluded from results
      * @return a {@link PagedResultDTO} containing the requested page of users
      */
@@ -198,17 +205,23 @@ public class UserService {
                 && userRepository.findByUsernameIgnoreCase(dto.username()).isPresent())
             throw new DomainException("Username is already registered: " + dto.username());
 
+
+        if (dto.firstName() != null)
+            user.setFirstName(dto.firstName());
+
+        if (dto.lastNames() != null)
+           user.setLastNames(dto.lastNames());
+
+        if (dto.username() != null)
+            user.setUsername(dto.username());
+
+        if (dto.email() != null)
+            user.setEmail(dto.email());
+
         Role role = roleRepository.findById(dto.roleId())
             .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + dto.roleId()));
 
-        user.setFirstName(dto.firstName());
-        user.setLastNames(dto.lastNames());
-        user.setUsername(dto.username());
-        user.setEmail(dto.email());
         user.setRole(role);
-        user.setDepartamento(dto.departamento());
-        if (dto.isActive() != null)
-            user.setIsActive(dto.isActive());
 
         return userMapper.toDto(userRepository.save(user));
     }
@@ -314,7 +327,7 @@ public class UserService {
         SecureRandom rng = new SecureRandom();
         for (int i = 0; i < 10; i++) {
             String candidate = "ICF" + year + String.format("%05d", rng.nextInt(100_000));
-            if (userRepository.findByMatricula(candidate).isEmpty())
+            if (userRepository.findByInstitutionalId(candidate).isEmpty())
                 return candidate;
         }
         throw new DomainException("Could not generate a unique matricula; please try again");

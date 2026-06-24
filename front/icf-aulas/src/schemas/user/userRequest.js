@@ -48,11 +48,6 @@ export const UserCreateSchema = z.object({
       STRONG_PASSWORD_REGEX,
       'La contraseña debe incluir mayúscula, minúscula, número y carácter especial (@$!%*?&#^()_-+=)'
     ),
-  departamento: z
-    .string()
-    .max(100, 'El departamento debe tener menos de 100 caracteres')
-    .optional()
-    .or(z.literal('')),
   roleId: z.number().int().positive('El rol es requerido').optional(),
 });
 
@@ -76,12 +71,6 @@ export const UserUpdateSchema = z.object({
     .regex(USERNAME_REGEX, 'Solo letras, números, puntos, guiones y guiones bajos'),
   email: z.string().email('Correo electrónico no válido'),
   roleId: z.number().int().positive('El rol es requerido'),
-  isActive: z.boolean().optional(),
-  departamento: z
-    .string()
-    .max(100, 'El departamento debe tener menos de 100 caracteres')
-    .optional()
-    .or(z.literal('')),
 });
 
 export default UserCreateSchema;

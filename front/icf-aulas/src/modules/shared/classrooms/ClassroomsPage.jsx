@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Plus, Eye, Pencil, Trash2, Building2, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Building2, CheckCircle2, XCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 
 import { useAuth } from '../../../context/AuthContext';
 import { ROLES } from '../../../utils/roles';
-import { useClassrooms, useAllClassrooms } from '../../../hooks/useClassrooms';
-import { useClassroomsForm } from '../../../hooks/useClassroomsForm';
+import { useClassrooms, useAllClassrooms } from './hooks/useClassrooms';
+import { useClassroomsForm } from './hooks/useClassroomsForm';
 import { usePagination } from '../../../hooks/usePagination';
 import { DEFAULT_PAGE_SIZE } from '../../../utils/queryUtils';
 import { typeLabel } from '../../../schemas/classroom';
@@ -31,9 +31,9 @@ import './ClassroomsPage.css';
 // TODO: when GET /api/v1/classrooms accepts ?status=, remove client-side filter
 // and pass the param to useClassrooms (see classrooms-children-array-request.md §2).
 const STATUS_FILTER_OPTIONS = [
-  { value: 'all',      label: 'Todas'      },
-  { value: 'active',   label: 'Activas'    },
-  { value: 'inactive', label: 'Inactivas'  },
+  { value: 'all', label: 'Todas' },
+  { value: 'active', label: 'Activas' },
+  { value: 'inactive', label: 'Inactivas' },
 ];
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -57,14 +57,14 @@ export default function ClassroomsPage() {
     loading,
     createMutation,
     updateMutation,
-    deactivateMutation,
-    reactivateMutation,
+    deleteMutation,
+    toggleStatusMutation,
     setChildrenMutation,
   } = useClassrooms({
     search,
     page,
     size: DEFAULT_PAGE_SIZE,
-    sort:      'name',
+    sort: 'name',
     direction: 'asc',
   });
 
@@ -75,7 +75,7 @@ export default function ClassroomsPage() {
   // Only meaningful for admins (teachers already receive active-only from server).
   const classrooms = useMemo(() => {
     if (!isAdmin || statusFilter === 'all') return rawClassrooms;
-    if (statusFilter === 'active')   return rawClassrooms.filter((r) => r.isActive);
+    if (statusFilter === 'active') return rawClassrooms.filter((r) => r.isActive);
     if (statusFilter === 'inactive') return rawClassrooms.filter((r) => !r.isActive);
     return rawClassrooms;
   }, [rawClassrooms, statusFilter, isAdmin]);
@@ -85,8 +85,9 @@ export default function ClassroomsPage() {
     createOpen, editTarget, viewTarget, deleteTarget,
     form,
     openCreate, closeCreate,
-    openEdit,   closeEdit,
-    openView,   closeView,
+    openEdit, openDelete,
+    closeEdit,
+    openView, closeView,
     setDeleteTarget,
     onField,
     handleCreateSubmit,
@@ -119,28 +120,28 @@ export default function ClassroomsPage() {
   // ── Table columns ─────────────────────────────────────────────────────────────
   const columns = [
     {
-      key:   'name',
-      header:'Nombre',
+      key: 'name',
+      header: 'Nombre',
       width: '26%',
-      render:(r) => r.name,
+      render: (r) => r.name,
     },
     {
-      key:   'type',
-      header:'Tipo',
+      key: 'type',
+      header: 'Tipo',
       width: '14%',
-      render:(r) => typeLabel(r.type),
+      render: (r) => typeLabel(r.type),
     },
     {
-      key:   'capacity',
-      header:'Capacidad',
+      key: 'capacity',
+      header: 'Capacidad',
       width: '10%',
-      render:(r) => r.capacity ?? '—',
+      render: (r) => r.capacity ?? '—',
     },
     {
-      key:   'description',
-      header:'Descripción',
+      key: 'description',
+      header: 'Descripción',
       width: '26%',
-      render:(r) => (
+      render: (r) => (
         <span
           className="classrooms__description"
           title={r.description || undefined}
@@ -150,21 +151,21 @@ export default function ClassroomsPage() {
       ),
     },
     {
-      key:   'isActive',
-      header:'Estado',
+      key: 'isActive',
+      header: 'Estado',
       width: '10%',
-      render:(r) => (
+      render: (r) => (
         <Badge variant={r.isActive ? 'success' : 'danger'}>
           {r.isActive ? 'Disponible' : 'No disponible'}
         </Badge>
       ),
     },
     {
-      key:   'acciones',
-      header:'Acciones',
+      key: 'acciones',
+      header: 'Acciones',
       width: isAdmin ? '14%' : '8%',
       align: 'right',
-      render:(r) => (
+      render: (r) => (
         <div className="classrooms__actions">
           {/* Ver información — available to all */}
           <button
@@ -190,29 +191,28 @@ export default function ClassroomsPage() {
                 <Pencil size={16} />
               </button>
 
-              {/* Dar de baja (active only) / Reactivar (inactive only) */}
-              {r.isActive ? (
-                <button
-                  type="button"
-                  className="classrooms__action-btn classrooms__action-btn--danger"
-                  title={`Dar de baja ${r.name}`}
-                  aria-label={`Dar de baja ${r.name}`}
-                  onClick={() => setDeleteTarget(r)}
-                >
-                  <Trash2 size={16} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="classrooms__action-btn classrooms__action-btn--success"
-                  title={`Reactivar ${r.name}`}
-                  aria-label={`Reactivar ${r.name}`}
-                  disabled={reactivateMutation.isPending}
-                  onClick={() => reactivateMutation.mutateAsync(r.uuid)}
-                >
-                  <RotateCcw size={16} />
-                </button>
-              )}
+              {/* Toggle status (activate / deactivate) */}
+              <button
+                type="button"
+                className={`classrooms__action-btn ${r.isActive ? 'classrooms__action-btn--warning' : 'classrooms__action-btn--success'}`}
+                title={r.isActive ? `Desactivar ${r.name}` : `Activar ${r.name}`}
+                aria-label={r.isActive ? `Desactivar ${r.name}` : `Activar ${r.name}`}
+                disabled={toggleStatusMutation.isPending}
+                onClick={() => toggleStatusMutation.mutateAsync(r.uuid)}
+              >
+                {r.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+              </button>
+
+              {/* Eliminar (always available to admin) */}
+              <button
+                type="button"
+                className="classrooms__action-btn classrooms__action-btn--danger"
+                title={`Eliminar ${r.name}`}
+                aria-label={`Eliminar ${r.name}`}
+                onClick={() => openDelete(r)}
+              >
+                <Trash2 size={16} />
+              </button>
             </>
           )}
         </div>
@@ -390,25 +390,24 @@ export default function ClassroomsPage() {
             />
           </FormModal>
 
-          {/* Dar de baja */}
+          {/* Eliminar */}
           <ConfirmDeleteModal
             open={!!deleteTarget}
             onClose={() => setDeleteTarget(null)}
-            onConfirm={() => deactivateMutation.mutateAsync(deleteTarget?.uuid)}
-            title="¿Dar de baja esta aula?"
+            onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
+            title="¿Eliminar esta aula?"
             message={
               deleteTarget
                 ? deleteTargetChildren.length > 0
-                  ? `Se desactivará "${deleteTarget.name}". ` +
-                    `⚠️ Esta aula es padre de ${deleteTargetChildren.length} aula${deleteTargetChildren.length !== 1 ? 's' : ''} ` +
-                    `(${deleteTargetChildren.map((c) => c.name).join(', ')}); ` +
-                    `al darla de baja quedarán desvinculadas pero seguirán activas. ` +
-                    `El historial de reservaciones se conservará.`
-                  : `Se desactivará "${deleteTarget.name}". El historial de reservaciones se conservará. ` +
-                    `Puedes reactivarla desde la tabla en cualquier momento.`
-                : 'Esta acción desactivará el aula seleccionada.'
+                  ? `Se eliminará "${deleteTarget.name}" de forma permanente. ` +
+                  `⚠️ Esta aula es padre de ${deleteTargetChildren.length} aula${deleteTargetChildren.length !== 1 ? 's' : ''} ` +
+                  `(${deleteTargetChildren.map((c) => c.name).join(', ')}); ` +
+                  `al eliminarla quedarán desvinculadas. ` +
+                  `Esta acción no se puede deshacer.`
+                  : `Se eliminará "${deleteTarget.name}" de forma permanente. Esta acción no se puede deshacer.`
+                : 'Esta acción eliminará el aula seleccionada.'
             }
-            confirmLabel="Dar de baja"
+            confirmLabel="Eliminar"
             cancelLabel="Cancelar"
           />
         </>

@@ -37,9 +37,6 @@ public class UserDetailsImp implements UserDetails {
     /** BCrypt-hashed password — never serialized or logged. */
     private final String password;
 
-    /** Whether the account is active; inactive users are rejected during authentication. */
-    private final boolean enabled;
-
     /** Concatenation of firstName and lastNames, embedded in the JWT for display purposes. */
     private final String nombreCompleto;
 
@@ -60,7 +57,6 @@ public class UserDetailsImp implements UserDetails {
         this.username       = user.getUsername();
         this.email          = user.getEmail();
         this.password       = user.getPasswordHash();
-        this.enabled        = Boolean.TRUE.equals(user.getIsActive());
         this.roleName       = user.getRole().getName();
         this.authorities    = Collections.singleton(new SimpleGrantedAuthority("ROLE_" + this.roleName));
         this.nombreCompleto = (user.getFirstName() + " " + user.getLastNames()).trim();
@@ -73,5 +69,5 @@ public class UserDetailsImp implements UserDetails {
     }
 
     @Override
-    public boolean isEnabled()              { return enabled; }
+    public boolean isEnabled()              { return true; }
 }

@@ -11,7 +11,7 @@
  *  NOTE: `isActive` is NEVER sent in the payload; it is backend-derived and read-only.
  */
 import { useState } from 'react';
-import { SemesterRequestSchema } from '../schemas/semester';
+import { SemesterRequestSchema } from '../../../../schemas/semester';
 
 const EMPTY_FORM = { name: '', startDate: '', endDate: '' };
 
@@ -45,10 +45,10 @@ function parseZodErrors(zodError) {
  * }}
  */
 export function useSemestersForm({ createMutation, updateMutation }) {
-  const [open,       setOpen]       = useState(false);
-  const [mode,       setMode]       = useState('create');
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState('create');
   const [editTarget, setEditTarget] = useState(null);
-  const [form,       setForm]       = useState(EMPTY_FORM);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState({});
 
   // ── Modal helpers ─────────────────────────────────────────────────────────────
@@ -63,9 +63,9 @@ export function useSemestersForm({ createMutation, updateMutation }) {
   function openEdit(semester) {
     setEditTarget(semester);
     setForm({
-      name:      semester.name,
+      name: semester.name,
       startDate: semester.startDate,
-      endDate:   semester.endDate,
+      endDate: semester.endDate,
     });
     setFormErrors({});
     setMode('edit');

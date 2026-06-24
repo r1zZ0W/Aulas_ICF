@@ -68,14 +68,23 @@ public class User extends BaseEntity {
      * Format: {@code ICF<yyyy><5 digits>} (e.g. {@code ICF202600001}).
      * Managed by the service layer; never supplied by the client.
      */
-    @Column(name = "matricula", nullable = false, unique = true, length = 20)
-    private String matricula;
+    @Column(name = "institutional_id", nullable = false, unique = true, length = 20)
+    private String institutionalId;
 
-    /** Department or area the user belongs to (optional free-text). */
-    @Column(name = "departamento", length = 100)
-    private String departamento;
+    /**
+     * Returns a null-safe, whitespace-collapsed display name for this user.
+     *
+     * <p>Concatenates {@code firstName} and {@code lastNames}, trimming each part
+     * individually before joining. Handles {@code null} name components gracefully
+     * (no "Daniel null" output) and collapses any run of internal whitespace to a
+     * single space.</p>
+     *
+     * @return the user's full display name, never {@code null}
+     */
+    public String getFullName() {
+        String fName = firstName != null ? firstName.trim() : "";
+        String lName = lastNames != null ? lastNames.trim() : "";
+        return (fName + " " + lName).trim().replaceAll("\\s+", " ");
+    }
 
-    /** Soft-delete flag; inactive users cannot authenticate. */
-    @Column(name = "is_active")
-    private Boolean isActive;
 }

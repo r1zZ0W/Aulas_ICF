@@ -44,7 +44,7 @@ public class NotificationService {
      * @param plainPassword plaintext password from the registration DTO (not yet erased)
      */
     public void notifyNewUserCredentials(String email, String fullName, String matricula,
-                                          String username, String departamento, String plainPassword) {
+                                          String username, String plainPassword) {
         try {
             mailSender.sendHtml(
                     email,
@@ -56,7 +56,6 @@ public class NotificationService {
                     + "<tr><td><strong>Matrícula:</strong></td><td>" + matricula + "</td></tr>"
                     + "<tr><td><strong>Usuario:</strong></td><td>" + username + "</td></tr>"
                     + "<tr><td><strong>Contraseña temporal:</strong></td><td>" + plainPassword + "</td></tr>"
-                    + (departamento != null ? "<tr><td><strong>Departamento:</strong></td><td>" + departamento + "</td></tr>" : "")
                     + "</table>"
                     + "<p>Por seguridad, te recomendamos cambiar tu contraseña al iniciar sesión por primera vez "
                     + "desde el menú <em>Mi perfil</em>.</p>"
@@ -83,24 +82,24 @@ public class NotificationService {
                                           List<String> adminEmails) {
         try {
             String dateStr = date.format(DATE_FMT);
-            String body = "<p>Se ha registrado una nueva solicitud de reserva:</p>"
+            String body = "<p>Se ha registrado una nueva reserva de aula:</p>"
                     + "<ul>"
                     + "<li><strong>Maestro/a:</strong> " + maestroFullName + "</li>"
-                    + "<li><strong>Aula solicitada:</strong> " + classroomName + "</li>"
+                    + "<li><strong>Aula:</strong> " + classroomName + "</li>"
                     + "<li><strong>Fecha:</strong> " + dateStr + "</li>"
-                    + "<li><strong>Estado:</strong> PENDIENTE (en espera de aprobación)</li>"
+                    + "<li><strong>Estado:</strong> ACTIVA (la reserva está confirmada)</li>"
                     + "</ul>"
-                    + "<p>Ingresa al sistema para revisar y aprobar o rechazar la solicitud.</p>";
+                    + "<p>Ingresa al sistema para consultar o administrar la reserva.</p>";
 
             // Notify the Maestro
             mailSender.sendHtml(maestroEmail,
-                    "Tu solicitud de reserva ha sido recibida — " + classroomName + " · " + dateStr, body);
+                    "Tu reserva ha sido confirmada — " + classroomName + " · " + dateStr, body);
 
             // Notify each active admin
             for (String adminEmail : adminEmails) {
                 try {
                     mailSender.sendHtml(adminEmail,
-                            "[Aulas ICF] Nueva solicitud de reserva pendiente — " + dateStr, body);
+                            "[Aulas ICF] Nueva reserva registrada — " + dateStr, body);
                 } catch (Exception adminEx) {
                     log.warn("[NotificationService] Failed to notify admin {}: {}", adminEmail, adminEx.getMessage());
                 }

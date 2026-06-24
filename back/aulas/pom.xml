@@ -143,15 +143,7 @@
             <scope>compile</scope>
         </dependency>
 
-        <!-- Flyway — versioned schema migrations (version managed by Spring Boot parent) -->
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-mysql</artifactId>
-        </dependency>
+        <!-- Schema migrations are managed manually via SQL scripts in docs/. -->
     </dependencies>
 
     <build>

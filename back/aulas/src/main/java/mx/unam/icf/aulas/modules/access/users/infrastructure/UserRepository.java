@@ -42,13 +42,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUuid(UUID uuid);
 
     /** Finds a user by their unique matrícula. */
-    Optional<User> findByMatricula(String matricula);
+    Optional<User> findByInstitutionalId(String matricula);
 
     /**
      * Returns all active users assigned to a specific role by role name.
      * Used to resolve admin recipients for reservation notifications.
      */
-    java.util.List<User> findByRole_NameAndIsActiveTrue(String roleName);
+    java.util.List<User> findByRoleName(String roleName);
 
     /** Returns true if at least one user with the given role name exists (used by AdminSeeder). */
     boolean existsByRole_Name(String roleName);
@@ -96,25 +96,24 @@ public interface UserRepository extends JpaRepository<User, Long> {
                    OR LOWER(u.lastNames) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(u.email)     LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(u.username)  LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(u.matricula) LIKE LOWER(CONCAT('%', :q, '%')))
+              )
             """)
     Page<User> search(@Param("q") String q, @Param("excludeUuid") UUID excludeUuid, Pageable pageable);
 
     /**
      * Returns a single-row aggregate with counts for the admin stats dashboard.
      *
-     * <p>Resolves all four counters in one database round-trip using a JPQL
+     * <p>Resolves all 2 counters in one database round-trip using a JPQL
      * constructor expression, without materializing the full user list.</p>
      *
-     * @return a {@link UserStatsDTO} with total / active / inactive / admin counts
+     * @return a {@link UserStatsDTO} with total and admin counts
      */
     @Query("""
-            SELECT new mx.unam.icf.aulas.modules.access.users.app.dtos.UserStatsDTO(
-                COUNT(u),
-                SUM(CASE WHEN u.isActive = true  THEN 1L ELSE 0L END),
-                SUM(CASE WHEN u.isActive = false OR u.isActive IS NULL THEN 1L ELSE 0L END),
-                SUM(CASE WHEN u.role.name = 'ADMIN' THEN 1L ELSE 0L END))
-            FROM User u
-            """)
+        SELECT new mx.unam.icf.aulas.modules.access.users.app.dtos.UserStatsDTO(
+            COUNT(u),
+            COUNT(CASE WHEN u.role.name = 'ADMIN' THEN 1 END)
+        )
+        FROM User u
+    """)
     UserStatsDTO fetchStats();
 }

@@ -5,21 +5,22 @@
  * Children assignment (edit mode):
  *   `form.childUuids` holds the UUIDs of classrooms the current aula should contain.
  *   On openEdit() it is pre-populated with the current direct children (via getChildren).
- *   handleEditSubmit() diffs against `prevChildUuids` and calls `setChildrenMutation`
- *   when the selection changed, using sequential PUTs (interino — see useClassrooms.js).
+ *   handleEditSubmit() diffs against `prevChildUuids` and, when the selection changed,
+ *   calls `setChildrenMutation` with the full desired set — a single atomic
+ *   PUT /api/v1/classrooms/{uuid}/children handled server-side in one transaction.
  */
 import { useState } from 'react';
-import { ClassroomRequestSchema } from '../schemas/classroom';
-import { getChildren } from '../utils/classroomTree';
+import { ClassroomRequestSchema } from '../../../../schemas/classroom';
+import { getChildren } from '../../../../utils/classroomTree';
 
 const DEFAULT_FORM = {
-  name:           '',
-  capacity:       20,
-  type:           'AULA',
-  description:    '',
+  name: '',
+  capacity: 20,
+  type: 'AULA',
+  description: '',
   linkedRoomUuid: null,
-  isActive:       true,
-  childUuids:     [],
+  isActive: true,
+  childUuids: [],
 };
 
 /**
@@ -37,13 +38,13 @@ export function useClassroomsForm({
   allClassrooms = [],
 }) {
   // ── Modal / target state ────────────────────────────────────────────────────
-  const [createOpen,    setCreateOpen]    = useState(false);
-  const [editTarget,    setEditTarget]    = useState(null);
-  const [viewTarget,    setViewTarget]    = useState(null);
-  const [deleteTarget,  setDeleteTarget]  = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [viewTarget, setViewTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ── Shared form data ────────────────────────────────────────────────────────
-  const [form,          setForm]          = useState(DEFAULT_FORM);
+  const [form, setForm] = useState(DEFAULT_FORM);
   // Snapshot of children UUIDs when the edit modal was opened,
   // used to diff against form.childUuids on submit.
   const [prevChildUuids, setPrevChildUuids] = useState([]);
@@ -60,19 +61,22 @@ export function useClassroomsForm({
     setEditTarget(classroom);
     setPrevChildUuids(currentChildren);
     setForm({
-      name:           classroom.name           ?? '',
-      capacity:       classroom.capacity       ?? 1,
-      type:           classroom.type           ?? 'AULA',
-      description:    classroom.description    ?? '',
+      name: classroom.name ?? '',
+      capacity: classroom.capacity ?? 1,
+      type: classroom.type ?? 'AULA',
+      description: classroom.description ?? '',
       linkedRoomUuid: classroom.linkedRoomUuid ?? null,
-      isActive:       classroom.isActive       ?? true,
-      childUuids:     currentChildren,
+      isActive: classroom.isActive ?? true,
+      childUuids: currentChildren,
     });
   }
   function closeEdit() { setEditTarget(null); }
 
+  function openDelete(classroom) { setDeleteTarget(classroom); }
+  function closeDelete() { setDeleteTarget(null); }
+
   function openView(classroom) { setViewTarget(classroom); }
-  function closeView()         { setViewTarget(null); }
+  function closeView() { setViewTarget(null); }
 
   // ── Field handler ───────────────────────────────────────────────────────────
   function onField(field, value) {
@@ -83,7 +87,7 @@ export function useClassroomsForm({
   async function handleCreateSubmit() {
     const payload = {
       ...form,
-      capacity:       Number(form.capacity),
+      capacity: Number(form.capacity),
       linkedRoomUuid: form.linkedRoomUuid || null,
     };
     const result = ClassroomRequestSchema.safeParse(payload);
@@ -99,7 +103,7 @@ export function useClassroomsForm({
   async function handleEditSubmit() {
     const payload = {
       ...form,
-      capacity:       Number(form.capacity),
+      capacity: Number(form.capacity),
       linkedRoomUuid: form.linkedRoomUuid || null,
     };
     const result = ClassroomRequestSchema.safeParse(payload);
@@ -113,27 +117,21 @@ export function useClassroomsForm({
       return;
     }
 
-    // 2. Update children if the selection changed (interino sequential PUTs)
-    const newSet  = new Set(form.childUuids ?? []);
+    // 2. Update children if the selection changed.
+    //    Send the full desired set to the backend — it diffs and applies atomically.
+    const newSet = new Set(form.childUuids ?? []);
     const prevSet = new Set(prevChildUuids ?? []);
-    const toAdd   = (form.childUuids ?? [])
-      .filter((u) => !prevSet.has(u))
-      .map((u) => allClassrooms.find((c) => c.uuid === u))
-      .filter(Boolean);
-    const toRemove = (prevChildUuids ?? [])
-      .filter((u) => !newSet.has(u))
-      .map((u) => allClassrooms.find((c) => c.uuid === u))
-      .filter(Boolean);
+    const childrenChanged =
+      newSet.size !== prevSet.size || [...newSet].some((u) => !prevSet.has(u));
 
-    if (toAdd.length > 0 || toRemove.length > 0) {
+    if (childrenChanged) {
       try {
         await setChildrenMutation.mutateAsync({
           parentUuid: editTarget.uuid,
-          toAdd,
-          toRemove,
+          childUuids: form.childUuids ?? [],
         });
       } catch {
-        // setChildrenMutation.onError already: invalidated cache + critical toast.
+        // setChildrenMutation.onError already: invalidated cache + error toast.
         // Close the modal so the user sees the re-fetched (real) state when they reopen it.
         closeEdit();
         return;
@@ -152,6 +150,7 @@ export function useClassroomsForm({
     openCreate,
     closeCreate,
     openEdit,
+    openDelete,
     closeEdit,
     openView,
     closeView,

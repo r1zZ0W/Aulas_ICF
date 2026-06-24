@@ -16,13 +16,13 @@ function resolveErrorMessage(error, overrides = {}) {
   if (overrides[error.status]) return overrides[error.status];
   const serverMessage = error.data?.message;
   const defaults = {
-    0:   'No se pudo conectar con el servidor. Verifica tu conexión.',
-    400: serverMessage || 'Los datos enviados no son válidos.',
+    0: 'No se pudo conectar con el servidor. Verifica tu conexión.',
+    400: 'Los datos enviados no son válidos.',
     401: 'No autorizado.',
     403: 'No tienes permisos para realizar esta acción.',
     404: 'El aula solicitada no existe.',
     405: 'Operación no permitida en este recurso.',
-    409: serverMessage || 'Ya existe un aula con ese nombre.',
+    409: 'Ya existe un aula con ese nombre.',
     500: 'Error interno del servidor. Intenta de nuevo más tarde.',
   };
   return defaults[error.status] || serverMessage || `Error inesperado (${error.status}).`;
@@ -114,15 +114,18 @@ export async function updateClassroom(uuid, payload) {
 }
 
 /**
- * Deactivates a classroom (baja lógica). ADMIN only.
- * Marks the classroom as inactive and automatically unlinks its direct children
- * (orphan cleanup option A — see classrooms-status-endpoints.md).
+ * Toggles the active status of a classroom. ADMIN only.
+ * Flips isActive: active → inactive (hidden from catalog, no new reservations allowed)
+ * or inactive/null → active. Child classrooms are not affected.
  * Reservation history is preserved (DFR NFR / LFTAIP).
- * PATCH /api/v1/classrooms/{uuid}/deactivate
+ * PATCH /api/v1/classrooms/{uuid}/toggle-status
+ *
+ * @returns {Promise<object>} the updated classroom with its new isActive value
  */
-export async function deactivateClassroom(uuid) {
+export async function toggleClassroomStatus(uuid) {
   try {
-    await api.patch(`/api/v1/classrooms/${uuid}/deactivate`);
+    const { data } = await api.patch(`/api/v1/classrooms/${uuid}/toggle-status`);
+    return ClassroomResponseSchema.parse(data.data ?? data);
   } catch (error) {
     if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
     throw error;
@@ -130,14 +133,32 @@ export async function deactivateClassroom(uuid) {
 }
 
 /**
- * Reactivates a previously deactivated classroom. ADMIN only.
- * Child classrooms unlinked during the prior deactivation are NOT re-linked automatically;
- * the administrator must update each child's parent explicitly if needed.
- * PATCH /api/v1/classrooms/{uuid}/reactivate
+ * Deletes a classroom. ADMIN only.
+ * DELETE /api/v1/classrooms/{uuid}
  */
-export async function reactivateClassroom(uuid) {
+export async function deleteClassroom(uuid) {
   try {
-    await api.patch(`/api/v1/classrooms/${uuid}/reactivate`);
+    await api.delete(`/api/v1/classrooms/${uuid}`);
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
+}
+
+/**
+ * Atomically assigns a set of direct child classrooms to the given parent. ADMIN only.
+ *
+ * Sends the full desired set of child UUIDs; the backend diffs against the current state
+ * and links/unlinks accordingly in a single transaction. An empty array removes all children.
+ *
+ * PUT /api/v1/classrooms/{parentUuid}/children
+ *
+ * @param {string}   parentUuid - UUID of the parent classroom.
+ * @param {string[]} childUuids - Full desired set of child classroom UUIDs.
+ */
+export async function setClassroomChildren(parentUuid, childUuids) {
+  try {
+    await api.put(`/api/v1/classrooms/${parentUuid}/children`, { childUuids });
   } catch (error) {
     if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
     throw error;

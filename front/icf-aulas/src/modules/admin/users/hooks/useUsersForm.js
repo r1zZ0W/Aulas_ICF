@@ -4,18 +4,18 @@
  * handlers, and submit orchestration.
  */
 import { useState } from 'react';
-import { UserCreateSchema, UserUpdateSchema } from '../schemas/index.js';
+import { UserCreateSchema, UserUpdateSchema } from '../../../../schemas/index.js';
 
 // ── Empty form state ──────────────────────────────────────────────────────────
 
 export const EMPTY_CREATE = {
   firstName: '', lastNames: '', username: '', email: '',
-  password: '', departamento: '', roleId: '',
+  password: '', roleId: ''
 };
 
 export const EMPTY_UPDATE = {
   firstName: '', lastNames: '', username: '', email: '',
-  departamento: '', roleId: '', isActive: true,
+  roleId: ''
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

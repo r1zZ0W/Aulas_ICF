@@ -8,6 +8,7 @@
  *  - ReservSlot: A precise block of time allocated for a user in a specific classroom on a single date.
  */
 import { z } from 'zod'
+import { TimeSlotSchema } from './timeSlot.js'
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export const ReservationGroupStatusEnum = z.enum(['ACTIVE', 'CANCELLED'], {
 
 /** Individual status of a specific scheduled classroom reservation occurrence. */
 export const ReservInstanceStatusEnum = z.enum(
-  ['CONFIRMED', 'CANCELLED_BY_USER', 'CANCELLED_BY_ADMIN'],
+  ['ACTIVE', 'CANCELLED_BY_USER', 'CANCELLED_BY_ADMIN'],
   { errorMap: () => ({ message: 'Estado de instancia no válido' }) }
 )
 
@@ -53,7 +54,7 @@ export const ReservationGroupResponseSchema = z.object({
   semesterName: z.string(),
   status: ReservationGroupStatusEnum,
   daysOfWeek: z.array(DayOfWeekEnum),
-  createdAt: z.string().datetime()
+  createdAt: z.string()
 })
 
 // ─── Reservation Instance ─────────────────────────────────────────────────────
@@ -63,25 +64,51 @@ export const ReservationGroupResponseSchema = z.object({
  * Validates the relationship between the reservation group, classroom, date, and status.
  */
 export const ReservInstanceRequestSchema = z.object({
-  groupUuid: z.string().uuid('UUID de grupo de reserva no válido'),
-  classroomUuid: z.string().uuid('UUID de aula no válido'),
+  groupUuid: z.string(),
+  classroomUuid: z.string(),
   date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato YYYY-MM-DD'),
-  status: ReservInstanceStatusEnum.default('CONFIRMED')
+  status: ReservInstanceStatusEnum.default('ACTIVE')
 })
 
 /**
  * Schema for validating and mapping reservation instance information retrieved from API responses.
- * Confirms identifier formats, date matches, and reservation statuses.
+ * Includes the enriched `classroomName`, `motivo`, `numAsistentes`, and `timeSlots` fields
+ * returned by the backend since v3.0 of the DTO.
  */
 export const ReservInstanceResponseSchema = z.object({
-  uuid: z.string().uuid(),
-  groupUuid: z.string().uuid(),
-  classroomUuid: z.string().uuid(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  uuid: z.string(),
+  groupUuid: z.string(),
+  classroomUuid: z.string(),
+  classroomName: z.string().optional().default(''),
+  date: z.string(),
   status: ReservInstanceStatusEnum,
-  createdAt: z.string().datetime()
+  attendeeCount: z.number().int().min(0),
+  timeSlots: z.array(TimeSlotSchema).default([]),
+  createdAt: z.string().optional(),
+})
+
+/**
+ * Schema for the atomic booking request.
+ * A single call creates the ReservationGroup and all its ReservInstance + ReservSlot rows.
+ */
+export const BookingRequestSchema = z.object({
+  classroomUuid: z.string(),
+  attendeeCount: z.number().int().positive('El número de asistentes debe ser positivo').min(2),
+  timeSlotIds: z.array(z.number().int()).min(1, 'Selecciona al menos un bloque de tiempo'),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha: YYYY-MM-DD'),
+  repeatUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  daysOfWeek: z.array(DayOfWeekEnum).nullable().optional(),
+})
+
+/**
+ * Schema for the reassignment request.
+ * At least one of `newClassroomUuid` or `newTimeSlotIds` must be provided.
+ */
+export const ReassignRequestSchema = z.object({
+  newClassroomUuid: z.string().uuid().optional(),
+  newTimeSlotIds: z.array(z.number().int()).min(1).optional(),
 })
 
 // ─── Reservation Slot ─────────────────────────────────────────────────────────
@@ -106,7 +133,7 @@ export const ReservSlotRequestSchema = z.object({
  * Includes precise start/end time validation, room mapping, and user associations.
  */
 export const ReservSlotResponseSchema = z.object({
-  instanceUuid: z.string().uuid(),
+  instanceUuid: z.string(),
   timeSlotId: z.number().int(),
   startTime: z
     .string()
@@ -117,25 +144,6 @@ export const ReservSlotResponseSchema = z.object({
   classroomId: z.number().int(),
   userId: z.number().int(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
-})
-
-// ─── Combined Frontend Schema ─────────────────────────────────────────────────
-
-/**
- * Combined schema used purely on the frontend for multi-step booking wizards.
- * Collects and validates semester, classroom, recurring weekdays, and time blocks
- * before distributing data to separate booking endpoints.
- */
-export const CreateReservationGroupSchema = z.object({
-  userUuid: z.string().uuid('UUID de usuario obligatorio'),
-  semesterId: z.number().int().positive('Selecciona un semestre válido'),
-  classroomUuid: z.string().uuid('Selecciona un aula válida'),
-  daysOfWeek: z
-    .array(DayOfWeekEnum)
-    .min(1, 'Selecciona al menos un día de la semana'),
-  timeSlots: z
-    .array(z.number().int().min(1).max(24))
-    .min(1, 'Selecciona al menos un bloque de tiempo')
 })
 
 export default ReservationGroupRequestSchema

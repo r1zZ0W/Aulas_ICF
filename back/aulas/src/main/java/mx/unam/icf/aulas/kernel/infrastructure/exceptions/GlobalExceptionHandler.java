@@ -10,6 +10,8 @@ import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidTokenExceptio
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.MissingTokenException;
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.TokenRevokedException;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
+import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ConflictDetailDTO;
+import mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -60,6 +62,23 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    /**
+     * Handles slot conflicts detected during the atomic bulk booking ({@code POST /api/v1/reservations/booking}).
+     * Returns HTTP 409 with a structured {@link ConflictDetailDTO} so the frontend can render a
+     * human-readable message like "El martes 23 de junio a las 10:00 ya está ocupado" rather
+     * than a generic error notice.
+     */
+    @ExceptionHandler(ReservationConflictException.class)
+    public ResponseEntity<ApiResponse<ConflictDetailDTO>> handleConflict(ReservationConflictException ex) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.<ConflictDetailDTO>builder()
+                        .error(true)
+                        .message(ex.getMessage())
+                        .data(new ConflictDetailDTO(ex.getConflictDate(), ex.getConflictTimeSlotId()))
+                        .build());
     }
 
     // ── Security ─────────────────────────────────────────────────────────────

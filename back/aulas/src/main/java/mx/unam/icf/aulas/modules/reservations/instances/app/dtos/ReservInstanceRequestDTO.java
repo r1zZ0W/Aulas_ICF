@@ -14,14 +14,13 @@ import java.util.UUID;
  * Request payload for creating a classroom reservation instance.
  *
  * <p>Carries the classroom, date, time slots, purpose, and expected attendee count.
- * The service automatically assigns {@code PENDIENTE} status — clients must not send a status field.</p>
+ * The service automatically assigns {@code ACTIVA} status — clients must not send a status field.</p>
  *
  * @param groupUuid     public UUID of the {@link mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroup} this instance belongs to
  * @param classroomUuid public UUID of the requested classroom
  * @param date          reservation date; must not be in the past
  * @param timeSlotIds   ordered list of 30-minute slot IDs (1–24, covering 07:00–19:00)
- * @param motivo        purpose or reason for the reservation (max 500 chars)
- * @param numAsistentes expected number of attendees
+ * @param attendeeCount expected number of attendees
  *
  * @author Ithera
  * @version 2.0
@@ -41,11 +40,7 @@ public record ReservInstanceRequestDTO(
         @NotEmpty(message = "At least one time slot is required")
         List<Integer> timeSlotIds,
 
-        @NotNull(message = "Purpose (motivo) is required")
-        @Size(max = 500, message = "Purpose must be at most 500 characters")
-        String motivo,
-
         @NotNull(message = "Number of attendees is required")
         @Positive(message = "Number of attendees must be positive")
-        Integer numAsistentes
+        Integer attendeeCount
 ) {}
