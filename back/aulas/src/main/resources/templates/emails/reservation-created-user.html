@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reserva confirmada — Aulas ICF</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:32px 0;">
+  <tr>
+    <td align="center">
+
+      <!-- Card -->
+      <table width="660" cellpadding="0" cellspacing="0"
+             style="background-color:#ffffff;border:1px solid #e5e7eb;border-radius:14px;
+                    box-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+                    overflow:hidden;">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding:32px 32px 0 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="border-bottom:2px solid #005687;padding-bottom:18px;">
+              <tr>
+                <td>
+                  <span style="font-size:20px;font-weight:700;color:#005687;line-height:28px;">Aulas ICF</span><br/>
+                  <span style="font-size:12px;color:#6a7282;line-height:16px;">Sistema de Administración de Espacios</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:24px 32px 32px 32px;">
+
+            <!-- Greeting -->
+            <p style="margin:0 0 16px 0;font-size:15px;font-weight:700;color:#1e2939;">
+              Hola <span th:text="${maestroNombre}">Nombre del Usuario</span>,
+            </p>
+
+            <!-- Intro -->
+            <p style="margin:0 0 24px 0;font-size:15px;color:#1e2939;line-height:1.625;">
+              Te confirmamos que tu reserva ha sido registrada exitosamente en el sistema.
+              A continuación, te compartimos los detalles de tu espacio:
+            </p>
+
+            <!-- Details card -->
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="background-color:#f9fafb;border:1px solid #f3f4f6;border-radius:10px;
+                          padding:20px;margin-bottom:24px;">
+              <tr>
+                <td style="padding-bottom:12px;">
+                  <span style="font-size:14px;font-weight:700;color:#005687;
+                               text-transform:uppercase;letter-spacing:.7px;">
+                    Detalles de la Reserva
+                  </span>
+                </td>
+              </tr>
+              <!-- Actividad -->
+              <tr>
+                <td width="140" style="font-size:14px;color:#6a7282;padding-bottom:8px;vertical-align:top;">Actividad:</td>
+                <td style="font-size:14px;font-weight:700;color:#1e2939;padding-bottom:8px;vertical-align:top;"
+                    th:text="${actividad}">Reserva de aula</td>
+              </tr>
+              <!-- Espacio -->
+              <tr>
+                <td width="140" style="font-size:14px;color:#6a7282;padding-bottom:8px;vertical-align:top;">Espacio asignado:</td>
+                <td style="font-size:14px;font-weight:700;color:#1e2939;padding-bottom:8px;vertical-align:top;"
+                    th:text="${aula}">Nombre del Aula</td>
+              </tr>
+              <!-- Fecha -->
+              <tr>
+                <td width="140" style="font-size:14px;color:#6a7282;padding-bottom:8px;vertical-align:top;">Fecha:</td>
+                <td style="font-size:14px;font-weight:700;color:#1e2939;padding-bottom:8px;vertical-align:top;"
+                    th:text="${fecha}">DD de Mes de YYYY</td>
+              </tr>
+              <!-- Horario -->
+              <tr>
+                <td width="140" style="font-size:14px;color:#6a7282;padding-bottom:8px;vertical-align:top;">Horario:</td>
+                <td style="font-size:14px;font-weight:700;color:#1e2939;padding-bottom:8px;vertical-align:top;"
+                    th:text="'De ' + ${horario}">De HH:mm – HH:mm</td>
+              </tr>
+              <!-- ID -->
+              <tr>
+                <td width="140" style="font-size:14px;color:#6a7282;vertical-align:middle;">ID de Reserva:</td>
+                <td style="vertical-align:middle;">
+                  <span style="display:inline-block;background-color:#e5e7eb;border-radius:4px;
+                               padding:2px 6px;font-family:'Consolas','Courier New',monospace;
+                               font-size:12px;color:#4a5565;line-height:16px;"
+                        th:text="${idReserva}">uuid</span>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Footer note -->
+            <p style="margin:0 0 32px 0;font-size:15px;color:#1e2939;line-height:1.625;">
+              Por favor, asegúrate de entregar el espacio en las mismas condiciones en las que
+              fue recibido al finalizar tu horario. Si necesitas hacer alguna modificación o
+              cancelar, puedes hacerlo desde tu panel en la sección de "Mis Reservas".
+            </p>
+
+            <!-- Divider + signature -->
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="border-top:1px solid #f3f4f6;padding-top:24px;">
+              <tr>
+                <td>
+                  <p style="margin:0;font-size:15px;color:#1e2939;line-height:1.625;">Saludos cordiales,</p>
+                  <p style="margin:0;font-size:15px;font-weight:700;color:#1e2939;line-height:1.625;">
+                    El equipo de Administración de Espacios
+                  </p>
+                </td>
+              </tr>
+            </table>
+
+          </td>
+        </tr>
+
+      </table>
+      <!-- /Card -->
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

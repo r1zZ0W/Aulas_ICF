@@ -3,11 +3,14 @@ package mx.unam.icf.aulas.modules.reservations.instances.app;
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
+import mx.unam.icf.aulas.kernel.domain.events.reservations.cancellations.ReservInstanceCancelledEventDTO;
+import mx.unam.icf.aulas.kernel.domain.events.reservations.creations.ReservInstanceCreatedEventDTO;
+import mx.unam.icf.aulas.kernel.domain.events.reservations.reassigns.ReservInstanceReassignEventDTO;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
-import mx.unam.icf.aulas.kernel.infrastructure.services.NotificationService;
 import mx.unam.icf.aulas.modules.reservations.history.app.ReservationHistoryService;
 import mx.unam.icf.aulas.modules.reservations.history.domain.ReservationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import mx.unam.icf.aulas.modules.academic.semesters.domain.Semester;
@@ -88,7 +91,7 @@ public class ReservInstanceService {
     private final ReservSlotRepository       slotRepository;
     private final UserRepository             userRepository;
     private final SemesterRepository         semesterRepository;
-    private final NotificationService        notificationService;
+    private final ApplicationEventPublisher  eventPublisher;
     private final ReservationHistoryService  historyService;
 
     // ── Queries ───────────────────────────────────────────────────────────────
@@ -317,13 +320,16 @@ public class ReservInstanceService {
         // 14. Single notification for the whole booking (not one per instance)
         List<String> adminEmails = userRepository.findByRoleName("ADMIN")
             .stream().map(User::getEmail).collect(Collectors.toList());
-        notificationService.notifyReservationCreated(
+        eventPublisher.publishEvent(new ReservInstanceCreatedEventDTO(
             user.getEmail(),
             user.getFullName(),
             classroom.getName(),
             saved.getFirst().getDate(),
+            slotStartTime(timeSlots),
+            slotEndTime(timeSlots),
+            group.getUuid(),
             adminEmails
-        );
+        ));
 
         return mapper.toDtoList(saved);
     }
@@ -421,17 +427,20 @@ public class ReservInstanceService {
         // Record history for this single instance
         historyService.register(saved, ReservationEvent.CREATED, "Reservation created");
 
-        // Notify Maestro and all active admins (best-effort)
+        // Notify Maestro and all active admins (best-effort, via event)
         List<String> adminEmails = userRepository.findByRoleName("ADMIN")
             .stream().map(User::getEmail).collect(Collectors.toList());
         var owner = saved.getGroup().getUser();
-        notificationService.notifyReservationCreated(
-                owner.getEmail(),
-                owner.getFullName(),
-                saved.getClassroom().getName(),
-                saved.getDate(),
-                adminEmails
-        );
+        eventPublisher.publishEvent(new ReservInstanceCreatedEventDTO(
+            owner.getEmail(),
+            owner.getFullName(),
+            saved.getClassroom().getName(),
+            saved.getDate(),
+            slotStartTime(timeSlots),
+            slotEndTime(timeSlots),
+            saved.getUuid(),
+            adminEmails
+        ));
 
         return mapper.toDto(saved);
     }
@@ -457,10 +466,27 @@ public class ReservInstanceService {
             throw new AccessDeniedException("You can only cancel your own reservations");
         if (isCancelled(instance))
             throw new DomainException("Reservation is already cancelled");
+
+        // Capture data BEFORE deleting slots (defensive — slots will be gone after deleteByInstance)
+        String  maestroEmail    = instance.getGroup().getUser().getEmail();
+        String  maestroFullName = instance.getGroup().getUser().getFullName();
+        String  classroomName   = instance.getClassroom().getName();
+        LocalDate date          = instance.getDate();
+        UUID    reservationId   = instance.getUuid();
+        LocalTime start         = slotStartTimeFromInstance(instance);
+        LocalTime end           = slotEndTimeFromInstance(instance);
+        List<String> adminEmails = userRepository.findByRoleName("ADMIN")
+            .stream().map(User::getEmail).collect(Collectors.toList());
+
         instance.setStatus(ReservInstanceStatus.CANCELLED_BY_USER);
         slotRepository.deleteByInstance(instance);
         ReservInstance saved = reservInstanceRepository.save(instance);
         historyService.register(saved, ReservationEvent.CANCELLED_BY_USER, "Cancelled by owner");
+
+        eventPublisher.publishEvent(new ReservInstanceCancelledEventDTO(
+            maestroEmail, maestroFullName, classroomName, date,
+            start, end, reservationId, false, null, adminEmails
+        ));
         return mapper.toDto(saved);
     }
 
@@ -479,10 +505,27 @@ public class ReservInstanceService {
         ReservInstance instance = getOrThrow(uuid);
         if (isCancelled(instance))
             throw new DomainException("Reservation is already cancelled");
+
+        // Capture data BEFORE deleting slots (defensive — slots will be gone after deleteByInstance)
+        String  maestroEmail    = instance.getGroup().getUser().getEmail();
+        String  maestroFullName = instance.getGroup().getUser().getFullName();
+        String  classroomName   = instance.getClassroom().getName();
+        LocalDate date          = instance.getDate();
+        UUID    reservationId   = instance.getUuid();
+        LocalTime start         = slotStartTimeFromInstance(instance);
+        LocalTime end           = slotEndTimeFromInstance(instance);
+        List<String> adminEmails = userRepository.findByRoleName("ADMIN")
+            .stream().map(User::getEmail).collect(Collectors.toList());
+
         instance.setStatus(ReservInstanceStatus.CANCELLED_BY_ADMIN);
         slotRepository.deleteByInstance(instance);
         ReservInstance saved = reservInstanceRepository.save(instance);
         historyService.register(saved, ReservationEvent.CANCELLED_BY_ADMIN, "Cancelled by administrator");
+
+        eventPublisher.publishEvent(new ReservInstanceCancelledEventDTO(
+            maestroEmail, maestroFullName, classroomName, date,
+            start, end, reservationId, true, null, adminEmails
+        ));
         return mapper.toDto(saved);
     }
 
@@ -600,15 +643,22 @@ public class ReservInstanceService {
         // Record history
         historyService.register(saved, ReservationEvent.REASSIGNED, "Reassigned by administrator");
 
-        // Notify Maestro (best-effort)
+        // Notify Maestro and admins (best-effort, via event)
         var reassignedOwner = saved.getGroup().getUser();
-        notificationService.notifyReservationReassigned(
-                reassignedOwner.getEmail(),
-                reassignedOwner.getFullName(),
-                saved.getDate(),
-                oldClassroomName,
-                saved.getClassroom().getName()
-        );
+        List<String> adminEmails = userRepository.findByRoleName("ADMIN")
+            .stream().map(User::getEmail).collect(Collectors.toList());
+
+        eventPublisher.publishEvent(new ReservInstanceReassignEventDTO(
+            reassignedOwner.getEmail(),
+            reassignedOwner.getFullName(),
+            saved.getDate(),
+            oldClassroomName,
+            saved.getClassroom().getName(),
+            slotStartTime(destTimeSlots),
+            slotEndTime(destTimeSlots),
+            saved.getUuid(),
+            adminEmails
+        ));
 
         return mapper.toDto(saved);
     }
@@ -623,5 +673,57 @@ public class ReservInstanceService {
     private boolean isCancelled(ReservInstance instance) {
         return instance.getStatus() == ReservInstanceStatus.CANCELLED_BY_USER
             || instance.getStatus() == ReservInstanceStatus.CANCELLED_BY_ADMIN;
+    }
+
+    /**
+     * Returns the start time of the earliest slot in a resolved {@link TimeSlot} list,
+     * or {@code null} when the list is empty.
+     */
+    private LocalTime slotStartTime(List<TimeSlot> slots) {
+        return slots.stream()
+            .map(TimeSlot::getStartTime)
+            .min(Comparator.naturalOrder())
+            .orElse(null);
+    }
+
+    /**
+     * Returns the end time of the latest slot in a resolved {@link TimeSlot} list,
+     * or {@code null} when the list is empty.
+     */
+    private LocalTime slotEndTime(List<TimeSlot> slots) {
+        return slots.stream()
+            .map(TimeSlot::getEndTime)
+            .max(Comparator.naturalOrder())
+            .orElse(null);
+    }
+
+    /**
+     * Null-safe helper for cancellation: loads the slots for an instance via the
+     * repository (avoids relying on the lazy collection state) and returns the
+     * start time of the earliest slot. Returns {@code null} when no slots exist (anomaly).
+     *
+     * <p>Must be called <em>before</em> {@code slotRepository.deleteByInstance()} to
+     * ensure the slot rows are still present in the database.</p>
+     */
+    private LocalTime slotStartTimeFromInstance(ReservInstance instance) {
+        return slotRepository.findByInstance(instance).stream()
+            .map(s -> s.getTimeSlot().getStartTime())
+            .min(Comparator.naturalOrder())
+            .orElse(null);
+    }
+
+    /**
+     * Null-safe helper for cancellation: loads the slots for an instance via the
+     * repository and returns the end time of the latest slot. Returns {@code null}
+     * when no slots exist (anomaly).
+     *
+     * <p>Must be called <em>before</em> {@code slotRepository.deleteByInstance()} to
+     * ensure the slot rows are still present in the database.</p>
+     */
+    private LocalTime slotEndTimeFromInstance(ReservInstance instance) {
+        return slotRepository.findByInstance(instance).stream()
+            .map(s -> s.getTimeSlot().getEndTime())
+            .max(Comparator.naturalOrder())
+            .orElse(null);
     }
 }

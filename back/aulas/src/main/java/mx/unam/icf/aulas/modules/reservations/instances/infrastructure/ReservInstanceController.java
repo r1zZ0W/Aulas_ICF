@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.reservations.instances.infrastructure;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
 import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
@@ -14,6 +15,8 @@ import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.BookingRequestD
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReassignRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
+import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
+
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +39,7 @@ import java.util.UUID;
 /**
  * REST controller for classroom reservation instance endpoints.
  *
- * <p>Reservations are created in the {@link mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus#ACTIVA}
+ * <p>Reservations are created in the {@link ReservInstanceStatus#ACTIVE}
  * state and occupy the classroom immediately — there is no approval step.
  * Cancellation and reassignment require the ADMIN role (except user self-cancellation).
  * All endpoints are exposed under the base path {@code /api/v1/reservations}.</p>
@@ -136,7 +139,7 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
-     * Creates a new reservation instance with status {@code ACTIVA}.
+     * Creates a new reservation instance with status {@code ACTIVE}.
      * The classroom is occupied immediately — no admin approval is required.
      * The authenticated user must own the reservation group referenced in the payload.
      * POST /api/v1/reservations

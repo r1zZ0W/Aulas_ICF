@@ -2,24 +2,37 @@ package mx.unam.icf.aulas.kernel.infrastructure.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import mx.unam.icf.aulas.kernel.domain.events.reservations.cancellations.ReservInstanceCancelledEventDTO;
+import mx.unam.icf.aulas.kernel.domain.events.reservations.creations.ReservInstanceCreatedEventDTO;
+import mx.unam.icf.aulas.kernel.domain.events.reservations.reassigns.ReservInstanceReassignEventDTO;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
-import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Locale;
 
 /**
- * Best-effort notification service that wraps {@link MailSender} with try/catch guards.
+ * Best-effort notification service that renders HTML email templates via Thymeleaf
+ * and delegates delivery to {@link MailSender}.
  *
- * <p>Accepts only primitive/value-type arguments so this kernel-level service remains
- * free of module-level dependencies (kernel ← modules direction is preserved).</p>
+ * <p>All public methods are annotated with {@code @Async} so they execute on the
+ * bounded {@code mail-} thread pool defined in
+ * {@link mx.unam.icf.aulas.kernel.infrastructure.config.AsyncConfig}.
+ * Callers (event listeners) return immediately after the call, keeping HTTP
+ * response latency independent of SMTP performance.</p>
  *
- * <p>All methods are best-effort: SMTP failures are logged at WARN level and never propagated.
- * A delivery failure must never roll back the underlying business transaction.</p>
+ * <p>All methods are best-effort: SMTP and template failures are caught and logged at
+ * WARN level; they never propagate back to the caller or affect the business
+ * transaction (which has already committed by the time these methods run).</p>
+ *
+ * <p>Template location: {@code classpath:/templates/emails/&lt;name&gt;.html}.
+ * Variables are resolved by Thymeleaf using {@code th:text}, {@code th:if}, etc.</p>
  *
  * @author Ithera
- * @version 1.0
+ * @version 2.0
  */
 @Service
 @Slf4j
@@ -28,23 +41,25 @@ public class NotificationService {
 
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new Locale("es", "MX"));
+    private static final DateTimeFormatter TIME_FMT =
+            DateTimeFormatter.ofPattern("HH:mm");
 
-    private final MailSender mailSender;
+    private final MailSender     mailSender;
+    private final TemplateEngine templateEngine;
 
     // ── DFR §3.1 — User registration ─────────────────────────────────────────
 
     /**
      * Sends login credentials to a newly registered user (DFR §3.1).
      *
-     * @param email        institutional email of the new user
-     * @param fullName     display name (firstName + lastNames)
-     * @param matricula    auto-generated unique academic ID
-     * @param username     login username
-     * @param departamento department/area (may be null)
+     * @param email         institutional email of the new user
+     * @param fullName      display name (firstName + lastNames)
+     * @param matricula     auto-generated unique academic ID
+     * @param username      login username
      * @param plainPassword plaintext password from the registration DTO (not yet erased)
      */
     public void notifyNewUserCredentials(String email, String fullName, String matricula,
-                                          String username, String plainPassword) {
+                                         String username, String plainPassword) {
         try {
             mailSender.sendHtml(
                     email,
@@ -69,37 +84,49 @@ public class NotificationService {
     // ── DFR §4.1 — Reservation creation ──────────────────────────────────────
 
     /**
-     * Notifies the owning Maestro and active administrators when a reservation is submitted (DFR §4.1).
+     * Notifies the owning teacher and all active administrators when a reservation
+     * is successfully created (DFR §4.1).
      *
-     * @param maestroEmail    email of the teacher who submitted the reservation
-     * @param maestroFullName display name of the teacher
-     * @param classroomName   name of the requested classroom
-     * @param date            reservation date
-     * @param adminEmails     list of active ADMIN email addresses to notify
+     * <p>Runs asynchronously on the {@code mail-} thread pool; failures are logged and
+     * never propagated.</p>
+     *
+     * @param dto event payload carrying all information needed for both email templates
      */
-    public void notifyReservationCreated(String maestroEmail, String maestroFullName,
-                                          String classroomName, LocalDate date,
-                                          List<String> adminEmails) {
+    @Async
+    public void notifyReservationCreated(ReservInstanceCreatedEventDTO dto) {
         try {
-            String dateStr = date.format(DATE_FMT);
-            String body = "<p>Se ha registrado una nueva reserva de aula:</p>"
-                    + "<ul>"
-                    + "<li><strong>Maestro/a:</strong> " + maestroFullName + "</li>"
-                    + "<li><strong>Aula:</strong> " + classroomName + "</li>"
-                    + "<li><strong>Fecha:</strong> " + dateStr + "</li>"
-                    + "<li><strong>Estado:</strong> ACTIVA (la reserva está confirmada)</li>"
-                    + "</ul>"
-                    + "<p>Ingresa al sistema para consultar o administrar la reserva.</p>";
+            String dateStr   = dto.date().format(DATE_FMT);
+            String horario   = scheduleBuilder(dto.startTime(), dto.endTime());
+            String idStr     = dto.reservationId().toString();
 
             // Notify the Maestro
-            mailSender.sendHtml(maestroEmail,
-                    "Tu reserva ha sido confirmada — " + classroomName + " · " + dateStr, body);
+            Context ctxUser = new Context();
+            ctxUser.setVariable("maestroNombre", dto.maestroFullName());
+            ctxUser.setVariable("aula",          dto.classroomName());
+            ctxUser.setVariable("fecha",         dateStr);
+            ctxUser.setVariable("horario",       horario);
+            ctxUser.setVariable("idReserva",     idStr);
+            ctxUser.setVariable("actividad",     "Reserva de aula");
+            String bodyUser = templateEngine.process("emails/reservation-created-user", ctxUser);
+            mailSender.sendHtml(
+                    dto.maestroEmail(),
+                    "Tu reserva ha sido confirmada — " + dto.classroomName() + " · " + dateStr,
+                    bodyUser);
 
             // Notify each active admin
-            for (String adminEmail : adminEmails) {
+            Context ctxAdmin = new Context();
+            ctxAdmin.setVariable("maestroNombre", dto.maestroFullName());
+            ctxAdmin.setVariable("aula",          dto.classroomName());
+            ctxAdmin.setVariable("fecha",         dateStr);
+            ctxAdmin.setVariable("horario",       horario);
+            ctxAdmin.setVariable("idReserva",     idStr);
+            ctxAdmin.setVariable("actividad",     "Reserva de aula");
+            String bodyAdmin = templateEngine.process("emails/reservation-created-admin", ctxAdmin);
+            for (String adminEmail : dto.adminEmails()) {
                 try {
                     mailSender.sendHtml(adminEmail,
-                            "[Aulas ICF] Nueva reserva registrada — " + dateStr, body);
+                            "[Aulas ICF] Nueva reserva registrada — " + dateStr,
+                            bodyAdmin);
                 } catch (Exception adminEx) {
                     log.warn("[NotificationService] Failed to notify admin {}: {}", adminEmail, adminEx.getMessage());
                 }
@@ -112,35 +139,120 @@ public class NotificationService {
     // ── DFR §4.3 — Reassignment ───────────────────────────────────────────────
 
     /**
-     * Notifies the owning Maestro when their reservation is reassigned (DFR §4.3).
+     * Notifies the owning teacher and all active administrators when a reservation
+     * is reassigned to a different classroom or time block (DFR §4.3).
      *
-     * @param maestroEmail     email of the teacher who owns the reservation
-     * @param maestroFullName  display name of the teacher
-     * @param date             reservation date
-     * @param oldClassroomName name of the original classroom (before reassignment)
-     * @param newClassroomName name of the new classroom (after reassignment)
+     * <p>Runs asynchronously on the {@code mail-} thread pool; failures are logged and
+     * never propagated.</p>
+     *
+     * @param dto event payload carrying all information needed for both email templates
      */
-    public void notifyReservationReassigned(String maestroEmail, String maestroFullName,
-                                             LocalDate date,
-                                             String oldClassroomName, String newClassroomName) {
+    @Async
+    public void notifyReservationReassigned(ReservInstanceReassignEventDTO dto) {
         try {
-            String dateStr = date.format(DATE_FMT);
+            String dateStr  = dto.date().format(DATE_FMT);
+            String schedule  = scheduleBuilder(dto.startTime(), dto.endTime());
+            String idStr    = dto.reservationId().toString();
+
+            // Notify the Maestro
+            Context ctxUser = new Context();
+            ctxUser.setVariable("maestroNombre",  dto.teacherFullName());
+            ctxUser.setVariable("aulaAnterior",   dto.oldClassroomName());
+            ctxUser.setVariable("aulaNueva",      dto.newClassroomName());
+            ctxUser.setVariable("fecha",          dateStr);
+            ctxUser.setVariable("horario",        schedule);
+            ctxUser.setVariable("idReserva",      idStr);
+            String bodyUser = templateEngine.process("emails/reservation-reassigned-user", ctxUser);
             mailSender.sendHtml(
-                    maestroEmail,
+                    dto.teacherEmail(),
                     "[Aulas ICF] Tu reserva del " + dateStr + " ha sido reasignada",
-                    "<p>Estimado/a <strong>" + maestroFullName + "</strong>,</p>"
-                    + "<p>El administrador ha realizado cambios en tu reserva del "
-                    + "<strong>" + dateStr + "</strong>:</p>"
-                    + "<ul>"
-                    + "<li><strong>Aula anterior:</strong> " + oldClassroomName + "</li>"
-                    + "<li><strong>Aula asignada:</strong> " + newClassroomName + "</li>"
-                    + "</ul>"
-                    + "<p>Ingresa al sistema para consultar el bloque de horario actualizado.</p>"
-                    + "<p>Si tienes alguna duda, comunícate con el administrador.</p>"
-            );
+                    bodyUser);
+
+            // Notify each active admin
+            Context ctxAdmin = new Context();
+            ctxAdmin.setVariable("maestroNombre",  dto.teacherFullName());
+            ctxAdmin.setVariable("aulaAnterior",   dto.oldClassroomName());
+            ctxAdmin.setVariable("aulaNueva",      dto.newClassroomName());
+            ctxAdmin.setVariable("fecha",          dateStr);
+            ctxAdmin.setVariable("horario",        schedule);
+            ctxAdmin.setVariable("idReserva",      idStr);
+            String bodyAdmin = templateEngine.process("emails/reservation-reassigned-admin", ctxAdmin);
+            for (String adminEmail : dto.adminEmails()) {
+                try {
+                    mailSender.sendHtml(adminEmail,
+                            "[Aulas ICF] Reserva reasignada — " + dateStr,
+                            bodyAdmin);
+                } catch (Exception adminEx) {
+                    log.warn("[NotificationService] Failed to notify admin {}: {}", adminEmail, adminEx.getMessage());
+                }
+            }
         } catch (Exception e) {
-            log.warn("[NotificationService] Failed to send reassignment notification to {}: {}",
-                    maestroEmail, e.getMessage());
+            log.warn("[NotificationService] Failed to send reassignment notifications: {}", e.getMessage());
         }
+    }
+
+    // ── DFR §4.4 — Cancellation ───────────────────────────────────────────────
+
+    /**
+     * Notifies the owning teacher and all active administrators when a reservation
+     * is cancelled (by the teacher or by an administrator).
+     *
+     * <p>Runs asynchronously on the {@code mail-} thread pool; failures are logged and
+     * never propagated.</p>
+     *
+     * @param dto event payload carrying all information needed for both email templates
+     */
+    @Async
+    public void notifyReservationCancelled(ReservInstanceCancelledEventDTO dto) {
+        try {
+            String dateStr      = dto.date().format(DATE_FMT);
+            String horario      = scheduleBuilder(dto.startTime(), dto.endTime());
+            String idStr        = dto.reservationId().toString();
+            String canceladaPor = dto.cancelledByAdmin() ? "Administrador" : "Usuario";
+
+            // Notify the Maestro
+            Context ctxUser = new Context();
+            ctxUser.setVariable("maestroNombre", dto.maestroFullName());
+            ctxUser.setVariable("aula",          dto.classroomName());
+            ctxUser.setVariable("fecha",         dateStr);
+            ctxUser.setVariable("horario",       horario);
+            ctxUser.setVariable("idReserva",     idStr);
+            ctxUser.setVariable("actividad",     "Reserva de aula");
+            ctxUser.setVariable("motivo",        dto.reason());
+            String bodyUser = templateEngine.process("emails/reservation-cancelled-user", ctxUser);
+            mailSender.sendHtml(
+                    dto.maestroEmail(),
+                    "[Aulas ICF] Tu reserva del " + dateStr + " ha sido cancelada",
+                    bodyUser);
+
+            // Notify each active admin
+            Context ctxAdmin = new Context();
+            ctxAdmin.setVariable("maestroNombre", dto.maestroFullName());
+            ctxAdmin.setVariable("aula",          dto.classroomName());
+            ctxAdmin.setVariable("fecha",         dateStr);
+            ctxAdmin.setVariable("horario",       horario);
+            ctxAdmin.setVariable("idReserva",     idStr);
+            ctxAdmin.setVariable("actividad",     "Reserva de aula");
+            ctxAdmin.setVariable("canceladaPor",  canceladaPor);
+            String bodyAdmin = templateEngine.process("emails/reservation-cancelled-admin", ctxAdmin);
+            for (String adminEmail : dto.adminEmails()) {
+                try {
+                    mailSender.sendHtml(adminEmail,
+                            "[Aulas ICF] Reserva cancelada — " + dateStr,
+                            bodyAdmin);
+                } catch (Exception adminEx) {
+                    log.warn("[NotificationService] Failed to notify admin {}: {}", adminEmail, adminEx.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[NotificationService] Failed to send cancellation notifications: {}", e.getMessage());
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private String scheduleBuilder(LocalTime start, LocalTime end) {
+        if (start == null || end == null) return "—";
+        return start.format(TIME_FMT) + " – " + end.format(TIME_FMT);
     }
 }
