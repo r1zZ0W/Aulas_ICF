@@ -14,7 +14,7 @@ const STRONG_PASSWORD_REGEX =
 const USERNAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,49}$/;
 
 /** Name/lastname rule (letters, spaces, hyphens). */
-const NAME_REGEX = /^[a-zA-ZÀ-ÿ '\-]{1,100}$/;
+const NAME_REGEX = /^[a-zA-ZÀ-ÿ '-]{1,100}$/;
 
 /**
  * Schema for validating user creation requests.
@@ -52,7 +52,7 @@ export const UserCreateSchema = z.object({
 });
 
 /**
- * Schema for admin-initiated user updates (no password field).
+ * Schema for admin-initiated user updates.
  * Maps to backend UserUpdateRequestDTO.
  */
 export const UserUpdateSchema = z.object({
@@ -71,6 +71,44 @@ export const UserUpdateSchema = z.object({
     .regex(USERNAME_REGEX, 'Solo letras, números, puntos, guiones y guiones bajos'),
   email: z.string().email('Correo electrónico no válido'),
   roleId: z.number().int().positive('El rol es requerido'),
+  password: z
+    .string()
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .max(128, 'La contraseña debe tener menos de 128 caracteres')
+    .optional()
+    .nullable(),
+});
+
+/**
+ * Schema for the authenticated user's profile update.
+ * Matches the backend PUT /api/v1/users/me contract.
+ */
+export const UserSelfEditSchema = z.object({
+  firstName: z
+    .string()
+    .min(1, 'El nombre es requerido')
+    .max(100, 'El nombre debe tener menos de 100 caracteres'),
+  lastNames: z
+    .string()
+    .min(1, 'Los apellidos son requeridos')
+    .max(100, 'Los apellidos deben tener menos de 100 caracteres'),
+  username: z
+    .string()
+    .min(3, 'El usuario debe tener al menos 3 caracteres')
+    .max(50, 'El usuario debe tener menos de 50 caracteres')
+    .regex(USERNAME_REGEX, 'Solo letras, números, puntos, guiones y guiones bajos'),
+  email: z.string().email('Correo electrónico no válido'),
+  extension: z
+    .string()
+    .max(20, 'La extensión debe tener menos de 20 caracteres')
+    .optional()
+    .nullable(),
+  password: z
+    .string()
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .max(128, 'La contraseña debe tener menos de 128 caracteres')
+    .optional()
+    .nullable(),
 });
 
 export default UserCreateSchema;

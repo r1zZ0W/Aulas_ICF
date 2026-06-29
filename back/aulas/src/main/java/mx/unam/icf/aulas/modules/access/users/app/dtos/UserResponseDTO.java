@@ -12,6 +12,7 @@ import java.util.UUID;
  * @param lastNames
  * @param username
  * @param email
+ * @param extension
  * @param roleName
  * @param createdAt
  */
@@ -22,6 +23,7 @@ public record UserResponseDTO(
         String lastNames,
         String username,
         String email,
+        String extension,
         String roleName,
         LocalDateTime createdAt
 ) {}

@@ -117,6 +117,18 @@ public class UserController implements ResponseHandler {
     }
 
     /**
+     * Returns the authenticated user's own profile.
+     * GET /api/v1/users/me
+     */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<UserResponseDTO>> me(
+            @AuthenticationPrincipal UserDetailsImp principal
+    ) {
+        return ok(userService.findByUuid(principal.getUuid()));
+    }
+
+    /**
      * Updates a user's profile information. Requires ADMIN role.
      * An administrator cannot modify their own role or active status (DFR §3.2).
      * PUT /api/v1/users/{uuid}
@@ -153,10 +165,11 @@ public class UserController implements ResponseHandler {
     }
 
     /**
-     * Allows the authenticated user to update their own username and/or password.
+     * Allows the authenticated user to update their own profile details.
      * PUT /api/v1/users/me
      */
     @PutMapping("/me")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<UserResponseDTO>> selfEdit(
             @Valid @RequestBody UserSelfEditRequestDTO dto,
             @AuthenticationPrincipal UserDetailsImp principal

@@ -14,6 +14,7 @@ export const UserResponseSchema = z.object({
   lastNames: z.string(),
   username: z.string(),
   email: z.string(),
+  extension: z.string().nullable().optional(),
   roleName: z.string(),
   createdAt: z.string(),
 });

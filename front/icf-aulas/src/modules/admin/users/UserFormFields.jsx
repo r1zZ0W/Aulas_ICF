@@ -66,6 +66,17 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
           required
         />
       ) : (
+        <Input
+          label="Nueva contraseña"
+          type="password"
+          value={form.password}
+          onChange={(e) => onField('password', e.target.value)}
+          placeholder="Dejar en blanco para no cambiar"
+          error={errors.password}
+        />
+      )}
+
+      {!isCreate && (
         <Select
           label="Estado"
           value={String(form.isActive)}

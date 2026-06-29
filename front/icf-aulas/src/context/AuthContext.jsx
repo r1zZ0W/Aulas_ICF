@@ -48,6 +48,23 @@ export function AuthProvider({ children }) {
     setSession({ ...sessionData, role: getRoleFromToken(sessionData.token) });
   }, []);
 
+  /**
+   * Updates the persisted session with a partial payload (e.g. name/email after profile edits).
+   * Token values are left untouched unless explicitly provided.
+   */
+  const updateSession = useCallback((sessionPatch) => {
+    Object.values(SESSION_KEYS).forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(sessionPatch, key) && sessionPatch[key] !== undefined) {
+        localStorage.setItem(key, sessionPatch[key]);
+      }
+    });
+    setSession((current) => ({
+      ...current,
+      ...sessionPatch,
+      role: getRoleFromToken(sessionPatch.token || current.token),
+    }));
+  }, []);
+
   /** Removes all session data from localStorage and resets React state. */
   const clearSession = useCallback(() => {
     Object.values(SESSION_KEYS).forEach((key) => localStorage.removeItem(key));
@@ -60,6 +77,7 @@ export function AuthProvider({ children }) {
         user: session,
         isAuthenticated: !!session.token,
         persistSession,
+        updateSession,
         clearSession,
       }}
     >
