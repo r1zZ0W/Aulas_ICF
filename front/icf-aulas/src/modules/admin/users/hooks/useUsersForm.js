@@ -15,7 +15,7 @@ export const EMPTY_CREATE = {
 
 export const EMPTY_UPDATE = {
   firstName: '', lastNames: '', username: '', email: '',
-  roleId: ''
+  roleId: '', password: ''
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -99,6 +99,7 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
         roles.find((r) => r.name.toUpperCase() === user.roleName?.toUpperCase())?.id ?? ''
       ),
       isActive: user.isActive,
+      password: '',
     });
     setFormErrors({});
   }
@@ -148,6 +149,7 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
       roleId: Number(editForm.roleId),
       isActive: editForm.isActive === 'true' || editForm.isActive === true,
       departamento: editForm.departamento || undefined,
+      password: editForm.password ? editForm.password : undefined,
     };
     const result = UserUpdateSchema.safeParse(payload);
     if (!result.success) {

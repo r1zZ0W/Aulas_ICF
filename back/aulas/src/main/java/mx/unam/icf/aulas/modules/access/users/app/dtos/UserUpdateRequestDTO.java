@@ -9,14 +9,16 @@ import jakarta.validation.constraints.Size;
 /**
  * Request payload for an administrator updating a user's profile.
  *
- * <p>All fields except {@code isActive} are required. The role can be changed
- * by providing a different {@code roleId}.</p>
+ * <p>All profile fields are required. Password is optional and, when present,
+ * will be re-hashed before saving. The role can be changed by providing a
+ * different {@code roleId}.</p>
  *
  * @param firstName first name of the user
  * @param lastNames last name(s) of the user
  * @param username  unique login username
  * @param email     unique email address
  * @param roleId    internal identifier of the role to assign
+ * @param password  optional new password for admin-managed accounts
  *
  * @author Ithera
  * @version 2.0
@@ -44,5 +46,8 @@ public record UserUpdateRequestDTO(
         String email,
 
         @NotNull(message = "Role is required")
-        Long roleId
+        Long roleId,
+
+        @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
+        String password
 ) {}

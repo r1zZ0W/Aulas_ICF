@@ -218,6 +218,9 @@ public class UserService {
         if (dto.email() != null)
             user.setEmail(dto.email());
 
+        if (dto.password() != null && !dto.password().isBlank())
+            user.setPasswordHash(passwordEncoder.encode(dto.password()));
+
         Role role = roleRepository.findById(dto.roleId())
             .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + dto.roleId()));
 
@@ -285,6 +288,12 @@ public class UserService {
         User user = userRepository.findByUuid(uuid)
             .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uuid));
 
+        if (dto.firstName() != null)
+            user.setFirstName(dto.firstName());
+
+        if (dto.lastNames() != null)
+            user.setLastNames(dto.lastNames());
+
         if (dto.username() != null && !dto.username().isBlank()) {
             if (!user.getUsername().equalsIgnoreCase(dto.username())
                     && userRepository.findByUsernameIgnoreCase(dto.username()).isPresent())
@@ -292,8 +301,22 @@ public class UserService {
             user.setUsername(dto.username());
         }
 
-        if (dto.password() != null && !dto.password().isBlank())
+        if (dto.email() != null && !dto.email().isBlank()) {
+            if (!user.getEmail().equalsIgnoreCase(dto.email())
+                    && userRepository.findByEmailIgnoreCase(dto.email()).isPresent())
+                throw new DomainException("Email is already registered: " + dto.email());
+            user.setEmail(dto.email());
+        }
+
+        if (dto.extension() != null)
+            user.setExtension(dto.extension().isBlank() ? null : dto.extension().trim());
+
+        if (dto.password() != null && !dto.password().isBlank()) {
+            if (!"ADMIN".equalsIgnoreCase(user.getRole().getName())) {
+                throw new DomainException("Only administrators can change passwords from this profile");
+            }
             user.setPasswordHash(passwordEncoder.encode(dto.password()));
+        }
 
         return userMapper.toDto(userRepository.save(user));
     }

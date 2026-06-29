@@ -12,6 +12,7 @@ import {
   UserResponseSchema,
   UserCreateSchema,
   UserUpdateSchema,
+  UserSelfEditSchema,
   UserStatsSchema,
   RoleResponseSchema,
   PagedResultSchema,
@@ -123,6 +124,45 @@ export async function updateUser(uuid, payload) {
       throw new Error(resolveErrorMessage(error, {
         409: 'Ya existe un usuario con ese correo o nombre de usuario.',
         403: 'No puedes modificar tu propia cuenta desde aquí.',
+      }));
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetches the authenticated user's own profile.
+ * GET /api/v1/users/me
+ *
+ * @returns {Promise<object>} Current user profile.
+ */
+export async function getMyProfile() {
+  try {
+    const { data } = await api.get('/api/v1/users/me');
+    return UserResponseSchema.parse(data.data ?? data);
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
+}
+
+/**
+ * Updates the authenticated user's own profile.
+ * PUT /api/v1/users/me
+ *
+ * @param {z.infer<typeof UserSelfEditSchema>} payload
+ * @returns {Promise<object>} Updated user profile.
+ */
+export async function updateMyProfile(payload) {
+  try {
+    const body = UserSelfEditSchema.parse(payload);
+    const { data } = await api.put('/api/v1/users/me', body);
+    return UserResponseSchema.parse(data.data ?? data);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw new Error(resolveErrorMessage(error, {
+        409: 'Ya existe un usuario con ese correo o nombre de usuario.',
+        403: 'No puedes cambiar tu contraseña desde este perfil.',
       }));
     }
     throw error;

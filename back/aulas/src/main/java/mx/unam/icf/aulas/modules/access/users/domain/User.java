@@ -59,6 +59,10 @@ public class User extends BaseEntity {
     @Column(name = "email", nullable = false, unique = true, length = 150)
     private String email;
 
+    /** Optional office extension used in the profile screen. */
+    @Column(name = "extension", length = 20)
+    private String extension;
+
     /** BCrypt hash of the user's password. Never exposed in API responses. */
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
