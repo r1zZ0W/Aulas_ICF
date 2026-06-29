@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.reservations.instances.infrastructure;
 
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -39,7 +40,7 @@ public interface ReservInstanceRepository extends JpaRepository<ReservInstance, 
      */
     @Override
     @EntityGraph(attributePaths = {"group", "group.user", "classroom"})
-    Page<ReservInstance> findAll(Pageable pageable);
+    Page<ReservInstance> findAll(@NonNull Pageable pageable);
 
     /**
      * Returns a page of reservation instances belonging to a given user, with associations

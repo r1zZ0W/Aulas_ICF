@@ -30,9 +30,12 @@ import java.util.UUID;
  * @param attendeeCount  expected number of attendees
  * @param timeSlots      ordered list of 30-minute blocks reserved for this instance
  * @param createdAt      timestamp when this record was created
+ * @param reassigned     {@code true} when an administrator has reassigned this instance
+ *                       to a different classroom and/or time-slot block; display hint for
+ *                       the "Reasignada" badge (status remains ACTIVE after reassignment)
  *
  * @author Ithera
- * @version 4.0
+ * @version 4.1
  */
 public record ReservInstanceResponseDTO(
         UUID uuid,
@@ -46,5 +49,6 @@ public record ReservInstanceResponseDTO(
         ReservInstanceStatus status,
         Integer attendeeCount,
         List<TimeSlotDTO> timeSlots,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        Boolean reassigned
 ) {}

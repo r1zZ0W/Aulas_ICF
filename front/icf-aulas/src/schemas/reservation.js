@@ -90,6 +90,12 @@ export const ReservInstanceResponseSchema = z.object({
   attendeeCount: z.number().int().min(0),
   timeSlots: z.array(TimeSlotSchema).default([]),
   createdAt: z.string().optional(),
+  /**
+   * Display hint set by the backend when an admin has reassigned this instance.
+   * The instance status remains ACTIVE after reassignment; this flag powers the
+   * "Reasignada" badge in the history table without an extra audit-log query.
+   */
+  reassigned: z.boolean().optional().default(false),
 })
 
 /**
@@ -101,7 +107,6 @@ export const BookingRequestSchema = z.object({
   attendeeCount: z.number().int().positive('El número de asistentes debe ser positivo').min(2),
   timeSlotIds: z.array(z.number().int()).min(1, 'Selecciona al menos un bloque de tiempo'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha: YYYY-MM-DD'),
-  repeatUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   daysOfWeek: z.array(DayOfWeekEnum).nullable().optional(),
 })
 

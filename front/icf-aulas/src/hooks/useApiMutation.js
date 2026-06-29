@@ -12,16 +12,19 @@ import { toast } from '../utils/toast.jsx';
 /**
  * Wraps `useMutation` with the standard CRUD lifecycle:
  * 1. Call `mutationFn`.
- * 2. On success: invalidate `invalidateKey`, show `successMessage`, call optional `onSuccess`.
+ * 2. On success: invalidate `invalidateKey` (one or many), show `successMessage`, call optional `onSuccess`.
  * 3. On error: show `toast.error(err.message)` (overridable via `options`).
  *
  * Returns the full `UseMutationResult` so consumers are unchanged.
  *
  * @param {object}   params
  * @param {Function} params.mutationFn       - API call to execute.
- * @param {unknown[]} [params.invalidateKey] - Base query key to invalidate on success.
- *                                             Covers all sub-keys (e.g. `['users']` covers
- *                                             `['users','list',…]` and `['users','stats']`).
+ * @param {unknown[] | unknown[][]} [params.invalidateKey]
+ *   Base query key (or list of keys) to invalidate on success.
+ *   Single key:  `['users']`              — covers `['users','list',…]`, `['users','stats']`, etc.
+ *   Multi-key:   `[['reservations','availability'], ['reservations','history']]`
+ *                — each sub-array is invalidated independently (surgical cache updates).
+ *   Backward-compatible: existing callers passing a flat array (single key) are unaffected.
  * @param {string}   [params.successMessage] - Toast text shown after a successful mutation.
  * @param {Function} [params.onSuccess]      - Extra callback invoked after invalidation.
  * @param {object}   [params.options]        - Any additional `useMutation` options;
@@ -41,7 +44,10 @@ export function useApiMutation({
     mutationFn,
     onSuccess: (data, variables, context) => {
       if (invalidateKey) {
-        queryClient.invalidateQueries({ queryKey: invalidateKey });
+        // Support both single key ['foo'] and multiple keys [['foo'], ['bar']]
+        const isMulti = Array.isArray(invalidateKey[0]);
+        const keys = isMulti ? invalidateKey : [invalidateKey];
+        keys.forEach(key => queryClient.invalidateQueries({ queryKey: key }));
       }
       if (successMessage) toast.success(successMessage);
       onSuccess?.(data, variables, context);

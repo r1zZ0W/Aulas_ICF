@@ -62,6 +62,19 @@ public class ReservInstance extends BaseEntity {
     @Column(name = "attendee_count", nullable = false)
     private Integer attendeeCount;
 
+    /**
+     * Whether this instance has been reassigned to a different classroom and/or
+     * time-slot block by an administrator.
+     *
+     * <p>Defaults to {@code false} on creation and set permanently to {@code true}
+     * by {@link mx.unam.icf.aulas.modules.reservations.instances.app.ReservInstanceService#reassign}
+     * so the frontend can display a contextual "Reasignada" badge without an N+1
+     * join against the audit log. The instance status remains {@link ReservInstanceStatus#ACTIVE}
+     * after reassignment; this flag is a display hint only.</p>
+     */
+    @Column(name = "reassigned", nullable = false)
+    private Boolean reassigned = false;
+
     /** Individual 30-minute time-slot bookings for this instance, ordered by start time. */
     @OneToMany(mappedBy = "instance", fetch = FetchType.LAZY)
     @OrderBy(value = "timeSlot.id ASC")

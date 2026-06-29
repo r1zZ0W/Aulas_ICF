@@ -16,6 +16,10 @@ import './DataTable.css';
  * @param {string}  [loadingMessage]      - Text shown in the full-page loader (first load only).
  * @param {React.ReactNode} [emptyState]  - Rendered when rows is empty and not loading.
  * @param {string}  [className='']
+ * @param {(row: any) => void} [onRowClick] - Optional click handler for table rows.
+ *   When provided, rows receive `cursor: pointer` and call this handler with the full
+ *   row object. The caller is responsible for keeping the row object intact (never
+ *   pass a truncated version — modals need the original `uuid` for mutations).
  */
 export default function DataTable({
   columns = [],
@@ -25,6 +29,7 @@ export default function DataTable({
   loadingMessage = 'Cargando…',
   emptyState,
   className = '',
+  onRowClick,
 }) {
   const hasRows = rows.length > 0;
 
@@ -51,7 +56,12 @@ export default function DataTable({
         {hasRows && (
           <tbody className="data-table__body">
             {rows.map((row) => (
-              <tr key={rowKey ? rowKey(row) : JSON.stringify(row)} className="data-table__row">
+              <tr
+                key={rowKey ? rowKey(row) : JSON.stringify(row)}
+                className={`data-table__row${onRowClick ? ' data-table__row--clickable' : ''}`}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                style={onRowClick ? { cursor: 'pointer' } : undefined}
+              >
                 {columns.map((col) => (
                   <td
                     key={col.key}

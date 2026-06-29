@@ -22,14 +22,18 @@
  * @type {string[]}
  */
 export const ROOM_COLORS = [
-  '#2563eb', // blue
-  '#16a34a', // green
-  '#9333ea', // purple
-  '#ea580c', // orange
-  '#f59e0b', // amber
-  '#0891b2', // cyan
-  '#db2777', // pink
-  '#65a30d', // lime
+  '#2563eb', // Royal Blue
+  '#16a34a', // Forest Green
+  '#9333ea', // Purple
+  '#ea580c', // Orange
+  '#06b6d4', // Cyan
+  '#db2777', // Pink
+  '#e11d48', // Rose
+  '#7c3aed', // Violet
+  '#0d9488', // Teal
+  '#ca8a04', // Yellow/Gold
+  '#4f46e5', // Indigo
+  '#0284c7', // Sky Blue
 ];
 
 /**
@@ -48,9 +52,9 @@ export const ROOM_COLORS = [
 export function roomColor(uuid) {
   if (!uuid) return ROOM_COLORS[0];
   let hash = 0;
-  for (let i = 0; i < uuid.length; i++) {
+  for (let i = 0; i < uuid.length; i++)
     hash = ((hash * 31) + uuid.charCodeAt(i)) >>> 0; // keep as unsigned 32-bit int
-  }
+
   return ROOM_COLORS[hash % ROOM_COLORS.length];
 }
 
@@ -80,11 +84,11 @@ export function roomColor(uuid) {
 export function buildRoomsFromClassrooms(classrooms = []) {
   return classrooms
     .filter(c => c.isActive)
-    .map(c => ({
+    .map((c, index) => ({
       uuid: c.uuid,
       label: c.name,
-      // Future: `c.color ?? roomColor(c.uuid)` once backend ships the color field.
-      color: roomColor(c.uuid),
+      // Assign sequential colors based on list index to guarantee no duplicates
+      color: ROOM_COLORS[index % ROOM_COLORS.length],
       capacity: c.capacity,
       type: c.type,
     }));

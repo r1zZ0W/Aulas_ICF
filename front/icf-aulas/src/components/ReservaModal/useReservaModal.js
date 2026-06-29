@@ -31,10 +31,10 @@ function sameDay(a, b) {
 }
 
 /** @param {number} h @param {number} m @returns {number} */
-function toMins(h, m) { return h * 60 + m; }
+const toMins = (h, m) => h * 60 + m;
 
 /** @param {number} h @param {number} m @returns {string} */
-function fmt(h, m) { return `${h}:${String(m).padStart(2, '0')}`; }
+const fmt = (h, m) => `${h}:${String(m).padStart(2, '0')}`;
 
 /**
  * Returns available start time slots for the given date.
@@ -169,6 +169,10 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     });
   };
 
+  /**
+   * Toggles a day of the week in the selected days array.
+   * @param {string} val - The day of the week to toggle (e.g., 'MON').
+   */
   const toggleDay = (val) => {
     setSelectedDays(prev =>
       prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val]
@@ -196,7 +200,6 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     Boolean(startLabel) &&
     Boolean(endLabel) &&
     Number(attendees) >= 1 &&
-    (!recurring || Boolean(repeatUntil)) &&
     (!recurring || selectedDays.length > 0) &&
     !createBookingMutation.isPending;
 

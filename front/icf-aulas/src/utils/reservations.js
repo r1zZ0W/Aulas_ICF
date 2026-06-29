@@ -1,5 +1,5 @@
 /**
- * @fileoverview Timezone-safe utilities for the reservations calendar.
+ * @fileoverview Timezone-safe utilities for the reservations calendar and history table.
  *
  * ## Why timezone matters
  * `new Date("2026-06-23")` parses as UTC midnight and can shift to the PREVIOUS evening
@@ -81,6 +81,61 @@ export function labelsToTimeSlotIds(catalog, startLabel, endLabel) {
       return slotStart >= startMins && slotEnd <= endMins;
     })
     .map(slot => slot.id);
+}
+
+// ── History table helpers ──────────────────────────────────────────────────────
+
+/**
+ * Derives a short cosmetic display ID from a reservation UUID.
+ *
+ * @example getShortId('a1b2c3d4-…') // → 'RE-A1B2C3D4'
+ *
+ * ⚠️  Cosmetic only — NOT a unique identifier.
+ * The first 8 characters of a UUID are not guaranteed to be unique across all
+ * reservations. Do NOT use this value for:
+ *  - Support tickets or manual lookups in the database (use the full `uuid`).
+ *  - Search or filter logic (the column does not exist on the backend).
+ *  - Passing to modal mutations (those always need the full `uuid`).
+ *
+ * @param {string} uuid - Public UUID of the reservation instance.
+ * @returns {string} e.g. "RE-A1B2C3D4"
+ */
+export function getShortId(uuid) {
+  if (!uuid) return '—';
+  return `RE-${uuid.substring(0, 8).toUpperCase()}`;
+}
+
+/**
+ * Formats a local Date as "H:MM" (no seconds, no leading zero on hour).
+ * Exported so both ReservaInfoModal and the history table share the same format.
+ *
+ * @param {Date|null} date
+ * @returns {string} e.g. "9:00" or "—" when date is null
+ */
+export function fmtTime(date) {
+  if (!date) return '—';
+  return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * Derives the badge variant and label for a reservation instance.
+ *
+ * Precedence (mirrors the Figma design; status takes priority over the reassigned flag):
+ *  1. CANCELLED_BY_USER or CANCELLED_BY_ADMIN  → danger  / "Cancelada"
+ *  2. reassigned === true (status still ACTIVE) → primary / "Reasignada"
+ *  3. Otherwise (ACTIVE, not reassigned)        → success / "Activa"
+ *
+ * @param {{ status: string, reassigned?: boolean }} reservation
+ * @returns {{ variant: 'success'|'danger'|'primary'|'neutral', label: string }}
+ */
+export function reservationBadge({ status, reassigned } = {}) {
+  if (status === 'CANCELLED_BY_USER' || status === 'CANCELLED_BY_ADMIN') {
+    return { variant: 'danger', label: 'Cancelada' };
+  }
+  if (reassigned) {
+    return { variant: 'primary', label: 'Reasignada' };
+  }
+  return { variant: 'success', label: 'Activa' };
 }
 
 /**

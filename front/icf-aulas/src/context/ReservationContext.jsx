@@ -135,45 +135,60 @@ export function ReservationProvider({ children }) {
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
+  // Segmented cache invalidation keys.
+  // Using specific sub-keys avoids flushing unrelated queries while ensuring
+  // both the calendar and the history table stay in sync after any mutation.
+  // Rationale for INVALIDATE_BOTH on cancel/reassign:
+  //   • Calendar  — freed/moved slots must no longer show as occupied.
+  //   • History   — badge must update in real time (Cancelada / Reasignada).
+  // createBooking only affects the calendar (new slot appears); the history
+  // query will pick up the new entry on its next natural refetch.
+  const INVALIDATE_CALENDAR = ['reservations', 'availability'];
+  const INVALIDATE_HISTORY  = ['reservations', 'history'];
+  const INVALIDATE_BOTH     = [INVALIDATE_CALENDAR, INVALIDATE_HISTORY];
+
   /**
    * Creates a booking (group + all instances) atomically.
-   * Invalidates ['reservations'] on success so the calendar refreshes.
+   * Invalidates the calendar availability cache so new slots appear immediately.
    */
   const createBookingMutation = useApiMutation({
     mutationFn:     createBooking,
-    invalidateKey:  ['reservations'],
+    invalidateKey:  [INVALIDATE_CALENDAR],
     successMessage: 'Reserva creada exitosamente',
   });
 
   /**
    * Cancels a reservation as the owning teacher.
+   * Invalidates calendar (freed slot) and history (badge → Cancelada) on success.
    * Closes the info modal on success.
    */
   const cancelReservationMutation = useApiMutation({
     mutationFn:     (uuid) => cancelReservation(uuid),
-    invalidateKey:  ['reservations'],
+    invalidateKey:  INVALIDATE_BOTH,
     successMessage: 'Reserva cancelada',
     onSuccess:      () => setInfoModalOpen(false),
   });
 
   /**
    * Cancels a reservation as an administrator.
+   * Invalidates calendar (freed slot) and history (badge → Cancelada) on success.
    * Closes the info modal on success.
    */
   const cancelReservationAdminMutation = useApiMutation({
     mutationFn:     (uuid) => cancelReservationAdmin(uuid),
-    invalidateKey:  ['reservations'],
+    invalidateKey:  INVALIDATE_BOTH,
     successMessage: 'Reserva cancelada por administrador',
     onSuccess:      () => setInfoModalOpen(false),
   });
 
   /**
    * Reassigns an active reservation. Called as `reassignMutation.mutate({ uuid, ...payload })`.
+   * Invalidates calendar (new slot location) and history (badge → Reasignada) on success.
    * Closes the reschedule modal on success.
    */
   const reassignMutation = useApiMutation({
     mutationFn:     ({ uuid, ...payload }) => reassignReservation(uuid, payload),
-    invalidateKey:  ['reservations'],
+    invalidateKey:  INVALIDATE_BOTH,
     successMessage: 'Reserva reasignada exitosamente',
     onSuccess:      () => setRescheduleOpen(false),
   });

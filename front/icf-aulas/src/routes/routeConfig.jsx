@@ -2,8 +2,9 @@ import { ROLES } from '../utils/roles';
 
 import ClassroomsPage from '../modules/shared/classrooms/ClassroomsPage';
 import ReservationsPage from '../modules/shared/reservations/ReservationsPage';
+import HistoryPage from '../modules/shared/reservations/HistoryPage';
 import UsersPage from '../modules/admin/users/UsersPage';
-import { Calendar, School, Users } from 'lucide-react';
+import { Calendar, ClipboardList, School, Users } from 'lucide-react';
 
 /**
  * Central declaration of every private route.
@@ -34,6 +35,12 @@ export const PRIVATE_ROUTES = [
     element: <ClassroomsPage />,
     allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
     sidebar: { label: 'Aulas', icon: <School />, show: true },
+  },
+  {
+    path: '/history',
+    element: <HistoryPage />,
+    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
+    sidebar: { label: 'Historial', icon: <ClipboardList />, show: true },
   },
   {
     path: '/users',

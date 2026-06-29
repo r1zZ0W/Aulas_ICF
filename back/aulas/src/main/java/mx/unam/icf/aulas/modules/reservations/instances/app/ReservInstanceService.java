@@ -36,13 +36,13 @@ import mx.unam.icf.aulas.modules.reservations.slots.domain.ReservSlotId;
 import mx.unam.icf.aulas.modules.reservations.slots.infrastructure.ReservSlotRepository;
 import mx.unam.icf.aulas.modules.resources.classrooms.domain.Classroom;
 import mx.unam.icf.aulas.modules.resources.classrooms.infrastructure.ClassroomRepository;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -164,17 +164,16 @@ public class ReservInstanceService {
      * No client-side loops; no partial saves on error.</p>
      *
      * <p>Business rules (enforced in order):</p>
-     * <ol>
-     *   <li>Classroom must be active.</li>
-     *   <li>A semester must be active for {@code startDate}.</li>
-     *   <li>{@code repeatUntil}, if set, must not exceed {@code semester.endDate} (400 if it does —
-     *       no silent truncation).</li>
-     *   <li>Every target date must not be in the past, not be a Sunday, and fall within the
-     *       semester window.</li>
-     *   <li>Two bulk conflict queries (total 2 SELECTs regardless of the number of dates):
-     *       one for classroom double-booking, one for user schedule conflicts. The first
-     *       conflict found is returned as a structured 409 payload.</li>
-     * </ol>
+      * <ol>
+      *   <li>Classroom must be active.</li>
+      *   <li>The requested {@code startDate} must not be after the currently active semester's end date.
+      *       Requests beyond the active semester are rejected (400) immediately.</li>
+      *   <li>Every target date must not be in the past, not be a Sunday, and fall within the
+      *       semester window.</li>
+      *   <li>Two bulk conflict queries (total 2 SELECTs regardless of the number of dates):
+      *       one for classroom double-booking, one for user schedule conflicts. The first
+      *       conflict found is returned as a structured 409 payload.</li>
+      * </ol>
      *
      * @param dto           atomic booking request
      * @param principalUuid public UUID of the authenticated user making the request
@@ -196,33 +195,28 @@ public class ReservInstanceService {
         User user = userRepository.findByUuid(principalUuid)
             .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found: " + principalUuid));
 
-        // 3. Resolve active semester for the start date
-        Semester semester = semesterRepository.findCurrent(dto.startDate())
-            .orElseThrow(() -> new DomainException(
-                "No active semester covers the requested start date " + dto.startDate()));
+        // 3. Ensure the requested start date does not exceed the currently active semester
+        Semester currentSemester = semesterRepository.findCurrent(LocalDate.now())
+            .orElseThrow(() -> new DomainException("No active semester available at this time"));
+
+        if (dto.startDate().isAfter(currentSemester.getEndDate()))
+            throw new DomainException("Requested start date " + dto.startDate() + " is after the active semester end date " + currentSemester.getEndDate());
 
         // 4. Resolve target weekdays
         Set<DayOfWeek> days = (dto.daysOfWeek() == null || dto.daysOfWeek().isEmpty())
             ? Set.of(dto.startDate().getDayOfWeek())
             : new HashSet<>(dto.daysOfWeek());
 
-        // 5. Strict overflow check — no silent truncation
-        if (dto.repeatUntil() != null && dto.repeatUntil().isAfter(semester.getEndDate()))
-            throw new DomainException(
-                "The recurrence end date " + dto.repeatUntil() +
-                " exceeds the semester period (" + semester.getStartDate() +
-                " – " + semester.getEndDate() + ")");
-
         // 6. Create and persist the group (owns all generated instances)
         ReservationGroup group = new ReservationGroup();
         group.setUser(user);
-        group.setSemester(semester);
+        group.setSemester(currentSemester);
         group.setDaysOfWeek(days);
         group.setStatus(ReservationGroupStatus.ACTIVE);
         group = groupRepository.save(group);
 
-        // 7. Build target dates in memory
-        LocalDate endDate = dto.repeatUntil() != null ? dto.repeatUntil() : dto.startDate();
+        // 7. Build target dates in memory — recurrence removed, only the startDate is considered
+        LocalDate endDate = currentSemester.getEndDate();
         List<LocalDate> targetDates = new ArrayList<>();
 
         for (LocalDate d = dto.startDate(); !d.isAfter(endDate); d = d.plusDays(1))
@@ -236,14 +230,14 @@ public class ReservInstanceService {
                 " for the specified weekdays");
 
         // 8. Load time slots (validate IDs exist)
-        List<TimeSlot> timeSlots = dto.timeSlotIds().stream()
-            .map(id -> timeSlotRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found: " + id)))
-            .toList();
+        List<TimeSlot> timeSlots = timeSlotRepository.findAllById(dto.timeSlotIds());
+        if (timeSlots.size() != dto.timeSlotIds().size())
+            throw new ResourceNotFoundException("One or more time slots were not found");
+
 
         // 9. Per-date in-memory validations (no DB round-trips here)
         LocalDate today    = LocalDate.now();
-        LocalTime nowTime  = LocalTime.now();
+        LocalTime nowTime  = LocalTime.now(ZoneId.of("America/Mexico_City"));
         for (LocalDate d : targetDates) {
             if (d.isBefore(today))
                 throw new DomainException("Date " + d + " is in the past");
@@ -251,10 +245,10 @@ public class ReservInstanceService {
             if (d.getDayOfWeek() == DayOfWeek.SUNDAY)
                 throw new DomainException("Reservations cannot be made on Sundays (date: " + d + ")");
 
-            if (d.isBefore(semester.getStartDate()) || d.isAfter(semester.getEndDate()))
+            if (d.isBefore(currentSemester.getStartDate()) || d.isAfter(currentSemester.getEndDate()))
                 throw new DomainException(
                     "Date " + d + " falls outside the semester period " +
-                    semester.getStartDate() + " – " + semester.getEndDate());
+                    currentSemester.getStartDate() + " – " + currentSemester.getEndDate());
 
             if (d.equals(today)) {
                 LocalTime cutoff = nowTime.plusMinutes(15);
@@ -637,6 +631,11 @@ public class ReservInstanceService {
                 slotRepository.save(slot);
             }
         }
+
+        // Permanently mark this instance as reassigned so the frontend can surface
+        // the contextual "Reasignada" badge without querying the audit log.
+        // The instance status stays ACTIVE — reassignment is a display hint only.
+        instance.setReassigned(true);
 
         ReservInstance saved = reservInstanceRepository.save(instance);
 

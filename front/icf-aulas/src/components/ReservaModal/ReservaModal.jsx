@@ -4,6 +4,7 @@ import Modal from '../Modal/Modal';
 import { typeLabel } from '../../schemas/classroom';
 import { useReservaModal, WEEKDAY_OPTIONS } from './useReservaModal';
 import './ReservaModal.css';
+import { toDateString } from '../../utils/reservations';
 
 const MONTHS_ES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -337,25 +338,6 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                       </button>
                     ))}
                   </div>
-                </div>
-
-                {/* Repeat-until date */}
-                <div className="reserva-modal__field">
-                  <label className="reserva-modal__label">Repetir hasta*</label>
-                  <input
-                    type="date"
-                    className="reserva-modal__input"
-                    value={repeatUntil}
-                    min={toDateString(forDate)}
-                    max={semesterEnd}
-                    onChange={e => setRepeatUntil(e.target.value)}
-                    required
-                  />
-                  {semesterEnd && (
-                    <span className="reserva-modal__hint">
-                      Máximo hasta el fin del semestre: {semesterEnd}
-                    </span>
-                  )}
                 </div>
               </>
             )}
