@@ -96,6 +96,8 @@ export const ReservInstanceResponseSchema = z.object({
    * "Reasignada" badge in the history table without an extra audit-log query.
    */
   reassigned: z.boolean().optional().default(false),
+  /** Free-form class/event label. null when not provided; never empty string (backend normalises). */
+  title: z.string().nullable().optional(),
 })
 
 /**
@@ -107,6 +109,10 @@ export const BookingRequestSchema = z.object({
   attendeeCount: z.number().int().positive('El número de asistentes debe ser positivo').min(2),
   timeSlotIds: z.array(z.number().int()).min(1, 'Selecciona al menos un bloque de tiempo'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha: YYYY-MM-DD'),
+  title: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().trim().max(150, 'Máximo 150 caracteres').optional()
+  ),
   daysOfWeek: z.array(DayOfWeekEnum).nullable().optional(),
 })
 

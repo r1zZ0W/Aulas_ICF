@@ -10,6 +10,7 @@ import mx.unam.icf.aulas.kernel.infrastructure.persistance.UuidBinaryConverter;
 import mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroup;
 import mx.unam.icf.aulas.modules.reservations.slots.domain.ReservSlot;
 import mx.unam.icf.aulas.modules.resources.classrooms.domain.Classroom;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -29,7 +30,13 @@ import java.util.UUID;
  * @see ReservSlot
  */
 @Entity
-@Table(name = "reserv_instances")
+@Table(name = "reserv_instances", indexes = {
+        @Index(name = "idx_reserv_instances_group_status", columnList = "group_id, status"),
+        // Covers ReportStatisticsRepository.countInstancesPerGroup's `status + date` range scan
+        // followed by GROUP BY group_id (recurrence donut/tasa on Reportes y Estadísticas).
+        // See docs/migration_v1.4__reports_status_date_group_index.sql for the manual DDL.
+        @Index(name = "idx_reserv_instances_status_date_group", columnList = "status, date, group_id")
+})
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 public class ReservInstance extends BaseEntity {
@@ -75,8 +82,34 @@ public class ReservInstance extends BaseEntity {
     @Column(name = "reassigned", nullable = false)
     private Boolean reassigned = false;
 
+    /**
+     * Optional free-text label for this reservation (e.g. "Programación I — parcial").
+     *
+     * <p>Nullable; when absent the frontend falls back to {@code classroomName} as the
+     * display text. Always stored as {@code NULL} (never as an empty string) — the
+     * {@link #setTitle(String)} setter normalizes blank input to {@code null}.</p>
+     */
+    @Column(name = "title", length = 150)
+    private String title;
+
+    /**
+     * Sets the title, normalizing blank or whitespace-only values to {@code null}.
+     *
+     * <p>Centralizing this invariant in the setter guarantees consistent state
+     * regardless of the caller (service, MapStruct, or tests), without relying on
+     * {@code @PrePersist}/{@code @PreUpdate} lifecycle callbacks whose execution
+     * timing under Hibernate's flush-mode can be unreliable.</p>
+     *
+     * @param title the raw value from the request; {@code null} and blank strings both
+     *              result in {@code null} being stored
+     */
+    public void setTitle(String title) {
+        this.title = (title == null || title.isBlank()) ? null : title.trim();
+    }
+
     /** Individual 30-minute time-slot bookings for this instance, ordered by start time. */
     @OneToMany(mappedBy = "instance", fetch = FetchType.LAZY)
     @OrderBy(value = "timeSlot.id ASC")
+    @BatchSize(size = 50)
     private List<ReservSlot> slots;
 }

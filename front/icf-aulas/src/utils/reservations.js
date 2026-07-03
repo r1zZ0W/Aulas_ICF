@@ -83,27 +83,28 @@ export function labelsToTimeSlotIds(catalog, startLabel, endLabel) {
     .map(slot => slot.id);
 }
 
-// ── History table helpers ──────────────────────────────────────────────────────
+// ── Past-reservation guard ────────────────────────────────────────────────────
 
 /**
- * Derives a short cosmetic display ID from a reservation UUID.
+ * Returns `true` when the reservation's end time has already passed.
  *
- * @example getShortId('a1b2c3d4-…') // → 'RE-A1B2C3D4'
+ * Uses the last time-slot's `endTime` combined with `date` to build a local-time
+ * Date, then compares against `Date.now()`. Returns `false` (i.e. still actionable)
+ * when the date or slots are missing, to avoid accidentally hiding buttons.
  *
- * ⚠️  Cosmetic only — NOT a unique identifier.
- * The first 8 characters of a UUID are not guaranteed to be unique across all
- * reservations. Do NOT use this value for:
- *  - Support tickets or manual lookups in the database (use the full `uuid`).
- *  - Search or filter logic (the column does not exist on the backend).
- *  - Passing to modal mutations (those always need the full `uuid`).
- *
- * @param {string} uuid - Public UUID of the reservation instance.
- * @returns {string} e.g. "RE-A1B2C3D4"
+ * @param {{ date: string, timeSlots: Array<{ endTime: string }> }} reservation
+ * @returns {boolean}
  */
-export function getShortId(uuid) {
-  if (!uuid) return '—';
-  return `RE-${uuid.substring(0, 8).toUpperCase()}`;
+export function isReservationPast(reservation) {
+  if (!reservation?.date || !reservation?.timeSlots?.length) return false;
+  const [year, month, day] = reservation.date.split('-').map(Number);
+  const last = reservation.timeSlots[reservation.timeSlots.length - 1];
+  const [lh, lm] = last.endTime.split(':').map(Number);
+  const endDate = new Date(year, month - 1, day, lh, lm);
+  return endDate < new Date();
 }
+
+// ── History table helpers ──────────────────────────────────────────────────────
 
 /**
  * Formats a local Date as "H:MM" (no seconds, no leading zero on hour).
@@ -149,9 +150,10 @@ export function reservationBadge({ status, reassigned } = {}) {
  */
 export function instanceToEvent(instance, color = '#64748b') {
   const { start, end } = slotsToRange(instance.date, instance.timeSlots);
+  const instanceTitle = instance.title ?? instance.classroomName;
   const title = instance.userFullName
-    ? `${instance.classroomName || '(Sin nombre)'} - ${instance.userFullName}`
-    : (instance.classroomName || '(Sin nombre)');
+    ? `${instanceTitle || '(Sin nombre)'} - ${instance.userFullName}`
+    : (instanceTitle || '(Sin nombre)');
   return {
     id:              instance.uuid,
     title,

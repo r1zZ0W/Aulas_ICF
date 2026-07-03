@@ -333,7 +333,7 @@ export default function ClassroomsPage() {
             page={page}
             totalPages={totalPages}
             onPageChange={setPage}
-            showing={classrooms.length}
+            pageSize={classrooms.length}
             total={totalElements}
             noun="aula"
             searchActive={!!search}

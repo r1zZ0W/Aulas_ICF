@@ -5,28 +5,29 @@ import lombok.extern.slf4j.Slf4j;
 import mx.unam.icf.aulas.kernel.domain.events.reservations.cancellations.ReservInstanceCancelledEventDTO;
 import mx.unam.icf.aulas.kernel.domain.events.reservations.creations.ReservInstanceCreatedEventDTO;
 import mx.unam.icf.aulas.kernel.domain.events.reservations.reassigns.ReservInstanceReassignEventDTO;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
+import java.util.List;
 
 /**
  * Best-effort notification service that renders HTML email templates via Thymeleaf
  * and delegates delivery to {@link MailSender}.
  *
- * <p>All public methods are annotated with {@code @Async} so they execute on the
- * bounded {@code mail-} thread pool defined in
- * {@link mx.unam.icf.aulas.kernel.infrastructure.config.AsyncConfig}.
- * Callers (event listeners) return immediately after the call, keeping HTTP
- * response latency independent of SMTP performance.</p>
+ * <p>The class focuses on orchestration only: it prepares template variables,
+ * renders the HTML bodies, and delegates recipient/date/time helper work to
+ * {@link NotificationEmailUtils}.</p>
  *
- * <p>All methods are best-effort: SMTP and template failures are caught and logged at
- * WARN level; they never propagate back to the caller or affect the business
- * transaction (which has already committed by the time these methods run).</p>
+ * <p>All public reservation-notification methods are annotated with {@code @Async}
+ * so they execute on the bounded {@code mail-} thread pool defined in
+ * {@link mx.unam.icf.aulas.kernel.infrastructure.config.AsyncConfig}. Callers
+ * return immediately, keeping HTTP latency independent of SMTP performance.</p>
+ *
+ * <p>Failures are best-effort: template and SMTP issues are caught and logged at
+ * WARN level, and they never propagate back to the business transaction.</p>
  *
  * <p>Template location: {@code classpath:/templates/emails/&lt;name&gt;.html}.
  * Variables are resolved by Thymeleaf using {@code th:text}, {@code th:if}, etc.</p>
@@ -39,13 +40,11 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class NotificationService {
 
-    private static final DateTimeFormatter DATE_FMT =
-            DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new Locale("es", "MX"));
-    private static final DateTimeFormatter TIME_FMT =
-            DateTimeFormatter.ofPattern("HH:mm");
-
     private final MailSender     mailSender;
     private final TemplateEngine templateEngine;
+
+    @Value("${app.notifications.super-admin-email:${app.seed.admin-email:}}")
+    private String superAdminEmail;
 
     // ── DFR §3.1 — User registration ─────────────────────────────────────────
 
@@ -95,8 +94,8 @@ public class NotificationService {
     @Async
     public void notifyReservationCreated(ReservInstanceCreatedEventDTO dto) {
         try {
-            String dateStr   = dto.date().format(DATE_FMT);
-            String horario   = scheduleBuilder(dto.startTime(), dto.endTime());
+            String dateStr   = NotificationEmailUtils.formatDate(dto.date());
+            String horario   = NotificationEmailUtils.formatSchedule(dto.startTime(), dto.endTime());
             String idStr     = dto.reservationId().toString();
 
             // Notify the Maestro
@@ -122,15 +121,11 @@ public class NotificationService {
             ctxAdmin.setVariable("idReserva",     idStr);
             ctxAdmin.setVariable("actividad",     "Reserva de aula");
             String bodyAdmin = templateEngine.process("emails/reservation-created-admin", ctxAdmin);
-            for (String adminEmail : dto.adminEmails()) {
-                try {
-                    mailSender.sendHtml(adminEmail,
-                            "[Aulas ICF] Nueva reserva registrada — " + dateStr,
-                            bodyAdmin);
-                } catch (Exception adminEx) {
-                    log.warn("[NotificationService] Failed to notify admin {}: {}", adminEmail, adminEx.getMessage());
-                }
-            }
+            sendAdminNotification(
+                    "Sistema de reserva de aulas — Nueva reserva registrada — " + dateStr,
+                    bodyAdmin,
+                    dto.adminEmails()
+            );
         } catch (Exception e) {
             log.warn("[NotificationService] Failed to send reservation-created notifications: {}", e.getMessage());
         }
@@ -150,8 +145,8 @@ public class NotificationService {
     @Async
     public void notifyReservationReassigned(ReservInstanceReassignEventDTO dto) {
         try {
-            String dateStr  = dto.date().format(DATE_FMT);
-            String schedule  = scheduleBuilder(dto.startTime(), dto.endTime());
+            String dateStr  = NotificationEmailUtils.formatDate(dto.date());
+            String schedule  = NotificationEmailUtils.formatSchedule(dto.startTime(), dto.endTime());
             String idStr    = dto.reservationId().toString();
 
             // Notify the Maestro
@@ -165,7 +160,7 @@ public class NotificationService {
             String bodyUser = templateEngine.process("emails/reservation-reassigned-user", ctxUser);
             mailSender.sendHtml(
                     dto.teacherEmail(),
-                    "[Aulas ICF] Tu reserva del " + dateStr + " ha sido reasignada",
+                    "Sistema de reserva de aulas — Tu reserva del " + dateStr + " ha sido reasignada",
                     bodyUser);
 
             // Notify each active admin
@@ -177,15 +172,11 @@ public class NotificationService {
             ctxAdmin.setVariable("horario",        schedule);
             ctxAdmin.setVariable("idReserva",      idStr);
             String bodyAdmin = templateEngine.process("emails/reservation-reassigned-admin", ctxAdmin);
-            for (String adminEmail : dto.adminEmails()) {
-                try {
-                    mailSender.sendHtml(adminEmail,
-                            "[Aulas ICF] Reserva reasignada — " + dateStr,
-                            bodyAdmin);
-                } catch (Exception adminEx) {
-                    log.warn("[NotificationService] Failed to notify admin {}: {}", adminEmail, adminEx.getMessage());
-                }
-            }
+            sendAdminNotification(
+                    "Sistema de reserva de aulas — Reserva reasignada — " + dateStr,
+                    bodyAdmin,
+                    dto.adminEmails()
+            );
         } catch (Exception e) {
             log.warn("[NotificationService] Failed to send reassignment notifications: {}", e.getMessage());
         }
@@ -205,8 +196,8 @@ public class NotificationService {
     @Async
     public void notifyReservationCancelled(ReservInstanceCancelledEventDTO dto) {
         try {
-            String dateStr      = dto.date().format(DATE_FMT);
-            String horario      = scheduleBuilder(dto.startTime(), dto.endTime());
+            String dateStr      = NotificationEmailUtils.formatDate(dto.date());
+            String horario      = NotificationEmailUtils.formatSchedule(dto.startTime(), dto.endTime());
             String idStr        = dto.reservationId().toString();
             String canceladaPor = dto.cancelledByAdmin() ? "Administrador" : "Usuario";
 
@@ -222,7 +213,7 @@ public class NotificationService {
             String bodyUser = templateEngine.process("emails/reservation-cancelled-user", ctxUser);
             mailSender.sendHtml(
                     dto.maestroEmail(),
-                    "[Aulas ICF] Tu reserva del " + dateStr + " ha sido cancelada",
+                    "Sistema de reserva de aulas — Tu reserva del " + dateStr + " ha sido cancelada",
                     bodyUser);
 
             // Notify each active admin
@@ -235,15 +226,11 @@ public class NotificationService {
             ctxAdmin.setVariable("actividad",     "Reserva de aula");
             ctxAdmin.setVariable("canceladaPor",  canceladaPor);
             String bodyAdmin = templateEngine.process("emails/reservation-cancelled-admin", ctxAdmin);
-            for (String adminEmail : dto.adminEmails()) {
-                try {
-                    mailSender.sendHtml(adminEmail,
-                            "[Aulas ICF] Reserva cancelada — " + dateStr,
-                            bodyAdmin);
-                } catch (Exception adminEx) {
-                    log.warn("[NotificationService] Failed to notify admin {}: {}", adminEmail, adminEx.getMessage());
-                }
-            }
+            sendAdminNotification(
+                    "Sistema de reserva de aulas — Reserva cancelada — " + dateStr,
+                    bodyAdmin,
+                    dto.adminEmails()
+            );
         } catch (Exception e) {
             log.warn("[NotificationService] Failed to send cancellation notifications: {}", e.getMessage());
         }
@@ -251,8 +238,25 @@ public class NotificationService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private String scheduleBuilder(LocalTime start, LocalTime end) {
-        if (start == null || end == null) return "—";
-        return start.format(TIME_FMT) + " – " + end.format(TIME_FMT);
+    /**
+     * Dispatches a single consolidated HTML notification to the administrator group.
+     *
+     * <p>The configured super-admin mailbox is used as the primary recipient and the
+     * remaining administrator addresses are added as CC recipients.</p>
+     *
+     * @param subject email subject line
+     * @param body pre-rendered HTML content body
+     * @param adminEmails list of administrator email addresses from the event payload
+     */
+    private void sendAdminNotification(String subject, String body, List<String> adminEmails) {
+        String primaryRecipient = NotificationEmailUtils.resolvePrimaryAdminRecipient(superAdminEmail, adminEmails);
+        if (primaryRecipient == null || primaryRecipient.isBlank()) {
+            log.warn("[NotificationService] No admin recipient available to send notification: {}", subject);
+            return;
+        }
+
+        List<String> bccRecipients = NotificationEmailUtils.buildCcRecipients(primaryRecipient, adminEmails);
+        mailSender.sendHtml(primaryRecipient, subject, body, bccRecipients);
     }
+
 }

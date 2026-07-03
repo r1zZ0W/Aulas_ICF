@@ -33,9 +33,13 @@ import java.util.UUID;
  * @param reassigned     {@code true} when an administrator has reassigned this instance
  *                       to a different classroom and/or time-slot block; display hint for
  *                       the "Reasignada" badge (status remains ACTIVE after reassignment)
+ * @param title          optional free-text label for this reservation
+ *                       (e.g. "Programación I — parcial"); {@code null} when not provided —
+ *                       the frontend should fall back to {@code classroomName} in that case.
+ *                       Never an empty string (normalized to {@code null} on write).
  *
  * @author Ithera
- * @version 4.1
+ * @version 4.2
  */
 public record ReservInstanceResponseDTO(
         UUID uuid,
@@ -50,5 +54,6 @@ public record ReservInstanceResponseDTO(
         Integer attendeeCount,
         List<TimeSlotDTO> timeSlots,
         LocalDateTime createdAt,
-        Boolean reassigned
+        Boolean reassigned,
+        String title
 ) {}

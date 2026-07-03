@@ -31,11 +31,13 @@ export default function Sidebar() {
 
   return (
     <>
-      {loggingOut && <LoadingOverlay label="Cerrando sesión..." />}
       <aside className="sidebar">
+        {loggingOut && <LoadingOverlay label="Cerrando sesión..." />}
         {/* Brand */}
         <div className="sidebar__brand">
-          <img src={aulasHeader} alt="ICF Aulas" className="sidebar__logo" />
+          <NavLink to="/reservations" className="sidebar__link">
+            <img src={aulasHeader} alt="ICF Aulas" className="sidebar__logo" />
+          </NavLink>
         </div>
 
         {/* Nav */}

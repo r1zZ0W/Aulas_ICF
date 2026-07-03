@@ -21,9 +21,13 @@ import java.util.UUID;
  * @param date          reservation date; must not be in the past
  * @param timeSlotIds   ordered list of 30-minute slot IDs (1–24, covering 07:00–19:00)
  * @param attendeeCount expected number of attendees
+ * @param title         optional free-text label for this reservation; max 150 characters.
+ *                      The frontend must {@code .trim()} the value before sending —
+ *                      {@code @Size} validates the raw string, so 151 spaces would be
+ *                      rejected with 400. The backend normalises blank/empty to {@code null}.
  *
  * @author Ithera
- * @version 2.0
+ * @version 2.1
  */
 public record ReservInstanceRequestDTO(
 
@@ -42,5 +46,8 @@ public record ReservInstanceRequestDTO(
 
         @NotNull(message = "Number of attendees is required")
         @Positive(message = "Number of attendees must be positive")
-        Integer attendeeCount
+        Integer attendeeCount,
+
+        @Size(max = 150, message = "Title must not exceed 150 characters")
+        String title
 ) {}

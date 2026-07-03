@@ -43,14 +43,12 @@ const fmt = (h, m) => `${h}:${String(m).padStart(2, '0')}`;
 export function getStartSlots(date) {
   const now = new Date();
   const isToday = sameDay(date, now);
-  const nowMins = isToday
-    ? now.getHours() * 60 + (now.getMinutes() >= 30 ? 30 : 0)
-    : -1;
+  const nowMins = now.getHours() * 60 + now.getMinutes();
   const slots = [];
   for (let h = 7; h <= 19; h++) {
     for (let m = 0; m < 60; m += 30) {
       if (h === 19 && m === 30) continue;
-      if (toMins(h, m) <= nowMins) continue;
+      if (isToday && toMins(h, m) - nowMins <= 15) continue;
       slots.push({ h, m, label: fmt(h, m) });
     }
   }
@@ -217,6 +215,7 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
       attendeeCount: Number(attendees),
       timeSlotIds,
       startDate: toDateString(forDate),
+      title: className,
       ...(recurring && repeatUntil ? { repeatUntil } : {}),
       ...(recurring && selectedDays.length > 0 ? { daysOfWeek: selectedDays } : {}),
     };

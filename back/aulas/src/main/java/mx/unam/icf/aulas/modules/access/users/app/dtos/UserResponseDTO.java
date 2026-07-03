@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 public record UserResponseDTO(
         UUID uuid,
-        String matricula,
+        String institutionalId,
         String firstName,
         String lastNames,
         String username,

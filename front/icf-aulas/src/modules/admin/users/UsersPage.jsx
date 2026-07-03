@@ -201,7 +201,7 @@ export default function UsersPage() {
             page={page}
             totalPages={totalPages}
             onPageChange={setPage}
-            showing={users.length}
+            pageSize={users.length}
             total={totalElements}
             noun="usuario"
             searchActive={!!searchInput}

@@ -2,11 +2,8 @@ package mx.unam.icf.aulas.modules.reservations.instances.infrastructure;
 
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
-import org.jspecify.annotations.NonNull;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +16,13 @@ import java.util.UUID;
 /**
  * Spring Data repository for {@link ReservInstance} persistence and availability queries.
  *
+ * <p>Server-side filtering for the listing endpoints is handled via
+ * {@link ReservInstanceSpecification} and {@link JpaSpecificationExecutor}.
+ * Eager loading of {@code group}, {@code group.user}, and {@code classroom} for those
+ * queries is managed inside the specification itself (fetch joins on content queries,
+ * plain joins on count queries). The {@code slots} collection is loaded lazily in batches
+ * via {@code @BatchSize} on the entity.</p>
+ *
  * <p>Conflict detection ({@link #existsConflict}, {@link #existsConflictExcluding},
  * {@link #existsUserConflict}, {@link #existsUserConflictExcluding}) operates directly
  * on {@code ReservSlot} rows without a status predicate, because cancelled reservations
@@ -27,33 +31,13 @@ import java.util.UUID;
  * {@code uk_reserv_slots_user_time}.</p>
  *
  * @author Ithera
- * @version 3.0
+ * @version 4.0
  */
-public interface ReservInstanceRepository extends JpaRepository<ReservInstance, Long> {
+public interface ReservInstanceRepository
+        extends JpaRepository<ReservInstance, Long>, JpaSpecificationExecutor<ReservInstance> {
 
     /** Finds a reservation instance by its public UUID. */
     Optional<ReservInstance> findByUuid(UUID uuid);
-
-    /**
-     * Returns a page of all reservation instances with associations eagerly loaded.
-     * Used by the paginated admin listing endpoint.
-     */
-    @Override
-    @EntityGraph(attributePaths = {"group", "group.user", "classroom"})
-    Page<ReservInstance> findAll(@NonNull Pageable pageable);
-
-    /**
-     * Returns a page of reservation instances belonging to a given user, with associations
-     * eagerly loaded. A {@code countQuery} is required because the JOIN traversal would
-     * produce incorrect counts without it when Spring Data derives the count query automatically.
-     *
-     * @param userUuid public UUID of the owning user
-     * @param pageable pagination and sort criteria
-     */
-    @EntityGraph(attributePaths = {"group", "group.user", "classroom"})
-    @Query(value = "SELECT ri FROM ReservInstance ri WHERE ri.group.user.uuid = :userUuid",
-           countQuery = "SELECT COUNT(ri) FROM ReservInstance ri WHERE ri.group.user.uuid = :userUuid")
-    Page<ReservInstance> findByUserUuid(@Param("userUuid") UUID userUuid, Pageable pageable);
 
     /**
      * Returns active reservation instances for a specific classroom within a date range,
@@ -243,4 +227,37 @@ public interface ReservInstanceRepository extends JpaRepository<ReservInstance, 
      * @return {@code true} if at least one instance remains in the group
      */
     boolean existsByGroup_Id(Long groupId);
+
+    /**
+     * Returns every instance of a reservation group with classroom and slots eagerly
+     * joined, ordered by date ascending. Used by {@code StudentListService} to resolve
+     * classroom name and time block for the admin-notification event once the group's
+     * student roster is confirmed — the notification is deliberately deferred from
+     * booking time (see {@link mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroupStatus#PENDING_ROSTER}),
+     * so the data captured during {@code createBooking} is no longer in scope and must
+     * be re-resolved from the group's UUID.
+     *
+     * @param groupUuid public UUID of the reservation group
+     * @return instances ordered by date ASC; empty if the group has no instances
+     */
+    @Query("SELECT DISTINCT ri FROM ReservInstance ri " +
+           "JOIN FETCH ri.classroom c " +
+           "LEFT JOIN FETCH ri.slots s " +
+           "LEFT JOIN FETCH s.timeSlot ts " +
+           "WHERE ri.group.uuid = :groupUuid " +
+           "ORDER BY ri.date ASC")
+    List<ReservInstance> findByGroupUuidOrderByDateAsc(@Param("groupUuid") UUID groupUuid);
+
+    /**
+     * Bulk-deletes all reservation instances belonging to the given group.
+     * Used by {@code StudentRosterCleanupJob} to reap abandoned
+     * {@code PENDING_ROSTER} groups; must run <em>after</em> their {@code ReservSlot}
+     * rows have been removed (child before parent) and <em>before</em> the group itself
+     * is deleted.
+     *
+     * @param groupId internal database PK of the group (not the public UUID)
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM ReservInstance ri WHERE ri.group.id = :groupId")
+    void deleteAllByGroupId(@Param("groupId") Long groupId);
 }

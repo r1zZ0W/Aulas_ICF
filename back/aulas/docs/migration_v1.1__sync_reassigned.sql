@@ -6,6 +6,7 @@
 -- v1.1 adds a denormalized `reassigned` boolean column to
 -- `reserv_instances` so the frontend can display the contextual
 -- "Reasignada" badge without an N+1 join against `reservation_history`.
+-- Script location: back/aulas/docs/migration_v1.1__sync_reassigned.sql
 --
 -- When ddl-auto=update (dev) Hibernate creates the column automatically.
 -- In production (ddl-auto=validate) run this script manually BEFORE

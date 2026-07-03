@@ -2,9 +2,19 @@ import { Search } from "lucide-react";
 import Icon from "../Icon/Icon";
 import "./Buscador.css";
 
-export default function Buscador({ value, onChange, placeholder = "Buscar...", ...props }) {
+export default function Buscador({
+  value,
+  onChange,
+  placeholder = "Buscar...",
+  className = "",
+  style,
+  ...props
+}) {
   return (
-    <div className="buscador position-relative d-flex align-items-center w-100">
+    <div
+      className={`buscador position-relative d-flex align-items-center w-100 ${className}`.trim()}
+      style={style}
+    >
       <span
         className="buscador__icon position-absolute top-50 start-0 translate-middle-y ms-3 d-flex align-items-center justify-content-center"
         aria-hidden

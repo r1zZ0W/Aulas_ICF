@@ -34,6 +34,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SemesterService {
 
+    /**
+     * Maximum allowed semester duration, in calendar months. Guards against absurd date ranges
+     * (e.g., a multi-year "semester" from a data-entry mistake) that would otherwise silently
+     * distort period-based reporting — see
+     * {@link mx.unam.icf.aulas.modules.reports.app.StatisticsPeriodResolver}, whose semester
+     * scope derives {@code [from, to]} directly from these dates with no range cap of its own.
+     */
+    private static final int MAX_SEMESTER_MONTHS = 12;
+
     private final SemesterRepository repository;
     private final SemesterMapper mapper;
 
@@ -132,6 +141,9 @@ public class SemesterService {
      * <p>Rules applied in all cases:</p>
      * <ul>
      *   <li>{@code endDate} must be strictly after {@code startDate}.</li>
+     *   <li>{@code endDate} must not exceed {@code startDate + }{@value #MAX_SEMESTER_MONTHS}
+     *       {@code months} — applied on both create and update (including edits to an already
+     *       concluded semester) so a semester can never be widened into a multi-year range.</li>
      * </ul>
      *
      * <p>Additional rules on <strong>create</strong>:</p>
@@ -163,6 +175,10 @@ public class SemesterService {
                                boolean isCreate, LocalDate currentEnd, LocalDate today) {
         if (!end.isAfter(start))
             throw new DomainException("End date must be strictly after start date");
+
+        if (end.isAfter(start.plusMonths(MAX_SEMESTER_MONTHS)))
+            throw new DomainException(
+                    "Semester duration cannot exceed " + MAX_SEMESTER_MONTHS + " months");
 
         if (isCreate) {
             if (start.isBefore(today))

@@ -20,7 +20,12 @@ import { useDebouncedValue } from './useDebouncedValue';
 
 /**
  * @param {object}  [opts={}]
- * @param {number}  [opts.debounce=300] - Debounce delay for the search input in ms.
+ * @param {number}  [opts.debounce=300]        - Debounce delay for the search input in ms.
+ * @param {number}  [opts.minSearchLength=0]   - Minimum characters before writing to the URL.
+ *   - 0 (default): every non-empty debounced value is written → retrocompatible.
+ *   - N > 0: values shorter than N are NOT written; the URL (and thus the API query)
+ *     stays frozen at its previous value until the user reaches N chars or clears to 0.
+ *     This prevents the "ghost data" effect where 1-2 characters trigger a massive fetch.
  * @returns {{
  *   searchInput:    string,
  *   setSearchInput: (value: string) => void,
@@ -29,7 +34,7 @@ import { useDebouncedValue } from './useDebouncedValue';
  *   setPage:        (page: number) => void,
  * }}
  */
-export function usePagination({ debounce = 300 } = {}) {
+export function usePagination({ debounce = 300, minSearchLength = 0 } = {}) {
   const [params, setParams] = useSearchParams();
 
   // Read initial values from the URL so a hard refresh restores context.
@@ -39,8 +44,8 @@ export function usePagination({ debounce = 300 } = {}) {
   // Local input value — updates immediately on each keystroke for snappy UI.
   const [searchInput, setSearchInputState] = useState(urlSearch);
 
-  // Debounced value — written to the URL and used as the API query key.
-  const search = useDebouncedValue(searchInput, debounce);
+  // Debounced input — decides when to write the search term to the URL.
+  const debouncedInput = useDebouncedValue(searchInput, debounce);
 
   // Skip the initial effect run so we don't overwrite the URL on mount.
   const isMounted = useRef(false);
@@ -50,17 +55,21 @@ export function usePagination({ debounce = 300 } = {}) {
       isMounted.current = true;
       return;
     }
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (search) next.set('search', search);
-        else next.delete('search');
-        next.delete('page'); // reset to page 0 whenever the search term changes
-        return next;
-      },
-      { replace: true } // don't pollute the browser history on every keystroke
-    );
-  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+    const len = debouncedInput.trim().length;
+    if (len === 0 || len >= minSearchLength) {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (debouncedInput) next.set('search', debouncedInput);
+          else next.delete('search');
+          next.delete('page'); // reset to page 0 whenever the applied search changes
+          return next;
+        },
+        { replace: true } // don't pollute browser history on every keystroke
+      );
+    }
+    // 0 < len < minSearchLength → do nothing; URL stays frozen at previous value
+  }, [debouncedInput]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function setSearchInput(value) {
     setSearchInputState(value);
@@ -78,5 +87,8 @@ export function usePagination({ debounce = 300 } = {}) {
     );
   }
 
-  return { searchInput, setSearchInput, search, page: urlPage, setPage };
+  // search = the URL-applied value (what the API is actually querying).
+  // When minSearchLength > 0 and input is in the "limbo" range (1..N-1),
+  // this returns the last applied value so React Query keeps its cache intact.
+  return { searchInput, setSearchInput, search: urlSearch, page: urlPage, setPage };
 }

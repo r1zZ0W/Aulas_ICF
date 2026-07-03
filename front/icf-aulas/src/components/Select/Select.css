@@ -65,6 +65,7 @@
 }
 
 .select-wrap__value {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -144,6 +145,7 @@
 }
 
 .select-wrap__option-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -5,7 +5,8 @@ import ReservationsPage from '../modules/shared/reservations/ReservationsPage';
 import HistoryPage from '../modules/shared/reservations/HistoryPage';
 import ProfilePage from '../modules/shared/profile/ProfilePage';
 import UsersPage from '../modules/admin/users/UsersPage';
-import { Calendar, ClipboardList, School, UserRound, Users } from 'lucide-react';
+import ReportsPage from '../modules/admin/reports/ReportsPage';
+import { BarChart3, Calendar, ClipboardList, School, UserRound, Users } from 'lucide-react';
 
 /**
  * Central declaration of every private route.
@@ -32,12 +33,6 @@ export const PRIVATE_ROUTES = [
     sidebar: { label: 'Reservaciones', icon: <Calendar />, show: true },
   },
   {
-    path: '/profile',
-    element: <ProfilePage />,
-    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
-    sidebar: { label: 'Mi perfil', icon: <UserRound />, show: true },
-  },
-  {
     path: '/classrooms',
     element: <ClassroomsPage />,
     allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
@@ -54,5 +49,17 @@ export const PRIVATE_ROUTES = [
     element: <UsersPage />,
     allowedRoles: [ROLES.ADMIN],
     sidebar: { label: 'Usuarios', icon: <Users />, show: true },
-  }
+  },
+  {
+    path: '/reports',
+    element: <ReportsPage />,
+    allowedRoles: [ROLES.ADMIN],
+    sidebar: { label: 'Reportes y Estadísticas', icon: <BarChart3 />, show: true },
+  },
+  {
+    path: '/profile',
+    element: <ProfilePage />,
+    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
+    sidebar: { label: 'Mi perfil', icon: <UserRound />, show: true },
+  },
 ];

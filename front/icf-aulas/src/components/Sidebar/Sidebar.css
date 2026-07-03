@@ -20,6 +20,7 @@
   justify-content: center;
   gap: 10px;
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .sidebar__logo {

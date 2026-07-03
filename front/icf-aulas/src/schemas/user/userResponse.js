@@ -9,7 +9,7 @@ import { z } from 'zod';
  */
 export const UserResponseSchema = z.object({
   uuid: z.string(),
-  matricula: z.string().nullable().optional(),
+  institutionalId: z.string().nullable().optional(),
   firstName: z.string(),
   lastNames: z.string(),
   username: z.string(),

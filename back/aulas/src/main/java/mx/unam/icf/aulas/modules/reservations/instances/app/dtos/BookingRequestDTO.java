@@ -4,7 +4,7 @@ import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-// ...existing imports...
+import jakarta.validation.constraints.Size;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -29,9 +29,14 @@ import java.util.UUID;
  * @param daysOfWeek     optional weekdays hint; when provided the request is validated
  *                       against the weekday(s) but only the single {@code startDate}
  *                       is considered for booking
+ * @param title          optional free-text label for this reservation
+ *                       (e.g. "Programación I — parcial"); max 150 characters.
+ *                       The frontend must {@code .trim()} the value before sending —
+ *                       {@code @Size} validates the raw string, so 151 spaces would be
+ *                       rejected with 400. The backend normalises blank/empty to {@code null}.
  *
  * @author Ithera
- * @version 1.0
+ * @version 1.1
  */
 public record BookingRequestDTO(
 
@@ -54,5 +59,8 @@ public record BookingRequestDTO(
          * When provided, the request is only accepted if {@code startDate}'s weekday
          * is included or when it matches one of the provided days (single-date booking).
          */
-        List<DayOfWeek> daysOfWeek
+        List<DayOfWeek> daysOfWeek,
+
+        @Size(max = 150, message = "Title must not exceed 150 characters")
+        String title
 ) {}

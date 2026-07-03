@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../utils/roles';
 import { useReservation } from '../../context/ReservationContext';
 import { typeLabel } from '../../schemas/classroom';
-import { slotsToRange } from '../../utils/reservations';
+import { slotsToRange, isReservationPast } from '../../utils/reservations';
 import '../ReservaModal/ReservaModal.css';
 import './ReservaInfoModal.css';
 import { TriangleAlert } from 'lucide-react';
@@ -31,8 +31,10 @@ function fmtTime(date) {
  *  - `reservation.timeSlots` + `reservation.date` → start/end times
  *  - `reservation.numAsistentes` → attendee count (informational, not shown currently)
  *
- * Admins see "Editar" (→ reassign) and "Cancelar (admin)" buttons.
- * Teachers see "Cancelar" for their own reservations.
+ * Visibility rules (applied only when !isPast && status === 'ACTIVE'):
+ *  - Admin              → "Cancelar" (admin mutation) + "Reasignar"
+ *  - Teacher (owner)    → "Cancelar" (user mutation)
+ *  - Teacher (not owner) → read-only, no action buttons
  *
  * @param {{
  *   open:        boolean,
@@ -61,20 +63,24 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
   // Compute event start/end from the ordered time-slot list
   const { start, end } = slotsToRange(reservation.date, reservation.timeSlots ?? []);
 
-  const handleCancel = () => {
-    if (isAdmin) {
-      cancelReservationAdminMutation.mutate(reservation.uuid, {
-        onSuccess: onClose,
-      });
-    } else {
-      cancelReservationMutation.mutate(reservation.uuid, {
-        onSuccess: onClose,
-      });
-    }
-  };
+  // True when the logged-in teacher is the owner of this reservation.
+  // Admins bypass this check — they can act on any reservation.
+  const isOwner = user?.uuid === reservation.userUuid;
+
+  const handleCancelAdmin = () =>
+    cancelReservationAdminMutation.mutate(reservation.uuid, { onSuccess: onClose });
+
+  const handleCancelOwn = () =>
+    cancelReservationMutation.mutate(reservation.uuid, { onSuccess: onClose });
 
   const isCancelling =
     cancelReservationMutation.isPending || cancelReservationAdminMutation.isPending;
+
+  // Hide cancel/reassign actions when the reservation is already in the past
+  const isPast = isReservationPast(reservation);
+
+  // Guard: show action buttons only for active, future reservations
+  const canAct = !isPast && reservation.status === 'ACTIVE';
 
   return (
     <Modal open={open} className="reserva-info-modal">
@@ -100,7 +106,7 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
             <input
               type="text"
               className="reserva-modal__input reserva-info-modal__readonly"
-              value={reservation.classroomName || '—'}
+              value={reservation.title ?? reservation.classroomName ?? '—'}
               readOnly
             />
           </div>
@@ -167,28 +173,42 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
               Cerrar
             </button>
 
-            {/* Cancel reservation */}
-            {isAdmin && (
+            {/* ── Admin actions ─────────────────────────────────────────
+                 Visible only to admins on active, future reservations. */}
+            {isAdmin && canAct && (
+              <>
+                <button
+                  type="button"
+                  className="reserva-modal__btn reserva-modal__btn--danger"
+                  onClick={handleCancelAdmin}
+                  disabled={isCancelling}
+                >
+                  <Ban size={16} />
+                  {isCancelling ? 'Cancelando…' : 'Cancelar'}
+                </button>
+                <button
+                  type="button"
+                  className="reserva-modal__btn reserva-modal__btn--submit"
+                  onClick={onEdit}
+                >
+                  <Pencil size={18} />
+                  Reasignar
+                </button>
+              </>
+            )}
+
+            {/* ── Teacher owner action ──────────────────────────────────
+                 Only the owner teacher can cancel their own reservation.
+                 A teacher viewing someone else's reservation gets no buttons. */}
+            {!isAdmin && isOwner && canAct && (
               <button
                 type="button"
                 className="reserva-modal__btn reserva-modal__btn--danger"
-                onClick={handleCancel}
+                onClick={handleCancelOwn}
                 disabled={isCancelling}
               >
                 <Ban size={16} />
                 {isCancelling ? 'Cancelando…' : 'Cancelar'}
-              </button>
-            )}
-
-            {/* Admin reassign */}
-            {isAdmin && (
-              <button
-                type="button"
-                className="reserva-modal__btn reserva-modal__btn--submit"
-                onClick={onEdit}
-              >
-                <Pencil size={18} />
-                Reasignar
               </button>
             )}
           </footer>

@@ -32,17 +32,6 @@ public interface ResponseHandler {
     }
 
     /**
-     * Build a successful HTTP 200 response with a custom message and a data payload.
-     * @param message the success message to include in the API response body.
-     * @param data the payload to include in the API response body.
-     * @return a {@link ResponseEntity} with status 200 and a successful {@link ApiResponse}
-     * @param <R> the payload type.
-     */
-    default <R> ResponseEntity<ApiResponse<R>> ok(String message, R data) {
-        return  ResponseEntity.ok(ApiResponse.success(message, data));
-    }
-
-    /**
      * Builds a successful HTTP 201 response containing a data payload.
      *
      * @param data the created resource payload

@@ -158,7 +158,8 @@ function ProfileEditor({ profile }) {
                   {roleLabel(profile.roleName ?? user.role)}
                 </Badge>
                 <Badge variant="neutral">
-                  {profile.matricula || 'Sin matrícula'}
+                  {profile.institutionalId || 'Sin matrícula'}
+                  {console.log(profile)}
                 </Badge>
               </div>
             </div>

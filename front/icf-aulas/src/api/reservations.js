@@ -48,17 +48,17 @@ function resolveErrorMessage(error, overrides = {}) {
 
 /**
  * Returns a paginated list of all reservation instances (admin use).
- * GET /api/v1/reservations[?page=&size=&sort=&direction=]
+ * GET /api/v1/reservations[?page=&size=&sort=&direction=&search=&status=&reassigned=&classroomId=&from=&to=]
  *
  * Allowed sort fields: createdAt, date, status. Default: date desc.
  * Returns the raw API response so `parsePageResponse` can extract items/totalPages.
  *
- * @param {{ page?: number, size?: number, sort?: string, direction?: string }} [params={}]
+ * @param {{ page?: number, size?: number, sort?: string, direction?: string, search?: string, status?: string, reassigned?: boolean, classroomId?: string, from?: string, to?: string }} [params={}]
  * @returns {Promise<object>} Raw API response containing `data.items`, `data.totalPages`, etc.
  */
-export async function getReservations({ page, size, sort = 'date', direction = 'desc' } = {}) {
+export async function getReservations({ page, size, sort = 'date', direction = 'desc', search, status, reassigned, classroomId, from, to } = {}) {
   try {
-    const qs = buildPageParams({ page, size, sort, direction });
+    const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, classroomId, from, to });
     const { data } = await api.get(`/api/v1/reservations${qs}`);
     // Validate each item in the page without stripping the envelope
     if (Array.isArray(data?.data?.items)) {
@@ -74,18 +74,18 @@ export async function getReservations({ page, size, sort = 'date', direction = '
 /**
  * Returns a paginated list of reservation instances belonging to a specific user.
  * A Maestro may only query their own UUID; an admin can query any user.
- * GET /api/v1/reservations/user/{userUuid}[?page=&size=&sort=&direction=]
+ * GET /api/v1/reservations/user/{userUuid}[?page=&size=&sort=&direction=&search=&status=&reassigned=&classroomId=&from=&to=]
  *
  * Allowed sort fields: createdAt, date, status. Default: date desc.
  * Returns the raw API response so `parsePageResponse` can extract items/totalPages.
  *
  * @param {string} userUuid
- * @param {{ page?: number, size?: number, sort?: string, direction?: string }} [params={}]
+ * @param {{ page?: number, size?: number, sort?: string, direction?: string, search?: string, status?: string, reassigned?: boolean, classroomId?: string, from?: string, to?: string }} [params={}]
  * @returns {Promise<object>} Raw API response containing `data.items`, `data.totalPages`, etc.
  */
-export async function getReservationsByUser(userUuid, { page, size, sort = 'date', direction = 'desc' } = {}) {
+export async function getReservationsByUser(userUuid, { page, size, sort = 'date', direction = 'desc', search, status, reassigned, classroomId, from, to } = {}) {
   try {
-    const qs = buildPageParams({ page, size, sort, direction });
+    const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, classroomId, from, to });
     const { data } = await api.get(`/api/v1/reservations/user/${userUuid}${qs}`);
     if (Array.isArray(data?.data?.items)) {
       data.data.items = z.array(ReservInstanceResponseSchema).parse(data.data.items);

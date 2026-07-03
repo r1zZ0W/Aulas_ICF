@@ -94,7 +94,7 @@ El DTO `ReservInstanceResponseDTO` la expone como `Boolean reassigned`.
 
 **Migración obligatoria en producción**
 Antes de activar `ddl-auto=validate`, ejecutar el script
-`back/doc/migration_v1.1__sync_reassigned.sql` en orden:
+`back/aulas/docs/migration_v1.1__sync_reassigned.sql` en orden:
 1. `ALTER TABLE` — añade la columna.
 2. `UPDATE` de backfill — deriva el valor desde `reservation_history`.
 3. Arrancar la aplicación.

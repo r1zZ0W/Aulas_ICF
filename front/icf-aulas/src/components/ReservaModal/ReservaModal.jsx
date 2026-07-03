@@ -231,6 +231,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                 placeholder="Ej. Introducción a Mecánica de Fluidos"
                 value={className}
                 onChange={e => setClassName(e.target.value)}
+                maxLength={150}
                 required
               />
             </div>

@@ -14,21 +14,36 @@ export const DEFAULT_PAGE_SIZE = 10;
  * Only includes params that have a non-empty, defined value, so a no-arg call returns ''
  * (triggering the backend's "all in one page" fallback).
  *
- * @param {object} [params={}]
- * @param {string}  [params.search]    - Free-text filter (LIKE on name/email/username/matricula).
- * @param {number}  [params.page]      - Zero-based page index.
- * @param {number}  [params.size]      - Page size (1–100).
- * @param {string}  [params.sort]      - Sort field (must be in the endpoint's allowed set).
- * @param {'asc'|'desc'} [params.direction] - Sort direction.
+ * @param {object}        [params={}]
+ * @param {string}        [params.search]      - Free-text filter.
+ * @param {string}        [params.status]      - Reservation status filter (ACTIVE, CANCELLED_*).
+ * @param {boolean}       [params.reassigned]  - Reassignment flag filter. IMPORTANT: `false` is a
+ *                                               valid value and MUST be sent to the backend to
+ *                                               select never-reassigned instances. Do NOT collapse
+ *                                               this to a truthy-check — that would break the
+ *                                               "Activa" partition (reassigned=false).
+ * @param {string}        [params.classroomId] - Classroom UUID filter.
+ * @param {string}        [params.from]        - ISO date lower bound (yyyy-MM-dd).
+ * @param {string}        [params.to]          - ISO date upper bound (yyyy-MM-dd).
+ * @param {number}        [params.page]        - Zero-based page index.
+ * @param {number}        [params.size]        - Page size (1–100).
+ * @param {string}        [params.sort]        - Sort field (must be in the endpoint's allowed set).
+ * @param {'asc'|'desc'}  [params.direction]   - Sort direction.
  * @returns {string} Query string including leading '?' or empty string.
  */
-export function buildPageParams({ search, page, size, sort, direction } = {}) {
+export function buildPageParams({ search, status, reassigned, classroomId, from, to, page, size, sort, direction } = {}) {
   const entries = [
-    ['search',    search],
-    ['page',      page],
-    ['size',      size],
-    ['sort',      sort],
-    ['direction', direction],
+    ['search',      search],
+    ['status',      status],
+    // `false` passes the filter (not undefined/null/'') — correct; do not change to truthy-check.
+    ['reassigned',  reassigned],
+    ['classroomId', classroomId],
+    ['from',        from],
+    ['to',          to],
+    ['page',        page],
+    ['size',        size],
+    ['sort',        sort],
+    ['direction',   direction],
   ].filter(([, v]) => v !== undefined && v !== null && v !== '');
 
   if (entries.length === 0) return '';

@@ -13,6 +13,7 @@ import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDet
 import mx.unam.icf.aulas.modules.reservations.instances.app.ReservInstanceService;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.BookingRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReassignRequestDTO;
+import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceFilter;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
@@ -52,13 +53,33 @@ public class ReservInstanceController implements ResponseHandler {
     private final ReservInstanceService service;
 
     /**
-     * Retrieves a paginated list of reservation instances.
-     * GET /api/v1/reservations[?page=0&size=20&sort=date&direction=desc]
+     * Retrieves a filtered, paginated list of all reservation instances.
+     * GET /api/v1/reservations[?page=0&size=20&sort=date&direction=desc&search=...&status=...&reassigned=...&classroomId=...&from=...&to=...]
      *
      * <p>Allowed sort fields: {@code createdAt}, {@code date}, {@code status}.</p>
      *
-     * @param criteria pagination and sorting criteria, resolved and validated by {@link PageCriteriaArgumentResolver}
-     * @return paginated list of all reservation instances
+     * <p>All filter parameters are optional and combined with AND when present:</p>
+     * <ul>
+     *   <li>{@code search} — case-insensitive LIKE over classroom name and user full name
+     *       (min. 3 chars recommended; full table scan below that threshold)</li>
+     *   <li>{@code status} — exact match; invalid value → 400</li>
+     *   <li>{@code reassigned} — {@code true} = only admin-reassigned instances;
+     *       {@code false} = only never-reassigned instances; omitted = no restriction.
+     *       Combine with {@code status=ACTIVE} for clean "Activa/Reasignada" partition.
+     *       Non-boolean value (e.g. {@code reassigned=foo}) → 400.</li>
+     *   <li>{@code classroomId} — equality on classroom UUID</li>
+     *   <li>{@code from} / {@code to} — inclusive date range (ISO format {@code yyyy-MM-dd})</li>
+     * </ul>
+     *
+     * @param criteria    pagination and sorting criteria, resolved by {@link PageCriteriaArgumentResolver}
+     * @param search      optional case-insensitive search term (classroom name or user name)
+     * @param status      optional status filter
+     * @param reassigned  optional reassignment flag filter ({@code true}/{@code false}; omit for no restriction)
+     * @param classroomId optional classroom UUID filter
+     * @param from        optional start date (inclusive)
+     * @param to          optional end date (inclusive)
+     * @return paginated list of reservation instances matching the filters; {@code totalElements}
+     *         reflects the filtered count, not the global total
      */
     @GetMapping
     public ResponseEntity<ApiResponse<PagedResultDTO<ReservInstanceResponseDTO>>> findAll(
@@ -66,8 +87,15 @@ public class ReservInstanceController implements ResponseHandler {
                     value = {"createdAt", "date", "status"},
                     defaultSort = "date",
                     defaultDirection = "desc")
-            PageCriteria criteria) {
-        return ok(service.findAll(criteria.toPageable()));
+            PageCriteria criteria,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) ReservInstanceStatus status,
+            @RequestParam(required = false) Boolean reassigned,
+            @RequestParam(required = false) UUID classroomId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        ReservInstanceFilter filter = new ReservInstanceFilter(search, status, reassigned, classroomId, from, to, null);
+        return ok(service.findAll(filter, criteria.toPageable()));
     }
 
     /**
@@ -82,12 +110,27 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
-     * Retrieves reservation instances for a specific user, paginated.
+     * Retrieves filtered, paginated reservation instances for a specific user.
      * ADMIN users may query any user; a Maestro may only query their own reservations.
-     * GET /api/v1/reservations/user/{userUuid}[?page=0&size=20&sort=date&direction=desc]
+     * GET /api/v1/reservations/user/{userUuid}[?page=0&size=20&sort=date&direction=desc&search=...&status=...&reassigned=...&classroomId=...&from=...&to=...]
      *
      * <p>Allowed sort fields: {@code createdAt}, {@code date}, {@code status}.</p>
      *
+     * <p>Same filter parameters as {@link #findAll} are supported, including
+     * {@code reassigned} and {@code classroomId}. The {@code userUuid} path variable is
+     * injected into the filter by the service layer via
+     * {@link mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceFilter#withUser}
+     * — it is not a request parameter.</p>
+     *
+     * @param userUuid    public UUID of the target user (path variable)
+     * @param principal   authenticated user (used for access control)
+     * @param criteria    pagination and sorting criteria
+     * @param search      optional case-insensitive search term
+     * @param status      optional status filter
+     * @param reassigned  optional reassignment flag filter ({@code true}/{@code false}; omit for no restriction)
+     * @param classroomId optional classroom UUID filter
+     * @param from        optional start date (inclusive)
+     * @param to          optional end date (inclusive)
      * @throws AccessDeniedException when a non-admin attempts to view another user's reservations
      */
     @GetMapping("/user/{userUuid}")
@@ -98,10 +141,17 @@ public class ReservInstanceController implements ResponseHandler {
                     value = {"createdAt", "date", "status"},
                     defaultSort = "date",
                     defaultDirection = "desc")
-            PageCriteria criteria) {
+            PageCriteria criteria,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) ReservInstanceStatus status,
+            @RequestParam(required = false) Boolean reassigned,
+            @RequestParam(required = false) UUID classroomId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         if (!"ADMIN".equals(principal.getRoleName()) && !userUuid.equals(principal.getUuid()))
             throw new AccessDeniedException("You can only view your own reservations");
-        return ok(service.findByUser(userUuid, criteria.toPageable()));
+        ReservInstanceFilter filter = new ReservInstanceFilter(search, status, reassigned, classroomId, from, to, null);
+        return ok(service.findByUser(userUuid, filter, criteria.toPageable()));
     }
 
     /**

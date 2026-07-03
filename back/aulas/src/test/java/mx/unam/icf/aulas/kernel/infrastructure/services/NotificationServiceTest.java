@@ -1,6 +1,7 @@
 package mx.unam.icf.aulas.kernel.infrastructure.services;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -9,8 +10,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import org.springframework.test.util.ReflectionTestUtils;
 import mx.unam.icf.aulas.kernel.domain.events.reservations.creations.ReservInstanceCreatedEventDTO;
 import mx.unam.icf.aulas.kernel.domain.events.reservations.cancellations.ReservInstanceCancelledEventDTO;
+import mx.unam.icf.aulas.kernel.domain.events.reservations.reassigns.ReservInstanceReassignEventDTO;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -41,6 +44,16 @@ public class NotificationServiceTest {
 
     @Captor
     ArgumentCaptor<String> bodyCaptor;
+
+    @Captor
+    ArgumentCaptor<List<String>> ccCaptor;
+
+    private static final String SUPER_ADMIN_EMAIL = "superadmin@unam.mx";
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(notificationService, "superAdminEmail", SUPER_ADMIN_EMAIL);
+    }
 
     @Test
     void notifyNewUserCredentials_sendsHtmlWithCredentials() {
@@ -82,26 +95,47 @@ public class NotificationServiceTest {
         when(templateEngine.process(eq("emails/reservation-created-user"), any(Context.class))).thenReturn("<user-body>");
         when(templateEngine.process(eq("emails/reservation-created-admin"), any(Context.class))).thenReturn("<admin-body>");
 
-        // Simulate failure when sending to badadmin
-        doThrow(new RuntimeException("SMTP failure"))
-                .when(mailSender).sendHtml(eq("badadmin@unam.mx"), anyString(), anyString());
-
         // Act
         notificationService.notifyReservationCreated(dto);
 
-        // Assert: total 4 sendHtml calls -> 1 teacher + 3 admins
-        verify(mailSender, times(4)).sendHtml(toCaptor.capture(), subjectCaptor.capture(), bodyCaptor.capture());
+        // Assert: 1 teacher email + 1 admin email with CC
+        verify(mailSender).sendHtml(eq("maestro@unam.mx"), anyString(), anyString());
+        verify(mailSender).sendHtml(toCaptor.capture(), subjectCaptor.capture(), bodyCaptor.capture(), ccCaptor.capture());
 
-        // Captured recipients include teacher and all admins
-        List<String> recipients = toCaptor.getAllValues();
-        assertTrue(recipients.contains("maestro@unam.mx"));
-        assertTrue(recipients.contains("admin1@unam.mx"));
-        assertTrue(recipients.contains("badadmin@unam.mx"));
-        assertTrue(recipients.contains("admin2@unam.mx"));
+        assertEquals(SUPER_ADMIN_EMAIL, toCaptor.getValue());
+        assertEquals(List.of("admin1@unam.mx", "badadmin@unam.mx", "admin2@unam.mx"), ccCaptor.getValue());
 
         // Verify that template engine was invoked for both templates
         verify(templateEngine, times(1)).process(eq("emails/reservation-created-user"), any(Context.class));
         verify(templateEngine, times(1)).process(eq("emails/reservation-created-admin"), any(Context.class));
+    }
+
+    @Test
+    void notifyReservationReassigned_sendsToTeacherAndSuperAdminWithCc() {
+        ReservInstanceReassignEventDTO dto = new ReservInstanceReassignEventDTO(
+                "maestro@unam.mx",
+                "Maestro Ejemplo",
+                LocalDate.of(2026, 6, 27),
+                "Aula 101",
+                "Aula 202",
+                LocalTime.of(12, 0),
+                LocalTime.of(14, 0),
+                UUID.randomUUID(),
+                List.of("admin1@unam.mx", "admin2@unam.mx")
+        );
+
+        when(templateEngine.process(eq("emails/reservation-reassigned-user"), any(Context.class))).thenReturn("<user-body>");
+        when(templateEngine.process(eq("emails/reservation-reassigned-admin"), any(Context.class))).thenReturn("<admin-body>");
+
+        notificationService.notifyReservationReassigned(dto);
+
+        verify(mailSender).sendHtml(eq("maestro@unam.mx"), anyString(), anyString());
+        verify(mailSender).sendHtml(toCaptor.capture(), subjectCaptor.capture(), bodyCaptor.capture(), ccCaptor.capture());
+
+        assertEquals(SUPER_ADMIN_EMAIL, toCaptor.getValue());
+        assertEquals(List.of("admin1@unam.mx", "admin2@unam.mx"), ccCaptor.getValue());
+        verify(templateEngine).process(eq("emails/reservation-reassigned-user"), any(Context.class));
+        verify(templateEngine).process(eq("emails/reservation-reassigned-admin"), any(Context.class));
     }
 
     @Test
@@ -124,12 +158,12 @@ public class NotificationServiceTest {
 
         notificationService.notifyReservationCancelled(dto);
 
-        // Expect 2 emails: maestro + 1 admin
-        verify(mailSender, times(2)).sendHtml(toCaptor.capture(), subjectCaptor.capture(), bodyCaptor.capture());
+        // Expect 2 emails: maestro + 1 admin mailbox with empty CC
+        verify(mailSender).sendHtml(eq("maestro@unam.mx"), anyString(), anyString());
+        verify(mailSender).sendHtml(toCaptor.capture(), subjectCaptor.capture(), bodyCaptor.capture(), ccCaptor.capture());
 
-        List<String> recipients = toCaptor.getAllValues();
-        assertTrue(recipients.contains("maestro@unam.mx"));
-        assertTrue(recipients.contains("admin@unam.mx"));
+        assertEquals(SUPER_ADMIN_EMAIL, toCaptor.getValue());
+        assertEquals(List.of("admin@unam.mx"), ccCaptor.getValue());
 
         // Ensure templates were called
         verify(templateEngine).process(eq("emails/reservation-cancelled-user"), any(Context.class));

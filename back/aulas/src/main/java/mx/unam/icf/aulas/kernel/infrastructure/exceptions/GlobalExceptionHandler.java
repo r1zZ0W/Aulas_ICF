@@ -12,6 +12,9 @@ import mx.unam.icf.aulas.modules.access.auth.app.exceptions.TokenRevokedExceptio
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ConflictDetailDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException;
+import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentValidationErrorDTO;
+import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.DuplicateStudentException;
+import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.EmptyStudentListException;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -78,6 +81,29 @@ public class GlobalExceptionHandler {
                         .error(true)
                         .message(ex.getMessage())
                         .data(new ConflictDetailDTO(ex.getConflictDate(), ex.getConflictTimeSlotId()))
+                        .build());
+    }
+
+    /**
+     * Handles student-roster validation failures from the Excel upload flow
+     * ({@code POST /api/v1/reservations/groups/{groupUuid}/students}): an empty workbook
+     * (no data rows) or an intra-file duplicate student name. Returns HTTP 422 with a
+     * structured {@link StudentValidationErrorDTO} — {@code row}/{@code value} populated
+     * for a duplicate, both {@code null} for an empty roster — mirroring the 409 conflict
+     * handler's pattern of a typed payload instead of a bare message.
+     */
+    @ExceptionHandler({ EmptyStudentListException.class, DuplicateStudentException.class })
+    public ResponseEntity<ApiResponse<StudentValidationErrorDTO>> handleStudentListValidation(RuntimeException ex) {
+        StudentValidationErrorDTO detail = (ex instanceof DuplicateStudentException dup)
+                ? new StudentValidationErrorDTO(dup.getRow(), dup.getStudentFullName())
+                : new StudentValidationErrorDTO(null, null);
+
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.<StudentValidationErrorDTO>builder()
+                        .error(true)
+                        .message(ex.getMessage())
+                        .data(detail)
                         .build());
     }
 
@@ -224,6 +250,22 @@ public class GlobalExceptionHandler {
         String message = isDev() && ex.getMessage() != null && !ex.getMessage().isBlank()
                 ? ex.getMessage()
                 : "The email could not be sent. Please try again later.";
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(message));
+    }
+
+    /**
+     * Handles failures from {@link mx.unam.icf.aulas.kernel.app.FileStorageService}
+     * (disk write/read errors); returns 500. In {@code dev} profile the raw message is
+     * forwarded; in production a generic message is used, matching {@link #handleMailSending}.
+     */
+    @ExceptionHandler(FileStorageException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFileStorage(FileStorageException ex) {
+        log.error("File storage error", ex);
+        String message = isDev() && ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "The file could not be processed. Please try again later.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(message));

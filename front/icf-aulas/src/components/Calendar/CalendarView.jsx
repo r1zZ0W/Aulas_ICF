@@ -96,15 +96,9 @@ export default function CalendarView() {
       .map(inst => instanceToEvent(inst, roomById[inst.classroomUuid]?.color ?? '#64748b'));
 
     if (currentView === 'timeGridWeek') {
-      const mins = now.getMinutes() >= 30 ? 30 : 0;
-      const boundary = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        now.getHours(),
-        mins,
-        0
-      );
+      const timeToCheck = new Date(now.getTime() + 15 * 60 * 1000 + 1);
+      const ms = 30 * 60 * 1000;
+      const boundary = new Date(Math.ceil(timeToCheck.getTime() / ms) * ms);
 
       list.push({
         id: 'past-disabled-bg',
@@ -175,7 +169,7 @@ export default function CalendarView() {
           slotMaxTime="19:30:00"
           slotDuration="00:30:00"
           snapDuration="00:30:00"
-          allDaySlot={true}
+          allDaySlot={false}
           allDayText="Todo el día"
           height="100%"
           slotLabelFormat={{ hour: 'numeric', minute: '2-digit', hour12: true }}

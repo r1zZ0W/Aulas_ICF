@@ -1,0 +1,37 @@
+-- ============================================================
+-- Migration v1.4 — (Recommended) composite index for recurrence aggregation
+-- ============================================================
+-- Context
+-- -------
+-- ReportStatisticsRepository.countInstancesPerGroup (recurrence donut/tasa on
+-- the Reportes y Estadísticas dashboard) runs:
+--
+--   SELECT COUNT(ri.id) FROM reserv_instances ri
+--   WHERE ri.status = :status AND ri.date BETWEEN :from AND :to
+--   GROUP BY ri.group_id
+--
+-- The existing idx_reserv_instances_group_status(group_id, status) index
+-- (migration v1.3) does not cover the `date` predicate, so the database has
+-- to scan pages to evaluate `date BETWEEN :from AND :to` before it can group
+-- by group_id. This is functionally correct today but will not scale well as
+-- reserv_instances grows across multiple semesters of history.
+--
+-- Recommendation
+-- --------------
+-- A composite index on (status, date, group_id) lets the engine perform an
+-- index range scan on `status + date` and derive group_id groupings directly
+-- from the index, without a separate table scan.
+--
+-- This migration is NOT required for the recurrence fix to be correct — it is
+-- a performance recommendation to apply once reservation volume/history grows
+-- enough to matter. Not yet applied automatically via ddl-auto; run STEP 1
+-- manually when ready.
+--
+-- Verified table/column names:
+--   table  : reserv_instances
+--   columns: status, date, group_id
+-- ============================================================
+
+-- STEP 1 — Add the composite index (idempotent; safe to run multiple times)
+CREATE INDEX IF NOT EXISTS idx_reserv_instances_status_date_group
+  ON reserv_instances (status, date, group_id);

@@ -54,11 +54,7 @@ export function useCalendar({ onRangeChange } = {}) {
 
   const selectAllow = (info) => {
     const now = new Date();
-    const mins = now.getMinutes() >= 30 ? 30 : 0;
-    const boundary = new Date(
-      now.getFullYear(), now.getMonth(), now.getDate(),
-      now.getHours(), mins, 0
-    );
+    const boundary = new Date(now.getTime() + 15 * 60 * 1000);
     return info.start > boundary;
   };
 
@@ -76,11 +72,7 @@ export function useCalendar({ onRangeChange } = {}) {
       openModal(info.date);
     } else if (currentView === 'timeGridWeek') {
       const now = new Date();
-      const mins = now.getMinutes() >= 30 ? 30 : 0;
-      const boundary = new Date(
-        now.getFullYear(), now.getMonth(), now.getDate(),
-        now.getHours(), mins, 0
-      );
+      const boundary = new Date(now.getTime() + 15 * 60 * 1000);
       if (info.date <= boundary) return;
 
       const startDate = new Date(info.date);

@@ -53,6 +53,18 @@ public interface ReservSlotRepository extends JpaRepository<ReservSlot, ReservSl
     @Query("DELETE FROM ReservSlot rs WHERE rs.classroomId = :classroomId")
     void deleteAllByClassroomId(@Param("classroomId") Long classroomId);
 
+    /**
+     * Bulk-deletes all slots whose owning instance belongs to the given reservation group.
+     * Used by {@code StudentRosterCleanupJob} to reap abandoned {@code PENDING_ROSTER}
+     * groups; must run <em>before</em> {@code ReservInstanceRepository.deleteAllByGroupId}
+     * (child before parent) so the classroom slots are freed for new bookings.
+     *
+     * @param groupId internal database PK of the reservation group (not the public UUID)
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM ReservSlot rs WHERE rs.instance.group.id = :groupId")
+    void deleteAllByGroupId(@Param("groupId") Long groupId);
+
     // ── Bulk conflict detection for atomic booking ────────────────────────────
 
     /**

@@ -24,6 +24,7 @@ import mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroupStat
 import mx.unam.icf.aulas.modules.reservations.groups.infrastructure.ReservationGroupRepository;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.BookingRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReassignRequestDTO;
+import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceFilter;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException;
@@ -31,6 +32,7 @@ import mx.unam.icf.aulas.modules.reservations.instances.app.mappers.ReservInstan
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
 import mx.unam.icf.aulas.modules.reservations.instances.infrastructure.ReservInstanceRepository;
+import mx.unam.icf.aulas.modules.reservations.instances.infrastructure.ReservInstanceSpecification;
 import mx.unam.icf.aulas.modules.reservations.slots.domain.ReservSlot;
 import mx.unam.icf.aulas.modules.reservations.slots.domain.ReservSlotId;
 import mx.unam.icf.aulas.modules.reservations.slots.infrastructure.ReservSlotRepository;
@@ -97,14 +99,24 @@ public class ReservInstanceService {
     // ── Queries ───────────────────────────────────────────────────────────────
 
     /**
-     * Returns a page of all reservation instances in the system.
+     * Returns a filtered, paginated list of all reservation instances in the system.
      *
+     * <p>All filter fields in {@code filter} are optional; a {@code null}/blank value
+     * means "no restriction on that dimension". Multiple non-null filters are combined
+     * with AND. Eager loading of {@code group}, {@code group.user}, and {@code classroom}
+     * is handled inside {@link ReservInstanceSpecification}; {@code slots} are loaded
+     * lazily in batches.</p>
+     *
+     * @param filter   optional filter criteria; must not be {@code null} (use an all-null
+     *                 instance for "no filters")
      * @param pageable pagination and sort criteria
-     * @return a {@link PagedResultDTO} containing the requested page
+     * @return a {@link PagedResultDTO} containing the requested page with the filtered count
      */
     @Transactional(readOnly = true)
-    public PagedResultDTO<ReservInstanceResponseDTO> findAll(Pageable pageable) {
-        return PageMapper.toDto(reservInstanceRepository.findAll(pageable), mapper::toDtoList);
+    public PagedResultDTO<ReservInstanceResponseDTO> findAll(ReservInstanceFilter filter, Pageable pageable) {
+        return PageMapper.toDto(
+                reservInstanceRepository.findAll(ReservInstanceSpecification.build(filter), pageable),
+                mapper::toDtoList);
     }
 
     /**
@@ -122,15 +134,22 @@ public class ReservInstanceService {
     }
 
     /**
-     * Returns a page of reservation instances belonging to a specific user.
+     * Returns a filtered, paginated list of reservation instances belonging to a specific user.
+     *
+     * <p>The {@code userUuid} restriction is injected into the filter so that the same
+     * {@link ReservInstanceSpecification} is reused for both the admin "Todas" view and
+     * the user-scoped "Mis Reservas" view. All other filter dimensions are preserved.</p>
      *
      * @param userUuid public UUID of the target user
+     * @param filter   optional filter criteria (userUuid will be overridden with the path variable)
      * @param pageable pagination and sort criteria
-     * @return a {@link PagedResultDTO} containing the requested page
+     * @return a {@link PagedResultDTO} containing the requested page with the filtered count
      */
     @Transactional(readOnly = true)
-    public PagedResultDTO<ReservInstanceResponseDTO> findByUser(UUID userUuid, Pageable pageable) {
-        return PageMapper.toDto(reservInstanceRepository.findByUserUuid(userUuid, pageable), mapper::toDtoList);
+    public PagedResultDTO<ReservInstanceResponseDTO> findByUser(UUID userUuid, ReservInstanceFilter filter, Pageable pageable) {
+        return PageMapper.toDto(
+                reservInstanceRepository.findAll(ReservInstanceSpecification.build(filter.withUser(userUuid)), pageable),
+                mapper::toDtoList);
     }
 
     /**
@@ -207,21 +226,33 @@ public class ReservInstanceService {
             ? Set.of(dto.startDate().getDayOfWeek())
             : new HashSet<>(dto.daysOfWeek());
 
-        // 6. Create and persist the group (owns all generated instances)
+        // 6. Create and persist the group (owns all generated instances).
+        // Status starts as PENDING_ROSTER, not ACTIVE: the group only becomes ACTIVE once
+        // the mandatory student roster (.xlsx) is uploaded via StudentListService.upload,
+        // which also fires the admin-notification event below. This prevents notifying
+        // admins about a reservation that never receives its roster. See
+        // ReservationGroupStatus#PENDING_ROSTER and StudentRosterCleanupJob for the reaper
+        // that removes groups abandoned in this state past the grace period.
         ReservationGroup group = new ReservationGroup();
         group.setUser(user);
         group.setSemester(currentSemester);
         group.setDaysOfWeek(days);
-        group.setStatus(ReservationGroupStatus.ACTIVE);
+        group.setStatus(ReservationGroupStatus.PENDING_ROSTER);
         group = groupRepository.save(group);
 
-        // 7. Build target dates in memory — recurrence removed, only the startDate is considered
+        // 7. Build target dates in memory — only the startDate is considered if daysOfWeek is not specified
         LocalDate endDate = currentSemester.getEndDate();
         List<LocalDate> targetDates = new ArrayList<>();
 
-        for (LocalDate d = dto.startDate(); !d.isAfter(endDate); d = d.plusDays(1))
-            if (days.contains(d.getDayOfWeek()))
-                targetDates.add(d);
+        if (dto.daysOfWeek() == null || dto.daysOfWeek().isEmpty()) {
+            targetDates.add(dto.startDate());
+        } else {
+            for (LocalDate d = dto.startDate(); !d.isAfter(endDate); d = d.plusDays(1)) {
+                if (days.contains(d.getDayOfWeek())) {
+                    targetDates.add(d);
+                }
+            }
+        }
 
 
         if (targetDates.isEmpty())
@@ -288,6 +319,7 @@ public class ReservInstanceService {
             inst.setStatus(ReservInstanceStatus.ACTIVE);
             inst.setAttendeeCount(dto.attendeeCount());
             inst.setDate(d);
+            inst.setTitle(dto.title());
             toSave.add(inst);
         }
         List<ReservInstance> saved = reservInstanceRepository.saveAll(toSave);
@@ -311,19 +343,10 @@ public class ReservInstanceService {
         // 13. Record history for every created instance in a single batch
         historyService.registerAll(saved, ReservationEvent.CREATED, "Reservation created");
 
-        // 14. Single notification for the whole booking (not one per instance)
-        List<String> adminEmails = userRepository.findByRoleName("ADMIN")
-            .stream().map(User::getEmail).collect(Collectors.toList());
-        eventPublisher.publishEvent(new ReservInstanceCreatedEventDTO(
-            user.getEmail(),
-            user.getFullName(),
-            classroom.getName(),
-            saved.getFirst().getDate(),
-            slotStartTime(timeSlots),
-            slotEndTime(timeSlots),
-            group.getUuid(),
-            adminEmails
-        ));
+        // 14. No admin-notification event here (intentional): the group is still
+        // PENDING_ROSTER. StudentListService.upload publishes ReservInstanceCreatedEventDTO
+        // once the mandatory student roster is confirmed, so admins only ever see
+        // reservations with a real roster attached.
 
         return mapper.toDtoList(saved);
     }

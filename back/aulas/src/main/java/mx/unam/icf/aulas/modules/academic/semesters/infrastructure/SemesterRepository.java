@@ -63,4 +63,32 @@ public interface SemesterRepository extends JpaRepository<Semester, Long> {
     default Optional<Semester> findCurrent(LocalDate today) {
         return findFirstByStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByEndDateDesc(today, today);
     }
+
+    /**
+     * Returns the semester that immediately precedes the given start date.
+     *
+     * <p>Used by {@link mx.unam.icf.aulas.modules.reports.app.StatisticsPeriodResolver} to
+     * locate the previous comparable period when computing the {@code totalReservasDeltaPct}
+     * KPI for semester-scoped statistics.</p>
+     *
+     * <p>Ordering by {@code startDate DESC} and limiting to 1 row ensures a deterministic result
+     * even when overlapping semester date ranges exist due to data-entry errors.</p>
+     *
+     * @param startDate the start date of the current semester; the returned semester must have
+     *                  a {@code startDate} strictly less than this value
+     * @return the immediately preceding semester, or empty if the given semester is the first one
+     */
+    Optional<Semester> findFirstByStartDateLessThanOrderByStartDateDesc(LocalDate startDate);
+
+    /**
+     * Returns the semester with the latest {@code endDate} in the database.
+     *
+     * <p>Used as a fallback by {@link mx.unam.icf.aulas.modules.reports.app.StatisticsPeriodResolver}
+     * when no semester is currently active (e.g., the current date falls between two semesters).
+     * Preferring the latest semester by end date means the dashboard shows the most recent
+     * academic period's data rather than returning an empty response.</p>
+     *
+     * @return the semester with the furthest-future end date, or empty if no semesters exist
+     */
+    Optional<Semester> findTopByOrderByEndDateDesc();
 }
