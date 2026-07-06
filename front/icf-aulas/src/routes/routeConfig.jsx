@@ -1,12 +1,15 @@
-import { ROLES } from '../utils/roles';
-
-import ClassroomsPage from '../modules/shared/classrooms/ClassroomsPage';
-import ReservationsPage from '../modules/shared/reservations/ReservationsPage';
-import HistoryPage from '../modules/shared/reservations/HistoryPage';
-import ProfilePage from '../modules/shared/profile/ProfilePage';
-import UsersPage from '../modules/admin/users/UsersPage';
-import ReportsPage from '../modules/admin/reports/ReportsPage';
+import { lazy } from 'react';
 import { BarChart3, Calendar, ClipboardList, School, UserRound, Users } from 'lucide-react';
+import { PRIVATE_ROUTES_META } from './routes.meta';
+
+const ReservationsPage = lazy(() => import('../modules/shared/reservations/ReservationsPage'));
+const ClassroomsPage   = lazy(() => import('../modules/shared/classrooms/ClassroomsPage'));
+const HistoryPage      = lazy(() => import('../modules/shared/reservations/HistoryPage'));
+const UsersPage        = lazy(() => import('../modules/admin/users/UsersPage'));
+const ReportsPage      = lazy(() => import('../modules/admin/reports/ReportsPage'));
+const ProfilePage      = lazy(() => import('../modules/shared/profile/ProfilePage'));
+
+const metaFor = (path) => PRIVATE_ROUTES_META.find((m) => m.path === path);
 
 /**
  * Central declaration of every private route.
@@ -16,7 +19,9 @@ import { BarChart3, Calendar, ClipboardList, School, UserRound, Users } from 'lu
  *   - Authorization: `allowedRoles` is enforced by RoleGuard.
  *   - Navigation: `sidebar` metadata is read by the Sidebar component.
  *
- * To add a new route: append an entry here — no other file needs to change.
+ * Path/roles/labels come from `routes.meta.js`; this file only adds the
+ * lazy-loaded element and icon for each one. To add a new route: append an
+ * entry to `routes.meta.js` and its element/icon here.
  *
  * @type {Array<{
  *   path: string,
@@ -27,39 +32,33 @@ import { BarChart3, Calendar, ClipboardList, School, UserRound, Users } from 'lu
  */
 export const PRIVATE_ROUTES = [
   {
-    path: '/reservations',
+    ...metaFor('/reservations'),
     element: <ReservationsPage />,
-    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
-    sidebar: { label: 'Reservaciones', icon: <Calendar />, show: true },
+    sidebar: { ...metaFor('/reservations').sidebar, icon: <Calendar /> },
   },
   {
-    path: '/classrooms',
+    ...metaFor('/classrooms'),
     element: <ClassroomsPage />,
-    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
-    sidebar: { label: 'Aulas', icon: <School />, show: true },
+    sidebar: { ...metaFor('/classrooms').sidebar, icon: <School /> },
   },
   {
-    path: '/history',
+    ...metaFor('/history'),
     element: <HistoryPage />,
-    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
-    sidebar: { label: 'Historial', icon: <ClipboardList />, show: true },
+    sidebar: { ...metaFor('/history').sidebar, icon: <ClipboardList /> },
   },
   {
-    path: '/users',
+    ...metaFor('/users'),
     element: <UsersPage />,
-    allowedRoles: [ROLES.ADMIN],
-    sidebar: { label: 'Usuarios', icon: <Users />, show: true },
+    sidebar: { ...metaFor('/users').sidebar, icon: <Users /> },
   },
   {
-    path: '/reports',
+    ...metaFor('/reports'),
     element: <ReportsPage />,
-    allowedRoles: [ROLES.ADMIN],
-    sidebar: { label: 'Reportes y Estadísticas', icon: <BarChart3 />, show: true },
+    sidebar: { ...metaFor('/reports').sidebar, icon: <BarChart3 /> },
   },
   {
-    path: '/profile',
+    ...metaFor('/profile'),
     element: <ProfilePage />,
-    allowedRoles: [ROLES.ADMIN, ROLES.MAESTRO],
-    sidebar: { label: 'Mi perfil', icon: <UserRound />, show: true },
+    sidebar: { ...metaFor('/profile').sidebar, icon: <UserRound /> },
   },
 ];

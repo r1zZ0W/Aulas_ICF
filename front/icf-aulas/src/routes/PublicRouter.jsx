@@ -1,19 +1,22 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import Login from '../modules/public/pages/Login';
-import Error401 from '../errors/Error401.jsx';
-import Error403 from '../errors/Error403.jsx';
-import Error404 from '../errors/Error404.jsx';
-import { PRIVATE_ROUTES } from './routeConfig';
+import { lazy } from 'react';
+
+const Login = lazy(() => import('../modules/public/pages/Login'));
+const Error401 = lazy(() => import('../errors/Error401'));
+const Error403 = lazy(() => import('../errors/Error403'));
+const Error404 = lazy(() => import('../errors/Error404'));
+import { PRIVATE_PATHS } from './routes.meta';
 
 export default function PublicRouter() {
     const location = useLocation();
 
     // If the unauthenticated user attempts to reach a known private route
     // show the 401 page. For unknown public routes show the 404 page.
+    // NOTE: pulls from routes.meta (paths only) rather than routeConfig, so
+    // the public bundle never imports the private pages' lazy() defs/icons.
     const privatePaths = [
         '/dashboard',
-        // include all private routes from the central config
-        ...PRIVATE_ROUTES.map((r) => r.path),
+        ...PRIVATE_PATHS,
     ];
 
     const isAttemptingPrivate = privatePaths.some((p) =>
