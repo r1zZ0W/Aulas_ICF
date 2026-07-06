@@ -1,13 +1,15 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy } from 'react';
+
 import { useAuth } from '../context/AuthContext';
 import { PRIVATE_ROUTES } from './routeConfig';
 import { getDashboardRoute } from '../utils/roles';
 import PrivateLayout from '../layouts/PrivateLayout';
 import RoleGuard from './RoleGuard';
 
-import Error401 from '../errors/Error401.jsx';
-import Error403 from '../errors/Error403.jsx';
-import Error404 from '../errors/Error404.jsx';
+const Error401 = lazy(() => import('../errors/Error401.jsx'));
+const Error403 = lazy(() => import('../errors/Error403.jsx'));
+const Error404 = lazy(() => import('../errors/Error404.jsx'));
 
 export default function PrivateRouter() {
     const { isAuthenticated, user } = useAuth();
