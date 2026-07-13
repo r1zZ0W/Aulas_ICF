@@ -22,6 +22,9 @@ const metaFor = (path) => PRIVATE_ROUTES_META.find((m) => m.path === path);
  * Path/roles/labels come from `routes.meta.js`; this file only adds the
  * lazy-loaded element and icon for each one. To add a new route: append an
  * entry to `routes.meta.js` and its element/icon here.
+ * Path/roles/labels come from `routes.meta.js`; this file only adds the
+ * lazy-loaded element and icon for each one. To add a new route: append an
+ * entry to `routes.meta.js` and its element/icon here.
  *
  * @type {Array<{
  *   path: string,
@@ -33,32 +36,42 @@ const metaFor = (path) => PRIVATE_ROUTES_META.find((m) => m.path === path);
 export const PRIVATE_ROUTES = [
   {
     ...metaFor('/reservations'),
+    ...metaFor('/reservations'),
     element: <ReservationsPage />,
+    sidebar: { ...metaFor('/reservations').sidebar, icon: <Calendar /> },
     sidebar: { ...metaFor('/reservations').sidebar, icon: <Calendar /> },
   },
   {
+    ...metaFor('/classrooms'),
     ...metaFor('/classrooms'),
     element: <ClassroomsPage />,
     sidebar: { ...metaFor('/classrooms').sidebar, icon: <Building2 /> },
   },
   {
     ...metaFor('/history'),
+    ...metaFor('/history'),
     element: <HistoryPage />,
+    sidebar: { ...metaFor('/history').sidebar, icon: <ClipboardList /> },
     sidebar: { ...metaFor('/history').sidebar, icon: <ClipboardList /> },
   },
   {
+    ...metaFor('/users'),
     ...metaFor('/users'),
     element: <UsersPage />,
     sidebar: { ...metaFor('/users').sidebar, icon: <Users /> },
   },
   {
     ...metaFor('/reports'),
+    ...metaFor('/reports'),
     element: <ReportsPage />,
+    sidebar: { ...metaFor('/reports').sidebar, icon: <BarChart3 /> },
     sidebar: { ...metaFor('/reports').sidebar, icon: <BarChart3 /> },
   },
   {
     ...metaFor('/profile'),
+    ...metaFor('/profile'),
     element: <ProfilePage />,
+    sidebar: { ...metaFor('/profile').sidebar, icon: <UserRound /> },
     sidebar: { ...metaFor('/profile').sidebar, icon: <UserRound /> },
   },
 ];
