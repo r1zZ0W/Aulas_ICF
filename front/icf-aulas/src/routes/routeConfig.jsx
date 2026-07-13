@@ -1,13 +1,13 @@
 import { lazy } from 'react';
-import { BarChart3, Calendar, ClipboardList, School, UserRound, Users } from 'lucide-react';
+import { BarChart3, Calendar, ClipboardList, Building2, UserRound, Users } from 'lucide-react';
 import { PRIVATE_ROUTES_META } from './routes.meta';
 
 const ReservationsPage = lazy(() => import('../modules/shared/reservations/ReservationsPage'));
-const ClassroomsPage   = lazy(() => import('../modules/shared/classrooms/ClassroomsPage'));
-const HistoryPage      = lazy(() => import('../modules/shared/reservations/HistoryPage'));
-const UsersPage        = lazy(() => import('../modules/admin/users/UsersPage'));
-const ReportsPage      = lazy(() => import('../modules/admin/reports/ReportsPage'));
-const ProfilePage      = lazy(() => import('../modules/shared/profile/ProfilePage'));
+const ClassroomsPage = lazy(() => import('../modules/shared/classrooms/ClassroomsPage'));
+const HistoryPage = lazy(() => import('../modules/shared/reservations/HistoryPage'));
+const UsersPage = lazy(() => import('../modules/admin/users/UsersPage'));
+const ReportsPage = lazy(() => import('../modules/admin/reports/ReportsPage'));
+const ProfilePage = lazy(() => import('../modules/shared/profile/ProfilePage'));
 
 const metaFor = (path) => PRIVATE_ROUTES_META.find((m) => m.path === path);
 
@@ -39,7 +39,7 @@ export const PRIVATE_ROUTES = [
   {
     ...metaFor('/classrooms'),
     element: <ClassroomsPage />,
-    sidebar: { ...metaFor('/classrooms').sidebar, icon: <School /> },
+    sidebar: { ...metaFor('/classrooms').sidebar, icon: <Building2 /> },
   },
   {
     ...metaFor('/history'),

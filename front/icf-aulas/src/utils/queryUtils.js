@@ -33,17 +33,17 @@ export const DEFAULT_PAGE_SIZE = 10;
  */
 export function buildPageParams({ search, status, reassigned, classroomId, from, to, page, size, sort, direction } = {}) {
   const entries = [
-    ['search',      search],
-    ['status',      status],
+    ['search', search],
+    ['status', status],
     // `false` passes the filter (not undefined/null/'') — correct; do not change to truthy-check.
-    ['reassigned',  reassigned],
+    ['reassigned', reassigned],
     ['classroomId', classroomId],
-    ['from',        from],
-    ['to',          to],
-    ['page',        page],
-    ['size',        size],
-    ['sort',        sort],
-    ['direction',   direction],
+    ['from', from],
+    ['to', to],
+    ['page', page],
+    ['size', size],
+    ['sort', sort],
+    ['direction', direction],
   ].filter(([, v]) => v !== undefined && v !== null && v !== '');
 
   if (entries.length === 0) return '';
@@ -61,7 +61,7 @@ export function parsePageResponse(res) {
   const raw = res?.data ?? res ?? {};
   const inner = raw?.data ?? raw;
   const items = Array.isArray(inner?.items) ? inner.items : [];
-  const totalPages    = inner?.totalPages    ?? 1;
+  const totalPages = inner?.totalPages ?? 1;
   const totalElements = inner?.totalElements ?? items.length;
 
   return { items, totalPages, totalElements };

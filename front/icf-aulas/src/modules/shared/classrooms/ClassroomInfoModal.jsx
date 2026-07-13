@@ -105,10 +105,11 @@ export default function ClassroomInfoModal({ open, onClose, classroom, allClassr
             {/* Aulas hijas */}
             <div className="classroom-info-modal__field">
               <dt className="classroom-info-modal__label">Aulas hijas</dt>
-              <dd className={`classroom-info-modal__value${children.length === 0 ? ' classroom-info-modal__value--muted' : ''}`}>
+              <dd style={{ whiteSpace: 'pre-line' }}
+                className={`classroom-info-modal__value${children.length === 0 ? ' classroom-info-modal__value--muted' : ''}`}>
                 {children.length === 0
                   ? '—'
-                  : children.map(c => c.name).join(', ')
+                  : children.map(c => c.name).join('\n')
                 }
               </dd>
             </div>
