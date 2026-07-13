@@ -1,18 +1,11 @@
 /**
- * @fileoverview Zod schema for the GET /api/v1/users/stats response.
- * Matches UserStatsDTO: { total, active, inactive, admins } — all longs (serialized as numbers).
+ * @fileoverview Zod schema for GET /api/v1/users/stats response.
+ * Matches backend UserStatsDTO: { total, admins } or { total, active, inactive, admins } as numbers.
  */
 import { z } from 'zod';
 
 /**
- * Users stats schema.
- * {
- *    total: long,
- *    active: long,
- *    inactive: long,
- *    admins: long,
- * }
- * @returns {z.ZodObject}
+ * Zod schema for validating user statistics payload.
  */
 export const UserStatsSchema = z.object({
   total: z.number(),

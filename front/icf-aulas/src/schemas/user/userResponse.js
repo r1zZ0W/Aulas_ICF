@@ -4,8 +4,8 @@
 import { z } from 'zod';
 
 /**
- * Schema for validating and parsing user information retrieved from administrative queries.
- * Matches the backend UserResponseDTO exactly.
+ * Zod schema for validating and parsing user information retrieved from administrative queries.
+ * Matches backend UserResponseDTO exactly.
  */
 export const UserResponseSchema = z.object({
   uuid: z.string(),

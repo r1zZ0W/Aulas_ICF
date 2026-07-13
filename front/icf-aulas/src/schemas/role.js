@@ -4,7 +4,7 @@
 import { z } from 'zod';
 
 /**
- * Schema for validating role list items returned by GET /api/v1/roles.
+ * Zod schema for validating role details returned by GET /api/v1/roles.
  */
 export const RoleResponseSchema = z.object({
   id: z.number().int().positive(),

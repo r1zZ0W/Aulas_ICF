@@ -1,19 +1,15 @@
+/**
+ * @fileoverview Validation schema for login requests.
+ */
 import { z } from 'zod';
 
 /**
- * @fileoverview Schema for validating login request.
- * Validates the structure of a login request.
+ * Zod schema for validating the user login credentials payload.
+ * Mirrors the backend LoginRequest contract (username and password).
  */
-
-/**
- * @typedef {z.infer<typeof LoginRequestSchema>} LoginRequest
- * Mantain a consistent naming pattern with backend: username, password.
- */
-const LoginRequestSchema = z.object({
-    username: z
-        .string(),
-    password: z
-        .string()
+export const LoginRequestSchema = z.object({
+  username: z.string().min(1, 'El usuario es requerido'),
+  password: z.string().min(1, 'La contraseña es requerida'),
 });
 
 export default LoginRequestSchema;

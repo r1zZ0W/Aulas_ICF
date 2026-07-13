@@ -1,24 +1,10 @@
 /**
  * @fileoverview Generic Zod factory for the backend's PagedResultDTO contract.
- *
- * All paginable list endpoints return:
- * {
- *   items: T[],
- *   totalElements: number,
- *   totalPages: number,
- *   page: number,       // base 0
- *   size: number,
- *   first: boolean,
- *   last: boolean,
- * }
- *
- * Usage:
- *   PagedResultSchema(UserResponseSchema).parse(data.data)
  */
 import { z } from 'zod';
 
 /**
- * Returns a Zod schema for a paged result whose items are validated by {@link itemSchema}.
+ * Returns a Zod schema for a paged result whose items are validated by itemSchema.
  *
  * @template T
  * @param {z.ZodType<T>} itemSchema - Schema for a single item in the page.
