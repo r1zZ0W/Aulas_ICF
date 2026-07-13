@@ -11,5 +11,6 @@ public record ClassroomResponseDTO(
         ClassroomType type,
         String description,
         UUID linkedRoomUuid,
-        Boolean isActive
+        Boolean isActive,
+        String roomImageUrl
 ) {}
