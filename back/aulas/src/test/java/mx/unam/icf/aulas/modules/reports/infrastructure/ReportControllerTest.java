@@ -52,29 +52,29 @@ class ReportControllerTest {
 
     @Test
     void statistics_defaultParams_returns200() throws Exception {
-        when(statisticsService.getStatistics(eq("MENSUAL"), isNull()))
+        when(statisticsService.getStatistics(eq("MONTHLY"), isNull()))
                 .thenReturn(buildEmptyDto());
 
         mockMvc.perform(get("/api/v1/reports/statistics"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").value(false))
                 .andExpect(jsonPath("$.data").exists())
-                .andExpect(jsonPath("$.data.totalReservas").value(0));
+                .andExpect(jsonPath("$.data.totalReservations").value(0));
     }
 
     // ── GET /statistics — explicit scope and anchor ───────────────────────────
 
     @Test
     void statistics_explicitScopeAndAnchor_passedToService() throws Exception {
-        when(statisticsService.getStatistics("SEMESTRAL", "some-uuid"))
+        when(statisticsService.getStatistics("SEMESTER", "some-uuid"))
                 .thenReturn(buildEmptyDto());
 
         mockMvc.perform(get("/api/v1/reports/statistics")
-                        .param("scope", "SEMESTRAL")
+                        .param("scope", "SEMESTER")
                         .param("anchor", "some-uuid"))
                 .andExpect(status().isOk());
 
-        verify(statisticsService).getStatistics("SEMESTRAL", "some-uuid");
+        verify(statisticsService).getStatistics("SEMESTER", "some-uuid");
     }
 
     // ── GET /statistics — ApiResponse envelope ────────────────────────────────
@@ -87,23 +87,23 @@ class ReportControllerTest {
         mockMvc.perform(get("/api/v1/reports/statistics"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").value(false))
-                .andExpect(jsonPath("$.data.aulasMasOcupadas").isArray())
-                .andExpect(jsonPath("$.data.usuariosMasReservas").isArray())
-                .andExpect(jsonPath("$.data.tendencia").isArray())
-                .andExpect(jsonPath("$.data.recurrencia").exists())
-                .andExpect(jsonPath("$.data.tasaRecurrenciaPct").value(0.0));
+                .andExpect(jsonPath("$.data.mostOccupiedClassrooms").isArray())
+                .andExpect(jsonPath("$.data.topUsers").isArray())
+                .andExpect(jsonPath("$.data.trend").isArray())
+                .andExpect(jsonPath("$.data.recurrence").exists())
+                .andExpect(jsonPath("$.data.recurrenceRatePct").value(0.0));
     }
 
     // ── GET /statistics — invalid scope → 400 ────────────────────────────────
 
     @Test
     void statistics_invalidScope_returns400() throws Exception {
-        when(statisticsService.getStatistics(eq("SEMANAL"), any()))
-                .thenThrow(new IllegalArgumentException("scope debe ser MENSUAL o SEMESTRAL"));
+        when(statisticsService.getStatistics(eq("WEEKLY"), any()))
+                .thenThrow(new IllegalArgumentException("scope must be MONTHLY or SEMESTER"));
         // Simulate dev profile so the real message is forwarded
         when(env.getActiveProfiles()).thenReturn(new String[]{"dev"});
 
-        mockMvc.perform(get("/api/v1/reports/statistics").param("scope", "SEMANAL"))
+        mockMvc.perform(get("/api/v1/reports/statistics").param("scope", "WEEKLY"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value(true));
     }
@@ -111,11 +111,11 @@ class ReportControllerTest {
     @Test
     void statistics_invalidAnchor_returns400() throws Exception {
         when(statisticsService.getStatistics(any(), eq("bad-anchor")))
-                .thenThrow(new IllegalArgumentException("anchor inválido para scope MENSUAL"));
+                .thenThrow(new IllegalArgumentException("Invalid anchor for scope MONTHLY"));
         when(env.getActiveProfiles()).thenReturn(new String[]{"dev"});
 
         mockMvc.perform(get("/api/v1/reports/statistics")
-                        .param("scope", "MENSUAL")
+                        .param("scope", "MONTHLY")
                         .param("anchor", "bad-anchor"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value(true));
@@ -124,12 +124,12 @@ class ReportControllerTest {
     @Test
     void statistics_nonExistentSemesterUuid_returns400() throws Exception {
         String fakeUuid = "00000000-0000-0000-0000-000000000000";
-        when(statisticsService.getStatistics(eq("SEMESTRAL"), eq(fakeUuid)))
-                .thenThrow(new IllegalArgumentException("Semestre no encontrado: " + fakeUuid));
+        when(statisticsService.getStatistics(eq("SEMESTER"), eq(fakeUuid)))
+                .thenThrow(new IllegalArgumentException("Semester not found: " + fakeUuid));
         when(env.getActiveProfiles()).thenReturn(new String[]{"dev"});
 
         mockMvc.perform(get("/api/v1/reports/statistics")
-                        .param("scope", "SEMESTRAL")
+                        .param("scope", "SEMESTER")
                         .param("anchor", fakeUuid))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value(true));
@@ -168,8 +168,8 @@ class ReportControllerTest {
         return new ReservationStatisticsDTO(
                 0L, null, null, null, 0.0,
                 List.of(), List.of(),
-                new ReservationStatisticsDTO.Recurrencia(0L, 0L),
-                List.of(new ReservationStatisticsDTO.TendenciaItem("01", 0L))
+                new ReservationStatisticsDTO.Recurrence(0L, 0L),
+                List.of(new ReservationStatisticsDTO.TrendPoint("01", 0L))
         );
     }
 }

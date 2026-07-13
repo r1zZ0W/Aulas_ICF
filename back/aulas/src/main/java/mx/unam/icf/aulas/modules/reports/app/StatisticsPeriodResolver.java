@@ -25,13 +25,14 @@ import java.util.UUID;
  *   <li>Derive the previous comparable period with proportional truncation when the current
  *       period is still open (see {@link #computePrevTo}).</li>
  *   <li>Build the ordered scaffold of trend-series labels (one per day or per month).</li>
- *   <li>Return {@link Optional#empty()} <em>only</em> when scope is {@code SEMESTRAL} and no
+ *   <li>Return {@link Optional#empty()} <em>only</em> when scope is {@code SEMESTER} and no
  *       semesters exist in the database, signalling the service to short-circuit.</li>
  * </ol>
  *
  * <p>All validation errors are thrown as {@link IllegalArgumentException}; the
  * {@link mx.unam.icf.aulas.kernel.infrastructure.exceptions.GlobalExceptionHandler} maps them
- * to HTTP 400.</p>
+ * to HTTP 400. Error messages follow the handler's convention (English, terse); the frontend
+ * translates them for display.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -44,27 +45,27 @@ public class StatisticsPeriodResolver {
     /**
      * Resolves the analysis period for the given scope and anchor.
      *
-     * @param scope  the analysis granularity ({@code MENSUAL} or {@code SEMESTRAL})
+     * @param scope  the analysis granularity ({@code MONTHLY} or {@code SEMESTER})
      * @param anchor the period anchor:
      *               <ul>
-     *                 <li>{@code MENSUAL}: a {@code yyyy-MM} string; {@code null}/blank → current month</li>
-     *                 <li>{@code SEMESTRAL}: a semester UUID string; {@code null}/blank → current semester
+     *                 <li>{@code MONTHLY}: a {@code yyyy-MM} string; {@code null}/blank → current month</li>
+     *                 <li>{@code SEMESTER}: a semester UUID string; {@code null}/blank → current semester
      *                     (or latest by end date if none is currently active)</li>
      *               </ul>
-     * @return the resolved period, or {@link Optional#empty()} if scope is {@code SEMESTRAL}
+     * @return the resolved period, or {@link Optional#empty()} if scope is {@code SEMESTER}
      *         and no semesters exist in the database at all
-     * @throws IllegalArgumentException if the anchor format is invalid, or a SEMESTRAL UUID
+     * @throws IllegalArgumentException if the anchor format is invalid, or a SEMESTER UUID
      *                                  does not match any existing semester
      */
     public Optional<ResolvedPeriod> resolve(StatisticsScope scope, String anchor) {
         LocalDate today = LocalDate.now();
         return switch (scope) {
-            case MENSUAL   -> Optional.of(resolveMonthly(anchor, today));
-            case SEMESTRAL -> resolveSemestral(anchor, today);
+            case MONTHLY  -> Optional.of(resolveMonthly(anchor, today));
+            case SEMESTER -> resolveSemesterPeriod(anchor, today);
         };
     }
 
-    // ── MENSUAL ───────────────────────────────────────────────────────────────
+    // ── MONTHLY ───────────────────────────────────────────────────────────────
 
     /**
      * Resolves a monthly analysis period.
@@ -88,7 +89,7 @@ public class StatisticsPeriodResolver {
         LocalDate prevTo         = computePrevTo(from, to, naturalEnd, prevFrom, prevNaturalEnd);
 
         return new ResolvedPeriod(
-                StatisticsScope.MENSUAL,
+                StatisticsScope.MONTHLY,
                 from, to,
                 prevFrom, prevTo,
                 buildDayScaffold(ym)
@@ -110,7 +111,7 @@ public class StatisticsPeriodResolver {
         try {
             return YearMonth.parse(anchor.trim());
         } catch (Exception e) {
-            throw new IllegalArgumentException("anchor inválido para scope MENSUAL");
+            throw new IllegalArgumentException("Invalid anchor for scope MONTHLY");
         }
     }
 
@@ -128,7 +129,7 @@ public class StatisticsPeriodResolver {
         return labels;
     }
 
-    // ── SEMESTRAL ─────────────────────────────────────────────────────────────
+    // ── SEMESTER ──────────────────────────────────────────────────────────────
 
     /**
      * Resolves a semester analysis period.
@@ -139,7 +140,7 @@ public class StatisticsPeriodResolver {
      * @throws IllegalArgumentException if the anchor is present but not a valid UUID,
      *                                  or if the UUID does not match any semester
      */
-    private Optional<ResolvedPeriod> resolveSemestral(String anchor, LocalDate today) {
+    private Optional<ResolvedPeriod> resolveSemesterPeriod(String anchor, LocalDate today) {
         Semester sem = resolveSemester(anchor, today);
         if (sem == null) {
             // No semesters in the database — short-circuit to empty DTO
@@ -163,7 +164,7 @@ public class StatisticsPeriodResolver {
         }
 
         return Optional.of(new ResolvedPeriod(
-                StatisticsScope.SEMESTRAL,
+                StatisticsScope.SEMESTER,
                 from, to,
                 prevFrom, prevTo,
                 buildMonthScaffold(from, naturalEnd)
@@ -199,19 +200,19 @@ public class StatisticsPeriodResolver {
         try {
             uuid = UUID.fromString(anchor.trim());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("anchor inválido para scope SEMESTRAL");
+            throw new IllegalArgumentException("Invalid anchor for scope SEMESTER");
         }
 
         return semesterRepository.findByUuid(uuid)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Semestre no encontrado: " + anchor.trim()));
+                        new IllegalArgumentException("Semester not found: " + anchor.trim()));
     }
 
     /**
      * Builds the complete ordered list of month labels for a semester scaffold.
      *
      * <p>Iterates from the first month of the semester to the last, including months that lie
-     * in the future (these will have {@code reservas = 0} in the trend series). Handles
+     * in the future (these will have {@code reservations = 0} in the trend series). Handles
      * cross-year semesters correctly (e.g., Aug–Jan produces {@code ["Ago","Sep",…,"Ene"]}).</p>
      *
      * <p>A well-formed semester never exceeds 12 months (enforced by
@@ -220,7 +221,7 @@ public class StatisticsPeriodResolver {
      * pre-existing data that predates that guard, when the range spans <em>more than</em> 12
      * months each label is disambiguated with a 2-digit year ({@code "Ene 26"}) — otherwise two
      * dates a year apart would both render as {@code "Ene"} and collide into one bucket in
-     * {@link ReservationStatisticsService#buildTendencia}.</p>
+     * {@link ReservationStatisticsService#buildTrend}.</p>
      *
      * @param semStart first day of the semester (natural start, not capped)
      * @param semEnd   last day of the semester (natural end, not capped by today)
@@ -236,7 +237,7 @@ public class StatisticsPeriodResolver {
         List<String> labels = new ArrayList<>();
         LocalDate cursor = firstMonth;
         while (!cursor.isAfter(semEnd)) {
-            labels.add(StatisticsScope.SEMESTRAL.tendenciaLabel(cursor, includeYear));
+            labels.add(StatisticsScope.SEMESTER.trendLabel(cursor, includeYear));
             cursor = cursor.plusMonths(1);
         }
         return labels;

@@ -48,7 +48,7 @@ class ReservationStatisticsServiceTest {
     void setUp() {
         // Closed month: 1-Mar to 31-Mar 2025; previous = Feb 2025 (complete)
         march2025 = new ResolvedPeriod(
-                StatisticsScope.MENSUAL,
+                StatisticsScope.MONTHLY,
                 LocalDate.of(2025, 3, 1),
                 LocalDate.of(2025, 3, 31),
                 LocalDate.of(2025, 2, 1),
@@ -59,11 +59,11 @@ class ReservationStatisticsServiceTest {
         lenient().when(slotProps.slotDurationHours()).thenReturn(0.5);
     }
 
-    // ── totalReservas ─────────────────────────────────────────────────────────
+    // ── totalReservations ─────────────────────────────────────────────────────
 
     @Test
-    void getStatistics_returnsTotalReservasFromDb() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
+    void getStatistics_returnsTotalReservationsFromDb() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
         stubEmptyCollections();
         when(statsRepo.countActive(
                 march2025.from(), march2025.to(), ReservInstanceStatus.ACTIVE))
@@ -72,230 +72,230 @@ class ReservationStatisticsServiceTest {
                 march2025.prevFrom(), march2025.prevTo(), ReservInstanceStatus.ACTIVE))
                 .thenReturn(0L);  // prevCount=0 → delta=null
 
-        ReservationStatisticsDTO dto = service.getStatistics("MENSUAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("MONTHLY", null);
 
-        assertThat(dto.totalReservas()).isEqualTo(42L);
+        assertThat(dto.totalReservations()).isEqualTo(42L);
     }
 
     // ── delta ─────────────────────────────────────────────────────────────────
 
     @Test
     void getStatistics_deltaNull_whenPrevPeriodIsZero() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
         stubEmptyCollections();
         when(statsRepo.countActive(march2025.from(), march2025.to(), ReservInstanceStatus.ACTIVE))
                 .thenReturn(50L);
         when(statsRepo.countActive(march2025.prevFrom(), march2025.prevTo(), ReservInstanceStatus.ACTIVE))
                 .thenReturn(0L);
 
-        assertThat(service.getStatistics("MENSUAL", null).totalReservasDeltaPct()).isNull();
+        assertThat(service.getStatistics("MONTHLY", null).totalReservationsDeltaPct()).isNull();
     }
 
     @Test
     void getStatistics_deltaNull_whenNoPrevPeriod() {
         ResolvedPeriod noPrev = new ResolvedPeriod(
-                StatisticsScope.SEMESTRAL,
+                StatisticsScope.SEMESTER,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30),
                 null, null,
                 List.of("Ene", "Feb", "Mar", "Abr", "May", "Jun")
         );
-        when(resolver.resolve(StatisticsScope.SEMESTRAL, null)).thenReturn(Optional.of(noPrev));
+        when(resolver.resolve(StatisticsScope.SEMESTER, null)).thenReturn(Optional.of(noPrev));
         stubEmptyCollections();
         when(statsRepo.countActive(any(), any(), any())).thenReturn(100L);
 
-        assertThat(service.getStatistics("SEMESTRAL", null).totalReservasDeltaPct()).isNull();
+        assertThat(service.getStatistics("SEMESTER", null).totalReservationsDeltaPct()).isNull();
         // countActive called only once (no prev period → no second call)
         verify(statsRepo, times(1)).countActive(any(), any(), any());
     }
 
     @Test
     void getStatistics_deltaPositive_whenActualExceedsPrev() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
         stubEmptyCollections();
         when(statsRepo.countActive(march2025.from(), march2025.to(), ReservInstanceStatus.ACTIVE))
                 .thenReturn(110L);
         when(statsRepo.countActive(march2025.prevFrom(), march2025.prevTo(), ReservInstanceStatus.ACTIVE))
                 .thenReturn(100L);
 
-        Double delta = service.getStatistics("MENSUAL", null).totalReservasDeltaPct();
+        Double delta = service.getStatistics("MONTHLY", null).totalReservationsDeltaPct();
 
         assertThat(delta).isEqualTo(10.0);  // (110-100)/100 * 100 = 10%
     }
 
-    // ── aulaMasOcupada ────────────────────────────────────────────────────────
+    // ── mostOccupiedClassroom ─────────────────────────────────────────────────
 
     @Test
-    void getStatistics_aulaMasOcupada_isFirstElement() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
+    void getStatistics_mostOccupiedClassroom_isFirstElement() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
         stubForTotal(20L);
         stubEmptyUsers();
-        stubEmptyTendencia();
+        stubEmptyTrend();
 
-        ClassroomSlotsView aula1 = mockAula("Aula 101", 40L);
-        ClassroomSlotsView aula2 = mockAula("Lab Física", 30L);
+        ClassroomSlotsView room1 = mockClassroom("Aula 101", 40L);
+        ClassroomSlotsView room2 = mockClassroom("Lab Física", 30L);
         when(statsRepo.topClassroomsBySlots(any(), any(), any(), any(Limit.class)))
-                .thenReturn(List.of(aula1, aula2));
+                .thenReturn(List.of(room1, room2));
 
-        ReservationStatisticsDTO dto = service.getStatistics("MENSUAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("MONTHLY", null);
 
-        assertThat(dto.aulaMasOcupada()).isNotNull();
-        assertThat(dto.aulaMasOcupada().nombre()).isEqualTo("Aula 101");
+        assertThat(dto.mostOccupiedClassroom()).isNotNull();
+        assertThat(dto.mostOccupiedClassroom().name()).isEqualTo("Aula 101");
         // Slot conversion: 40 slots × 0.5 h = 20 h
-        assertThat(dto.aulaMasOcupada().horas()).isEqualTo(20.0);
-        assertThat(dto.aulasMasOcupadas()).hasSize(2);
+        assertThat(dto.mostOccupiedClassroom().hours()).isEqualTo(20.0);
+        assertThat(dto.mostOccupiedClassrooms()).hasSize(2);
     }
 
     @Test
-    void getStatistics_aulaMasOcupada_isNull_whenNoData() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
+    void getStatistics_mostOccupiedClassroom_isNull_whenNoData() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
         stubForTotal(0L);
         when(statsRepo.topClassroomsBySlots(any(), any(), any(), any(Limit.class)))
                 .thenReturn(List.of());
         stubEmptyUsers();
-        stubEmptyTendencia();
+        stubEmptyTrend();
 
-        assertThat(service.getStatistics("MENSUAL", null).aulaMasOcupada()).isNull();
+        assertThat(service.getStatistics("MONTHLY", null).mostOccupiedClassroom()).isNull();
     }
 
-    // ── slot → horas uses slotProps, not a hardcoded 0.5 ─────────────────────
+    // ── slot → hours uses slotProps, not a hardcoded 0.5 ─────────────────────
 
     @Test
-    void getStatistics_horasCalculatedFromSlotProps_not_hardcoded() {
+    void getStatistics_hoursCalculatedFromSlotProps_not_hardcoded() {
         // Configure 45-minute slots (not the default 30)
         when(slotProps.slotDurationHours()).thenReturn(0.75);
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
         stubForTotal(10L);
         stubEmptyUsers();
-        stubEmptyTendencia();
+        stubEmptyTrend();
 
-        ClassroomSlotsView aula = mockAula("Sala A", 4L);
+        ClassroomSlotsView room = mockClassroom("Sala A", 4L);
         when(statsRepo.topClassroomsBySlots(any(), any(), any(), any(Limit.class)))
-                .thenReturn(List.of(aula));
+                .thenReturn(List.of(room));
 
-        ReservationStatisticsDTO dto = service.getStatistics("MENSUAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("MONTHLY", null);
 
         // 4 slots × 0.75 h = 3.0 h (not 4 × 0.5 = 2.0)
-        assertThat(dto.aulaMasOcupada().horas()).isEqualTo(3.0);
+        assertThat(dto.mostOccupiedClassroom().hours()).isEqualTo(3.0);
     }
 
-    // ── recurrencia ───────────────────────────────────────────────────────────
+    // ── recurrence ────────────────────────────────────────────────────────────
     //
-    // NOTE: recurrence is now counted by reservation (group), not by session-day.
+    // NOTE: recurrence is counted by reservation (group), not by session-day.
     // countInstancesPerGroup returns one entry per distinct group with instances in the period,
     // holding that group's instance count within [from, to]; the service classifies each entry
-    // (>1 = recurrente, ==1 = eventual). These service-level tests verify that classification and
-    // the tasa/eventuales arithmetic — the query itself is covered by
+    // (>1 = recurring, ==1 = one-time). These service-level tests verify that classification and
+    // the rate/oneTime arithmetic — the query itself is covered by
     // ReportStatisticsRepository's javadoc/SQL.
 
     @Test
-    void getStatistics_recurrencia_countsGroups_notInstances() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
-        stubEmptyAulas();
+    void getStatistics_recurrence_countsGroups_notInstances() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
+        stubEmptyClassrooms();
         stubEmptyUsers();
-        stubEmptyTendencia();
+        stubEmptyTrend();
         when(statsRepo.countActive(march2025.from(), march2025.to(), ReservInstanceStatus.ACTIVE))
                 .thenReturn(20L);  // e.g. a 12-session weekly class + 8 one-off bookings
         when(statsRepo.countActive(march2025.prevFrom(), march2025.prevTo(), ReservInstanceStatus.ACTIVE))
                 .thenReturn(0L);
-        // 5 distinct groups: one recurring (12 sessions in the period), four eventual (1 each)
+        // 5 distinct groups: one recurring (12 sessions in the period), four one-time (1 each)
         when(statsRepo.countInstancesPerGroup(march2025.from(), march2025.to(), ReservInstanceStatus.ACTIVE))
                 .thenReturn(List.of(12L, 1L, 1L, 1L, 1L));
 
-        ReservationStatisticsDTO dto = service.getStatistics("MENSUAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("MONTHLY", null);
 
-        assertThat(dto.recurrencia().recurrentes()).isEqualTo(1L);   // one recurring group
-        assertThat(dto.recurrencia().eventuales()).isEqualTo(4L);    // four eventual groups
-        // Invariant is now over distinct groups, NOT totalReservas (which counts session-days)
-        assertThat(dto.recurrencia().recurrentes() + dto.recurrencia().eventuales())
+        assertThat(dto.recurrence().recurring()).isEqualTo(1L);   // one recurring group
+        assertThat(dto.recurrence().oneTime()).isEqualTo(4L);     // four one-time groups
+        // Invariant is over distinct groups, NOT totalReservations (which counts session-days)
+        assertThat(dto.recurrence().recurring() + dto.recurrence().oneTime())
                 .isEqualTo(5L)
-                .isNotEqualTo(dto.totalReservas());
+                .isNotEqualTo(dto.totalReservations());
     }
 
     @Test
-    void getStatistics_tasaRecurrencia_computedOverGroupCount() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
-        stubEmptyAulas();
+    void getStatistics_recurrenceRate_computedOverGroupCount() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
+        stubEmptyClassrooms();
         stubEmptyUsers();
-        stubEmptyTendencia();
+        stubEmptyTrend();
         when(statsRepo.countActive(any(), any(), eq(ReservInstanceStatus.ACTIVE)))
                 .thenReturn(5L).thenReturn(0L);
-        // 5 groups, 2 recurring (>1 instance), 3 eventual → 2/5 = 40%
+        // 5 groups, 2 recurring (>1 instance), 3 one-time → 2/5 = 40%
         when(statsRepo.countInstancesPerGroup(any(), any(), any()))
                 .thenReturn(List.of(3L, 1L, 1L, 5L, 1L));
 
-        assertThat(service.getStatistics("MENSUAL", null).tasaRecurrenciaPct()).isEqualTo(40.0);
+        assertThat(service.getStatistics("MONTHLY", null).recurrenceRatePct()).isEqualTo(40.0);
     }
 
     @Test
-    void getStatistics_tasaRecurrencia_zeroWhenNoReservas() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
-        stubEmptyAulas();
+    void getStatistics_recurrenceRate_zeroWhenNoReservations() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
+        stubEmptyClassrooms();
         stubEmptyUsers();
-        stubEmptyTendencia();
+        stubEmptyTrend();
         when(statsRepo.countActive(any(), any(), any())).thenReturn(0L);
         when(statsRepo.countInstancesPerGroup(any(), any(), any())).thenReturn(List.of());
 
-        assertThat(service.getStatistics("MENSUAL", null).tasaRecurrenciaPct()).isEqualTo(0.0);
+        assertThat(service.getStatistics("MONTHLY", null).recurrenceRatePct()).isEqualTo(0.0);
     }
 
-    // ── nombre sanitizado (sin espacio fantasma) ──────────────────────────────
+    // ── sanitized name (no phantom trailing space) ────────────────────────────
 
     @Test
-    void getStatistics_usuarioNombreIsTrimmmed_whenLastNameAbsent() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
+    void getStatistics_userNameIsTrimmed_whenLastNameAbsent() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
         stubForTotal(1L);
-        stubEmptyAulas();
-        stubEmptyTendencia();
+        stubEmptyClassrooms();
+        stubEmptyTrend();
 
-        // The DB returns "Daniel " (with trailing space from CONCAT without TRIM) —
-        // but our query uses TRIM, so the projection receives "Daniel".
+        // The DB would return "Daniel " (trailing space from CONCAT without TRIM) —
+        // but the query uses TRIM, so the projection receives "Daniel".
         // We simulate the projection already having the clean value.
         UserReservationsView u = mockUser("Daniel", 1L);
         when(statsRepo.topUsersByReservations(any(), any(), any(), any(Limit.class)))
                 .thenReturn(List.of(u));
 
-        ReservationStatisticsDTO dto = service.getStatistics("MENSUAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("MONTHLY", null);
 
-        assertThat(dto.mayorUsuario()).isNotNull();
-        assertThat(dto.mayorUsuario().nombre()).isEqualTo("Daniel");
-        assertThat(dto.mayorUsuario().nombre()).doesNotEndWith(" ");
+        assertThat(dto.topUser()).isNotNull();
+        assertThat(dto.topUser().name()).isEqualTo("Daniel");
+        assertThat(dto.topUser().name()).doesNotEndWith(" ");
     }
 
-    // ── tendencia MENSUAL ─────────────────────────────────────────────────────
+    // ── trend MONTHLY ─────────────────────────────────────────────────────────
 
     @Test
-    void getStatistics_tendencia_fillsZerosForDaysWithNoData() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.of(march2025));
+    void getStatistics_trend_fillsZerosForDaysWithNoData() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.of(march2025));
         stubForTotal(2L);
-        stubEmptyAulas();
+        stubEmptyClassrooms();
         stubEmptyUsers();
 
         // Only day 15 has data
         DateCountView row = mockDateCount(LocalDate.of(2025, 3, 15), 2L);
         when(statsRepo.countPerDate(any(), any(), any())).thenReturn(List.of(row));
 
-        ReservationStatisticsDTO dto = service.getStatistics("MENSUAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("MONTHLY", null);
 
-        assertThat(dto.tendencia()).hasSize(31);  // March has 31 days
-        assertThat(dto.tendencia().get(14).label()).isEqualTo("15");  // index 14 = day 15
-        assertThat(dto.tendencia().get(14).reservas()).isEqualTo(2L);
-        assertThat(dto.tendencia().get(0).reservas()).isEqualTo(0L);   // day 1 = 0
-        assertThat(dto.tendencia().get(30).reservas()).isEqualTo(0L);  // day 31 = 0
+        assertThat(dto.trend()).hasSize(31);  // March has 31 days
+        assertThat(dto.trend().get(14).label()).isEqualTo("15");  // index 14 = day 15
+        assertThat(dto.trend().get(14).reservations()).isEqualTo(2L);
+        assertThat(dto.trend().get(0).reservations()).isEqualTo(0L);   // day 1 = 0
+        assertThat(dto.trend().get(30).reservations()).isEqualTo(0L);  // day 31 = 0
     }
 
-    // ── tendencia SEMESTRAL ───────────────────────────────────────────────────
+    // ── trend SEMESTER ────────────────────────────────────────────────────────
 
     @Test
-    void getStatistics_tendencia_semestral_aggregatesByMonth() {
+    void getStatistics_trend_semester_aggregatesByMonth() {
         ResolvedPeriod sem = new ResolvedPeriod(
-                StatisticsScope.SEMESTRAL,
+                StatisticsScope.SEMESTER,
                 LocalDate.of(2026, 1, 12), LocalDate.of(2026, 6, 26),
                 null, null,
                 List.of("Ene", "Feb", "Mar", "Abr", "May", "Jun")
         );
-        when(resolver.resolve(StatisticsScope.SEMESTRAL, null)).thenReturn(Optional.of(sem));
+        when(resolver.resolve(StatisticsScope.SEMESTER, null)).thenReturn(Optional.of(sem));
         stubForTotal(10L);
-        stubEmptyAulas();
+        stubEmptyClassrooms();
         stubEmptyUsers();
 
         // Two days in January, one in March.
@@ -307,18 +307,18 @@ class ReservationStatisticsServiceTest {
         when(statsRepo.countPerDate(any(), any(), any()))
                 .thenReturn(List.of(jan15, jan20, mar5));
 
-        ReservationStatisticsDTO dto = service.getStatistics("SEMESTRAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("SEMESTER", null);
 
-        assertThat(dto.tendencia()).hasSize(6);
-        assertThat(dto.tendencia().get(0).label()).isEqualTo("Ene");
-        assertThat(dto.tendencia().get(0).reservas()).isEqualTo(5L);  // 3 + 2
-        assertThat(dto.tendencia().get(2).label()).isEqualTo("Mar");
-        assertThat(dto.tendencia().get(2).reservas()).isEqualTo(5L);
-        assertThat(dto.tendencia().get(1).reservas()).isEqualTo(0L);  // Feb = 0
+        assertThat(dto.trend()).hasSize(6);
+        assertThat(dto.trend().get(0).label()).isEqualTo("Ene");
+        assertThat(dto.trend().get(0).reservations()).isEqualTo(5L);  // 3 + 2
+        assertThat(dto.trend().get(2).label()).isEqualTo("Mar");
+        assertThat(dto.trend().get(2).reservations()).isEqualTo(5L);
+        assertThat(dto.trend().get(1).reservations()).isEqualTo(0L);  // Feb = 0
     }
 
     @Test
-    void getStatistics_tendencia_semestral_disambiguatesRepeatedMonthsAcrossYears() {
+    void getStatistics_trend_semester_disambiguatesRepeatedMonthsAcrossYears() {
         // A malformed multi-year "semester" (>12 months) — the scaffold must include the year
         // in each label, and dates a year apart must NOT collapse into the same bucket.
         List<String> scaffold = List.of(
@@ -326,13 +326,13 @@ class ReservationStatisticsServiceTest {
                 "Jul 25", "Ago 25", "Sep 25", "Oct 25", "Nov 25", "Dic 25",
                 "Ene 26");
         ResolvedPeriod multiYear = new ResolvedPeriod(
-                StatisticsScope.SEMESTRAL,
+                StatisticsScope.SEMESTER,
                 LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 31),
                 null, null,
                 scaffold);
-        when(resolver.resolve(StatisticsScope.SEMESTRAL, null)).thenReturn(Optional.of(multiYear));
+        when(resolver.resolve(StatisticsScope.SEMESTER, null)).thenReturn(Optional.of(multiYear));
         stubForTotal(10L);
-        stubEmptyAulas();
+        stubEmptyClassrooms();
         stubEmptyUsers();
 
         DateCountView jan2025 = mockDateCount(LocalDate.of(2025, 1, 10), 4L);
@@ -340,65 +340,65 @@ class ReservationStatisticsServiceTest {
         when(statsRepo.countPerDate(any(), any(), any()))
                 .thenReturn(List.of(jan2025, jan2026));
 
-        ReservationStatisticsDTO dto = service.getStatistics("SEMESTRAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("SEMESTER", null);
 
-        assertThat(dto.tendencia()).hasSize(13);
-        assertThat(dto.tendencia().get(0).label()).isEqualTo("Ene 25");
-        assertThat(dto.tendencia().get(0).reservas()).isEqualTo(4L);   // NOT summed with Jan 2026
-        assertThat(dto.tendencia().get(12).label()).isEqualTo("Ene 26");
-        assertThat(dto.tendencia().get(12).reservas()).isEqualTo(7L);  // kept in its own bucket
+        assertThat(dto.trend()).hasSize(13);
+        assertThat(dto.trend().get(0).label()).isEqualTo("Ene 25");
+        assertThat(dto.trend().get(0).reservations()).isEqualTo(4L);   // NOT summed with Jan 2026
+        assertThat(dto.trend().get(12).label()).isEqualTo("Ene 26");
+        assertThat(dto.trend().get(12).reservations()).isEqualTo(7L);  // kept in its own bucket
     }
 
-    // ── short-circuit — rango vacío ───────────────────────────────────────────
+    // ── short-circuit — empty range ───────────────────────────────────────────
 
     @Test
     void getStatistics_shortCircuit_whenResolverReturnsEmpty() {
-        when(resolver.resolve(StatisticsScope.SEMESTRAL, null)).thenReturn(Optional.empty());
+        when(resolver.resolve(StatisticsScope.SEMESTER, null)).thenReturn(Optional.empty());
 
-        ReservationStatisticsDTO dto = service.getStatistics("SEMESTRAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("SEMESTER", null);
 
         // No database calls at all
         verifyNoInteractions(statsRepo);
 
         // DTO is in safe zeroed state
-        assertThat(dto.totalReservas()).isEqualTo(0L);
-        assertThat(dto.totalReservasDeltaPct()).isNull();
-        assertThat(dto.aulaMasOcupada()).isNull();
-        assertThat(dto.mayorUsuario()).isNull();
-        assertThat(dto.tasaRecurrenciaPct()).isEqualTo(0.0);
-        assertThat(dto.aulasMasOcupadas()).isEmpty();
-        assertThat(dto.usuariosMasReservas()).isEmpty();
+        assertThat(dto.totalReservations()).isEqualTo(0L);
+        assertThat(dto.totalReservationsDeltaPct()).isNull();
+        assertThat(dto.mostOccupiedClassroom()).isNull();
+        assertThat(dto.topUser()).isNull();
+        assertThat(dto.recurrenceRatePct()).isEqualTo(0.0);
+        assertThat(dto.mostOccupiedClassrooms()).isEmpty();
+        assertThat(dto.topUsers()).isEmpty();
     }
 
     @Test
-    void getStatistics_shortCircuit_tendenciaNotEmpty() {
-        when(resolver.resolve(StatisticsScope.SEMESTRAL, null)).thenReturn(Optional.empty());
+    void getStatistics_shortCircuit_trendNotEmpty() {
+        when(resolver.resolve(StatisticsScope.SEMESTER, null)).thenReturn(Optional.empty());
 
-        ReservationStatisticsDTO dto = service.getStatistics("SEMESTRAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("SEMESTER", null);
 
         // Trend scaffold must not be empty so chart axes don't collapse
-        assertThat(dto.tendencia()).isNotEmpty();
-        assertThat(dto.tendencia()).allMatch(item -> item.reservas() == 0L);
+        assertThat(dto.trend()).isNotEmpty();
+        assertThat(dto.trend()).allMatch(item -> item.reservations() == 0L);
     }
 
     @Test
-    void getStatistics_shortCircuit_mensualTendenciaHasCurrentMonthDays() {
-        when(resolver.resolve(StatisticsScope.MENSUAL, null)).thenReturn(Optional.empty());
+    void getStatistics_shortCircuit_monthlyTrendHasCurrentMonthDays() {
+        when(resolver.resolve(StatisticsScope.MONTHLY, null)).thenReturn(Optional.empty());
 
-        ReservationStatisticsDTO dto = service.getStatistics("MENSUAL", null);
+        ReservationStatisticsDTO dto = service.getStatistics("MONTHLY", null);
 
         int expectedDays = YearMonth.now().lengthOfMonth();
-        assertThat(dto.tendencia()).hasSize(expectedDays);
-        assertThat(dto.tendencia().get(0).label()).isEqualTo("01");
+        assertThat(dto.trend()).hasSize(expectedDays);
+        assertThat(dto.trend().get(0).label()).isEqualTo("01");
     }
 
-    // ── scope inválido ────────────────────────────────────────────────────────
+    // ── invalid scope ─────────────────────────────────────────────────────────
 
     @Test
     void getStatistics_invalidScope_throwsIllegalArgument() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> service.getStatistics("SEMANAL", null))
-                .withMessage("scope debe ser MENSUAL o SEMESTRAL");
+                .isThrownBy(() -> service.getStatistics("WEEKLY", null))
+                .withMessage("scope must be MONTHLY or SEMESTER");
         verifyNoInteractions(resolver, statsRepo);
     }
 
@@ -445,7 +445,7 @@ class ReservationStatisticsServiceTest {
         when(statsRepo.countInstancesPerGroup(any(), any(), any())).thenReturn(List.of());
     }
 
-    private void stubEmptyAulas() {
+    private void stubEmptyClassrooms() {
         when(statsRepo.topClassroomsBySlots(any(), any(), any(), any(Limit.class)))
                 .thenReturn(List.of());
     }
@@ -455,29 +455,29 @@ class ReservationStatisticsServiceTest {
                 .thenReturn(List.of());
     }
 
-    private void stubEmptyTendencia() {
+    private void stubEmptyTrend() {
         when(statsRepo.countPerDate(any(), any(), any())).thenReturn(List.of());
     }
 
     private void stubEmptyCollections() {
         when(statsRepo.countActive(any(), any(), any())).thenReturn(0L);
         when(statsRepo.countInstancesPerGroup(any(), any(), any())).thenReturn(List.of());
-        stubEmptyAulas();
+        stubEmptyClassrooms();
         stubEmptyUsers();
-        stubEmptyTendencia();
+        stubEmptyTrend();
     }
 
-    private ClassroomSlotsView mockAula(String nombre, long slots) {
+    private ClassroomSlotsView mockClassroom(String name, long slots) {
         ClassroomSlotsView v = mock(ClassroomSlotsView.class);
-        when(v.getNombre()).thenReturn(nombre);
+        when(v.getName()).thenReturn(name);
         when(v.getTotalSlots()).thenReturn(slots);
         return v;
     }
 
-    private UserReservationsView mockUser(String nombre, long reservas) {
+    private UserReservationsView mockUser(String name, long reservations) {
         UserReservationsView v = mock(UserReservationsView.class);
-        when(v.getNombre()).thenReturn(nombre);
-        when(v.getReservas()).thenReturn(reservas);
+        when(v.getName()).thenReturn(name);
+        when(v.getReservations()).thenReturn(reservations);
         return v;
     }
 

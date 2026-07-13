@@ -68,7 +68,7 @@ public interface SemesterRepository extends JpaRepository<Semester, Long> {
      * Returns the semester that immediately precedes the given start date.
      *
      * <p>Used by {@link mx.unam.icf.aulas.modules.reports.app.StatisticsPeriodResolver} to
-     * locate the previous comparable period when computing the {@code totalReservasDeltaPct}
+     * locate the previous comparable period when computing the {@code totalReservationsDeltaPct}
      * KPI for semester-scoped statistics.</p>
      *
      * <p>Ordering by {@code startDate DESC} and limiting to 1 row ensures a deterministic result

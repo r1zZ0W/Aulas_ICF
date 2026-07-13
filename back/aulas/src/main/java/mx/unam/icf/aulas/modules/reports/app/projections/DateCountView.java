@@ -11,7 +11,7 @@ import java.time.LocalDate;
  *
  * <p>The caller ({@link mx.unam.icf.aulas.modules.reports.app.ReservationStatisticsService})
  * fills in zero-reservation days/months by iterating over the full scaffold from
- * {@link mx.unam.icf.aulas.modules.reports.app.ResolvedPeriod#tendenciaLabels()} and
+ * {@link mx.unam.icf.aulas.modules.reports.app.ResolvedPeriod#trendLabels()} and
  * looking up each label in the map derived from these rows.</p>
  */
 public interface DateCountView {
@@ -19,7 +19,7 @@ public interface DateCountView {
     /**
      * Returns the reservation date for this bucket.
      * One distinct date per row; the caller converts it to a trend label via
-     * {@link mx.unam.icf.aulas.modules.reports.app.StatisticsScope#tendenciaLabel(LocalDate)}.
+     * {@link mx.unam.icf.aulas.modules.reports.app.StatisticsScope#trendLabel(LocalDate)}.
      *
      * @return non-null reservation date
      */

@@ -31,7 +31,7 @@ import java.util.List;
  *   <li>{@code GET /reservations} — generates and streams a PDF report for a given month.</li>
  *   <li>{@code GET /statistics} — returns aggregated JSON statistics for the dashboard.</li>
  *   <li>{@code GET /available-months} — returns the {@code yyyy-MM} months that have at least
- *       one active reservation, for the MENSUAL scope's period dropdown.</li>
+ *       one active reservation, for the MONTHLY scope's period dropdown.</li>
  * </ul>
  */
 @RestController
@@ -45,21 +45,21 @@ public class ReportController implements ResponseHandler {
     /**
      * Generates and downloads a PDF report of active reservations for the requested period.
      *
-     * <p>{@code GET /api/v1/reports/reservations?period=MES_EN_CURSO|MES_ANTERIOR[&classroomUuid=...]}</p>
+     * <p>{@code GET /api/v1/reports/reservations?period=CURRENT_MONTH|PREVIOUS_MONTH[&classroomUuid=...]}</p>
      *
-     * @param period        report period; defaults to {@code MES_EN_CURSO} when omitted
+     * @param period        report period; defaults to {@code CURRENT_MONTH} when omitted
      * @param classroomUuid optional UUID to filter by a specific classroom; omit for all classrooms
      * @return PDF bytes as {@code application/pdf} with a {@code Content-Disposition: attachment} header
      */
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping(value = "/reservations", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> reservationReport(
-            @RequestParam(defaultValue = "MES_EN_CURSO") ReportPeriod period,
+            @RequestParam(defaultValue = "CURRENT_MONTH") ReportPeriod period,
             @RequestParam(required = false) java.util.UUID classroomUuid) {
 
         byte[] pdf = reportService.generatePdf(period, classroomUuid);
 
-        YearMonth month = period == ReportPeriod.MES_ANTERIOR
+        YearMonth month = period == ReportPeriod.PREVIOUS_MONTH
                 ? YearMonth.now().minusMonths(1)
                 : YearMonth.now();
 
@@ -77,13 +77,13 @@ public class ReportController implements ResponseHandler {
     /**
      * Returns aggregated statistics for the "Reportes y Estadísticas" dashboard.
      *
-     * <p>{@code GET /api/v1/reports/statistics?scope=MENSUAL|SEMESTRAL[&anchor=...]}</p>
+     * <p>{@code GET /api/v1/reports/statistics?scope=MONTHLY|SEMESTER[&anchor=...]}</p>
      *
      * <p>Validation errors (unrecognised {@code scope}, malformed {@code anchor}, or a semester
      * UUID that does not exist) are thrown as {@link IllegalArgumentException} and mapped to
      * HTTP 400 by the global exception handler.</p>
      *
-     * @param scope  period granularity: {@code "MENSUAL"} (default) or {@code "SEMESTRAL"};
+     * @param scope  period granularity: {@code "MONTHLY"} (default) or {@code "SEMESTER"};
      *               case-insensitive
      * @param anchor period anchor: a {@code yyyy-MM} string for monthly scope, or a semester UUID
      *               string for semester scope; {@code null}/blank triggers the period default
@@ -93,7 +93,7 @@ public class ReportController implements ResponseHandler {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/statistics")
     public ResponseEntity<ApiResponse<ReservationStatisticsDTO>> statistics(
-            @RequestParam(defaultValue = "MENSUAL") String scope,
+            @RequestParam(defaultValue = "MONTHLY") String scope,
             @RequestParam(required = false) String anchor) {
 
        return ok(statisticsService.getStatistics(scope, anchor));
@@ -104,7 +104,7 @@ public class ReportController implements ResponseHandler {
      *
      * <p>{@code GET /api/v1/reports/available-months}</p>
      *
-     * <p>Used by the frontend to populate the MENSUAL scope's period dropdown with only the
+     * <p>Used by the frontend to populate the MONTHLY scope's period dropdown with only the
      * months that actually have data, instead of a fixed rolling window of the last 12 months.</p>
      *
      * @return {@link ApiResponse} wrapping the list of {@code yyyy-MM} strings

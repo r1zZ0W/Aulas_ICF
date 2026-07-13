@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!--
+  Reservations report template, rendered by Thymeleaf and converted to PDF with
+  openhtmltopdf (see OpenHtmlToPdfReservationReportGenerator).
+
+  Constraints imposed by the PDF engine:
+  - Must stay well-formed XHTML: every tag closed/self-closed.
+  - All CSS lives in the <style> block below; external stylesheets or relative-URI
+    resources cannot be resolved from inside the Spring Boot fat JAR. Any future
+    image (e.g. the ICF logo) must be embedded as a Base64 data URI.
+  - font-family must match the family name registered on the PdfRendererBuilder.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title th:text="${title}">Reporte de Reservas</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 1.5cm;
+        }
+
+        body {
+            font-family: 'DejaVu Sans', sans-serif;
+            font-size: 9pt;
+            color: #000000;
+        }
+
+        h1 {
+            font-size: 14pt;
+            text-align: center;
+            margin: 0 0 4pt 0;
+        }
+
+        .report-meta {
+            font-size: 10pt;
+            color: #444444;
+            text-align: center;
+            margin: 0 0 12pt 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        /* Repeats the header row on every printed page. */
+        thead {
+            display: table-header-group;
+        }
+
+        tr {
+            page-break-inside: avoid;
+        }
+
+        th {
+            background-color: #216096;
+            color: #ffffff;
+            font-weight: bold;
+            padding: 5pt;
+            text-align: center;
+        }
+
+        td {
+            padding: 4pt;
+            border-bottom: 0.5pt solid #d9d9d9;
+        }
+
+        tr.alt td {
+            background-color: #EBF3FC;
+        }
+
+        .empty {
+            text-align: center;
+            color: #444444;
+            padding: 14pt;
+        }
+    </style>
+</head>
+<body>
+    <h1 th:text="${title}">Reporte de Reservas</h1>
+    <p class="report-meta">
+        Período: <span th:text="${from}">2026-07-01</span> al <span th:text="${to}">2026-07-31</span>
+        &#160;|&#160; Total: <span th:text="${total}">0</span> reservas
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Aula</th>
+                <th>Maestro</th>
+                <th>Fecha</th>
+                <th>Bloque</th>
+                <th>Estado</th>
+                <th>Asistentes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="row, stat : ${rows}" th:classappend="${stat.odd} ? 'alt'">
+                <td th:text="${row.classroom}">Aula 1</td>
+                <td th:text="${row.teacher}">Nombre Apellido</td>
+                <td th:text="${row.date}">2026-07-01</td>
+                <td th:text="${row.timeBlock}">07:00 – 08:30</td>
+                <td th:text="${row.status}">ACTIVE</td>
+                <td th:text="${row.attendees}">25</td>
+            </tr>
+            <tr th:if="${rows.isEmpty()}">
+                <td class="empty" colspan="6">Sin reservas activas en el período.</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

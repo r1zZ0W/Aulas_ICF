@@ -36,9 +36,9 @@ import java.util.stream.IntStream;
  * </ol>
  *
  * <p><b>Short-circuit rule:</b> if the resolver cannot determine any valid date range
- * (e.g., {@code scope=SEMESTRAL} on a freshly installed database with no semesters),
+ * (e.g., {@code scope=SEMESTER} on a freshly installed database with no semesters),
  * the service returns a zeroed-out DTO immediately without touching the database.
- * The {@link ReservationStatisticsDTO#tendencia()} list is never empty in the short-circuit
+ * The {@link ReservationStatisticsDTO#trend()} list is never empty in the short-circuit
  * path — a scaffold of buckets is generated so that frontend chart components can render
  * their axes.</p>
  *
@@ -60,7 +60,7 @@ public class ReservationStatisticsService {
     /**
      * Returns the {@code yyyy-MM} months that have at least one active reservation, newest first.
      *
-     * <p>Used to populate the MENSUAL scope's period dropdown so it only lists months with
+     * <p>Used to populate the MONTHLY scope's period dropdown so it only lists months with
      * actual data, instead of a fixed rolling window. Aggregation happens entirely in the
      * database ({@link ReportStatisticsRepository#findActiveYearsAndMonths}); this method only
      * formats the already-aggregated rows.</p>
@@ -92,8 +92,8 @@ public class ReservationStatisticsService {
      * database snapshot and are eligible for connection-pool optimisations on supported
      * databases.</p>
      *
-     * @param rawScope the {@code scope} query parameter value ({@code "MENSUAL"} or
-     *                 {@code "SEMESTRAL"}); case-insensitive
+     * @param rawScope the {@code scope} query parameter value ({@code "MONTHLY"} or
+     *                 {@code "SEMESTER"}); case-insensitive
      * @param anchor   the {@code anchor} query parameter value: a {@code yyyy-MM} string for
      *                 monthly scope, or a semester UUID string for semester scope;
      *                 {@code null} or blank triggers the period default
@@ -121,49 +121,49 @@ public class ReservationStatisticsService {
         Double delta = computeDelta(total, p);
 
         // 3. Classroom occupancy (top 5)
-        List<ClassroomSlotsView> aulaRows = statsRepo.topClassroomsBySlots(
+        List<ClassroomSlotsView> classroomRows = statsRepo.topClassroomsBySlots(
                 p.from(), p.to(), ReservInstanceStatus.ACTIVE, Limit.of(TOP_N));
-        List<ReservationStatisticsDTO.AulaOcupacion> aulasMasOcupadas = aulaRows.stream()
-                .map(v -> new ReservationStatisticsDTO.AulaOcupacion(
-                        v.getNombre(), v.getTotalSlots() * slotHours))
+        List<ReservationStatisticsDTO.ClassroomOccupancy> mostOccupiedClassrooms = classroomRows.stream()
+                .map(v -> new ReservationStatisticsDTO.ClassroomOccupancy(
+                        v.getName(), v.getTotalSlots() * slotHours))
                 .toList();
-        ReservationStatisticsDTO.AulaOcupacion aulaMasOcupada =
-                aulasMasOcupadas.isEmpty() ? null : aulasMasOcupadas.get(0);
+        ReservationStatisticsDTO.ClassroomOccupancy mostOccupiedClassroom =
+                mostOccupiedClassrooms.isEmpty() ? null : mostOccupiedClassrooms.getFirst();
 
         // 4. User rankings (top 5)
-        List<UserReservationsView> usuarioRows = statsRepo.topUsersByReservations(
+        List<UserReservationsView> userRows = statsRepo.topUsersByReservations(
                 p.from(), p.to(), ReservInstanceStatus.ACTIVE, Limit.of(TOP_N));
-        List<ReservationStatisticsDTO.UsuarioReservas> usuariosMasReservas = usuarioRows.stream()
-                .map(v -> new ReservationStatisticsDTO.UsuarioReservas(v.getNombre(), v.getReservas()))
+        List<ReservationStatisticsDTO.UserReservations> topUsers = userRows.stream()
+                .map(v -> new ReservationStatisticsDTO.UserReservations(v.getName(), v.getReservations()))
                 .toList();
-        ReservationStatisticsDTO.UsuarioReservas mayorUsuario =
-                usuariosMasReservas.isEmpty() ? null : usuariosMasReservas.get(0);
+        ReservationStatisticsDTO.UserReservations topUser =
+                topUsers.isEmpty() ? null : topUsers.getFirst();
 
         // 5. Recurrence — counted by reservation (group), not by session-day. A weekly class
-        // with 12 sessions contributes 1 to "recurrentes", not 12; see countInstancesPerGroup.
+        // with 12 sessions contributes 1 to the recurring count, not 12; see countInstancesPerGroup.
         List<Long> instancesPerGroup = statsRepo.countInstancesPerGroup(
                 p.from(), p.to(), ReservInstanceStatus.ACTIVE);
-        long recurrentes = instancesPerGroup.stream().filter(c -> c > 1).count();
-        long eventuales  = instancesPerGroup.size() - recurrentes;
-        double tasa      = instancesPerGroup.isEmpty()
-                ? 0.0 : recurrentes * 100.0 / instancesPerGroup.size();
+        long recurring = instancesPerGroup.stream().filter(c -> c > 1).count();
+        long oneTime   = instancesPerGroup.size() - recurring;
+        double rate    = instancesPerGroup.isEmpty()
+                ? 0.0 : recurring * 100.0 / instancesPerGroup.size();
 
         // 6. Trend series — merge sparse DB rows into the complete scaffold
         List<DateCountView> dateRows = statsRepo.countPerDate(
                 p.from(), p.to(), ReservInstanceStatus.ACTIVE);
-        List<ReservationStatisticsDTO.TendenciaItem> tendencia =
-                buildTendencia(scope, p.tendenciaLabels(), dateRows);
+        List<ReservationStatisticsDTO.TrendPoint> trend =
+                buildTrend(scope, p.trendLabels(), dateRows);
 
         return new ReservationStatisticsDTO(
                 total,
                 delta,
-                aulaMasOcupada,
-                mayorUsuario,
-                tasa,
-                aulasMasOcupadas,
-                usuariosMasReservas,
-                new ReservationStatisticsDTO.Recurrencia(recurrentes, eventuales),
-                tendencia
+                mostOccupiedClassroom,
+                topUser,
+                rate,
+                mostOccupiedClassrooms,
+                topUsers,
+                new ReservationStatisticsDTO.Recurrence(recurring, oneTime),
+                trend
         );
     }
 
@@ -194,11 +194,11 @@ public class ReservationStatisticsService {
     /**
      * Merges the sparse date-count rows from the repository into the complete scaffold.
      *
-     * <p>For {@code SEMESTRAL} scope, multiple dates may fall in the same calendar month and
-     * are accumulated using {@link Long#sum}. For {@code MENSUAL} scope, each date maps to a
+     * <p>For {@code SEMESTER} scope, multiple dates may fall in the same calendar month and
+     * are accumulated using {@link Long#sum}. For {@code MONTHLY} scope, each date maps to a
      * unique day label.</p>
      *
-     * <p>{@code SEMESTRAL} labels only include the year when the scaffold spans more than 12
+     * <p>{@code SEMESTER} labels only include the year when the scaffold spans more than 12
      * months (see {@link StatisticsPeriodResolver#buildMonthScaffold}) — otherwise two dates a
      * year apart (e.g. two Januaries, for a mis-configured multi-year semester) would collapse
      * onto the same {@code "Ene"} key and their counts would be summed together instead of kept
@@ -210,36 +210,36 @@ public class ReservationStatisticsService {
      * @param dateRows   sparse list of (date, count) rows from the database
      * @return complete trend list; one entry per scaffold label, zero for empty buckets
      */
-    private List<ReservationStatisticsDTO.TendenciaItem> buildTendencia(
+    private List<ReservationStatisticsDTO.TrendPoint> buildTrend(
             StatisticsScope scope,
             List<String> scaffold,
             List<DateCountView> dateRows) {
 
-        boolean includeYear = scope == StatisticsScope.SEMESTRAL && scaffold.size() > 12;
+        boolean includeYear = scope == StatisticsScope.SEMESTER && scaffold.size() > 12;
 
         Map<String, Long> labelMap = new HashMap<>();
         for (DateCountView row : dateRows) {
-            String label = scope.tendenciaLabel(row.getDate(), includeYear);
+            String label = scope.trendLabel(row.getDate(), includeYear);
             labelMap.merge(label, row.getTotal(), Long::sum);
         }
 
         return scaffold.stream()
-                .map(label -> new ReservationStatisticsDTO.TendenciaItem(
+                .map(label -> new ReservationStatisticsDTO.TrendPoint(
                         label, labelMap.getOrDefault(label, 0L)))
                 .toList();
     }
 
     /**
      * Returns a zeroed-out statistics DTO for use when no date range can be determined
-     * (e.g., SEMESTRAL scope with no semesters in the database).
+     * (e.g., SEMESTER scope with no semesters in the database).
      *
-     * <p>The {@code tendencia} list is <em>never</em> empty: a scaffold of zero-valued buckets
+     * <p>The {@code trend} list is <em>never</em> empty: a scaffold of zero-valued buckets
      * is generated so that frontend chart components can render their axes without encountering
      * an empty array and throwing a runtime error.</p>
      *
      * <ul>
-     *   <li>{@code MENSUAL}: scaffold contains every day of the current month.</li>
-     *   <li>{@code SEMESTRAL}: scaffold contains the last 6 calendar months up to and
+     *   <li>{@code MONTHLY}: scaffold contains every day of the current month.</li>
+     *   <li>{@code SEMESTER}: scaffold contains the last 6 calendar months up to and
      *       including the current month, labelled with es-MX month abbreviations.</li>
      * </ul>
      *
@@ -247,22 +247,22 @@ public class ReservationStatisticsService {
      * @return a fully-initialised DTO with all numeric fields set to zero/null
      */
     private ReservationStatisticsDTO emptyStatistics(StatisticsScope scope) {
-        List<ReservationStatisticsDTO.TendenciaItem> tendencia;
+        List<ReservationStatisticsDTO.TrendPoint> trend;
 
-        if (scope == StatisticsScope.MENSUAL) {
+        if (scope == StatisticsScope.MONTHLY) {
             YearMonth ym = YearMonth.now();
-            tendencia = IntStream.rangeClosed(1, ym.lengthOfMonth())
-                    .mapToObj(d -> new ReservationStatisticsDTO.TendenciaItem(
+            trend = IntStream.rangeClosed(1, ym.lengthOfMonth())
+                    .mapToObj(d -> new ReservationStatisticsDTO.TrendPoint(
                             String.format("%02d", d), 0L))
                     .toList();
         } else {
-            // SEMESTRAL: last 6 months (month 0 = 5 months ago, month 5 = current)
+            // SEMESTER: last 6 months (month 0 = 5 months ago, month 5 = current)
             YearMonth current = YearMonth.now();
-            tendencia = IntStream.range(0, 6)
+            trend = IntStream.range(0, 6)
                     .mapToObj(i -> {
                         LocalDate d = current.minusMonths(5 - i).atDay(1);
-                        return new ReservationStatisticsDTO.TendenciaItem(
-                                StatisticsScope.SEMESTRAL.tendenciaLabel(d), 0L);
+                        return new ReservationStatisticsDTO.TrendPoint(
+                                StatisticsScope.SEMESTER.trendLabel(d), 0L);
                     })
                     .toList();
         }
@@ -275,8 +275,8 @@ public class ReservationStatisticsService {
                 0.0,
                 List.of(),
                 List.of(),
-                new ReservationStatisticsDTO.Recurrencia(0L, 0L),
-                tendencia
+                new ReservationStatisticsDTO.Recurrence(0L, 0L),
+                trend
         );
     }
 }

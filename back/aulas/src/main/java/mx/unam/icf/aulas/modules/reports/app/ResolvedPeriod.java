@@ -22,17 +22,17 @@ import java.util.List;
  *       lengths.</li>
  * </ul>
  *
- * @param scope           the granularity used to build this period
- * @param from            first date of the current analysis period (inclusive)
- * @param to              last date of the current analysis period (inclusive);
- *                        always {@code <= LocalDate.now()} — future dates are never included
- * @param prevFrom        first date of the comparable previous period (inclusive),
- *                        or {@code null} when no previous period exists
- * @param prevTo          last date of the comparable previous period (inclusive, see truncation
- *                        contract above), or {@code null} when no previous period exists
- * @param tendenciaLabels ordered, complete scaffold of trend-series labels for the full period
- *                        (including future days/months with zero reservations);
- *                        never empty
+ * @param scope       the granularity used to build this period
+ * @param from        first date of the current analysis period (inclusive)
+ * @param to          last date of the current analysis period (inclusive);
+ *                    always {@code <= LocalDate.now()} — future dates are never included
+ * @param prevFrom    first date of the comparable previous period (inclusive),
+ *                    or {@code null} when no previous period exists
+ * @param prevTo      last date of the comparable previous period (inclusive, see truncation
+ *                    contract above), or {@code null} when no previous period exists
+ * @param trendLabels ordered, complete scaffold of trend-series labels for the full period
+ *                    (including future days/months with zero reservations);
+ *                    never empty
  */
 public record ResolvedPeriod(
         StatisticsScope scope,
@@ -40,5 +40,5 @@ public record ResolvedPeriod(
         LocalDate to,
         LocalDate prevFrom,
         LocalDate prevTo,
-        List<String> tendenciaLabels
+        List<String> trendLabels
 ) {}

@@ -7,6 +7,10 @@ package mx.unam.icf.aulas.modules.reports.app.projections;
  * represents one classroom and the number of {@code ReservSlot} rows it holds within the
  * queried date range. The caller is responsible for converting {@code totalSlots} to hours
  * using the configured slot duration ({@code ReservationSlotProperties.slotDurationHours()}).</p>
+ *
+ * <p><b>Getter names must mirror the JPQL aliases</b> ({@code AS name}, {@code AS totalSlots})
+ * in the repository query — Spring Data resolves interface projections by alias at runtime,
+ * so a mismatch fails on execution, not compilation.</p>
  */
 public interface ClassroomSlotsView {
 
@@ -15,7 +19,7 @@ public interface ClassroomSlotsView {
      *
      * @return non-null classroom name
      */
-    String getNombre();
+    String getName();
 
     /**
      * Returns the total number of booked {@code ReservSlot} rows for this classroom in the period.

@@ -49,23 +49,23 @@ class StatisticsPeriodResolverTest {
         semester2026_1.setEndDate(LocalDate.of(2026, 6, 26));
     }
 
-    // ── MENSUAL — anchor parsing ───────────────────────────────────────────────
+    // ── MONTHLY — anchor parsing ───────────────────────────────────────────────
 
     @Test
     void mensual_withValidAnchor_derivesCorrectRange() {
         // Using a fully closed month (March 2025) so 'to' == naturalEnd
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MENSUAL, "2025-03");
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MONTHLY, "2025-03");
 
         assertThat(result).isPresent();
         ResolvedPeriod p = result.get();
         assertThat(p.from()).isEqualTo(LocalDate.of(2025, 3, 1));
         assertThat(p.to()).isEqualTo(LocalDate.of(2025, 3, 31));   // closed month
-        assertThat(p.scope()).isEqualTo(StatisticsScope.MENSUAL);
+        assertThat(p.scope()).isEqualTo(StatisticsScope.MONTHLY);
     }
 
     @Test
     void mensual_withBlankAnchor_defaultsToCurrentMonth() {
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MENSUAL, "");
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MONTHLY, "");
 
         assertThat(result).isPresent();
         assertThat(result.get().from()).isEqualTo(YearMonth.now().atDay(1));
@@ -74,29 +74,29 @@ class StatisticsPeriodResolverTest {
     @Test
     void mensual_withMalformedAnchor_throwsIllegalArgument() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> resolver.resolve(StatisticsScope.MENSUAL, "not-a-date"))
-                .withMessage("anchor inválido para scope MENSUAL");
+                .isThrownBy(() -> resolver.resolve(StatisticsScope.MONTHLY, "not-a-date"))
+                .withMessage("Invalid anchor for scope MONTHLY");
     }
 
-    // ── MENSUAL — day scaffold ────────────────────────────────────────────────
+    // ── MONTHLY — day scaffold ────────────────────────────────────────────────
 
     @Test
     void mensual_scaffoldContainsAllDaysOfMonth() {
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MENSUAL, "2025-02");
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MONTHLY, "2025-02");
 
         assertThat(result).isPresent();
-        assertThat(result.get().tendenciaLabels())
+        assertThat(result.get().trendLabels())
                 .hasSize(28)
                 .startsWith("01")
                 .endsWith("28");
     }
 
-    // ── MENSUAL — delta truncation ────────────────────────────────────────────
+    // ── MONTHLY — delta truncation ────────────────────────────────────────────
 
     @Test
     void mensual_closedPeriod_previousPeriodTakenComplete() {
         // June has 30 days; May has 31. Querying a closed June must give all of May.
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MENSUAL, "2025-06");
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MONTHLY, "2025-06");
 
         assertThat(result).isPresent();
         ResolvedPeriod p = result.get();
@@ -110,7 +110,7 @@ class StatisticsPeriodResolverTest {
     @Test
     void mensual_currentMonthAnchor_toIsCappedAtToday() {
         // Regardless of the current day of the month, 'to' must never exceed today.
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MENSUAL, null);
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MONTHLY, null);
 
         assertThat(result).isPresent();
         LocalDate today = LocalDate.now();
@@ -127,7 +127,7 @@ class StatisticsPeriodResolverTest {
         //   open   → prevTo < prevNaturalEnd  (proportional, not the full previous month)
         LocalDate today = LocalDate.now();
         YearMonth currentYm = YearMonth.from(today);
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MENSUAL, null);
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.MONTHLY, null);
 
         assertThat(result).isPresent();
         ResolvedPeriod p = result.get();
@@ -148,7 +148,7 @@ class StatisticsPeriodResolverTest {
         }
     }
 
-    // ── SEMESTRAL — default resolution ───────────────────────────────────────
+    // ── SEMESTER — default resolution ───────────────────────────────────────
 
     @Test
     void semestral_withNoAnchor_usesFindCurrent() {
@@ -156,7 +156,7 @@ class StatisticsPeriodResolverTest {
         when(semesterRepository.findFirstByStartDateLessThanOrderByStartDateDesc(any()))
                 .thenReturn(Optional.empty());
 
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTRAL, null);
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTER, null);
 
         assertThat(result).isPresent();
         assertThat(result.get().from()).isEqualTo(semester2026_1.getStartDate());
@@ -169,7 +169,7 @@ class StatisticsPeriodResolverTest {
         when(semesterRepository.findFirstByStartDateLessThanOrderByStartDateDesc(any()))
                 .thenReturn(Optional.empty());
 
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTRAL, "");
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTER, "");
 
         assertThat(result).isPresent();
     }
@@ -179,12 +179,12 @@ class StatisticsPeriodResolverTest {
         when(semesterRepository.findCurrent(any())).thenReturn(Optional.empty());
         when(semesterRepository.findTopByOrderByEndDateDesc()).thenReturn(Optional.empty());
 
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTRAL, "");
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTER, "");
 
         assertThat(result).isEmpty();
     }
 
-    // ── SEMESTRAL — anchor validation ─────────────────────────────────────────
+    // ── SEMESTER — anchor validation ─────────────────────────────────────────
 
     @Test
     void semestral_withValidUuid_resolvesSemester() {
@@ -193,7 +193,7 @@ class StatisticsPeriodResolverTest {
                 .thenReturn(Optional.empty());
 
         Optional<ResolvedPeriod> result = resolver.resolve(
-                StatisticsScope.SEMESTRAL, semesterUuid.toString());
+                StatisticsScope.SEMESTER, semesterUuid.toString());
 
         assertThat(result).isPresent();
         assertThat(result.get().from()).isEqualTo(semester2026_1.getStartDate());
@@ -202,8 +202,8 @@ class StatisticsPeriodResolverTest {
     @Test
     void semestral_withMalformedUuid_throwsIllegalArgument() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> resolver.resolve(StatisticsScope.SEMESTRAL, "not-a-uuid"))
-                .withMessage("anchor inválido para scope SEMESTRAL");
+                .isThrownBy(() -> resolver.resolve(StatisticsScope.SEMESTER, "not-a-uuid"))
+                .withMessage("Invalid anchor for scope SEMESTER");
     }
 
     @Test
@@ -212,11 +212,11 @@ class StatisticsPeriodResolverTest {
         when(semesterRepository.findByUuid(unknown)).thenReturn(Optional.empty());
 
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> resolver.resolve(StatisticsScope.SEMESTRAL, unknown.toString()))
-                .withMessageContaining("Semestre no encontrado");
+                .isThrownBy(() -> resolver.resolve(StatisticsScope.SEMESTER, unknown.toString()))
+                .withMessageContaining("Semester not found");
     }
 
-    // ── SEMESTRAL — month scaffold ────────────────────────────────────────────
+    // ── SEMESTER — month scaffold ────────────────────────────────────────────
 
     @Test
     void semestral_scaffoldContainsAllMonthsOfSemester() {
@@ -225,11 +225,11 @@ class StatisticsPeriodResolverTest {
                 .thenReturn(Optional.empty());
 
         Optional<ResolvedPeriod> result = resolver.resolve(
-                StatisticsScope.SEMESTRAL, semesterUuid.toString());
+                StatisticsScope.SEMESTER, semesterUuid.toString());
 
         assertThat(result).isPresent();
         // Semester 2026-1: Jan 12 – Jun 26 → months Ene, Feb, Mar, Abr, May, Jun
-        assertThat(result.get().tendenciaLabels())
+        assertThat(result.get().trendLabels())
                 .containsExactly("Ene", "Feb", "Mar", "Abr", "May", "Jun");
     }
 
@@ -249,10 +249,10 @@ class StatisticsPeriodResolverTest {
         when(semesterRepository.findFirstByStartDateLessThanOrderByStartDateDesc(any()))
                 .thenReturn(Optional.empty());
 
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTRAL, uuid.toString());
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTER, uuid.toString());
 
         assertThat(result).isPresent();
-        List<String> labels = result.get().tendenciaLabels();
+        List<String> labels = result.get().trendLabels();
         assertThat(labels).hasSize(13);
         assertThat(labels.get(0)).isEqualTo("Ene 25");
         assertThat(labels.get(12)).isEqualTo("Ene 26");
@@ -260,7 +260,7 @@ class StatisticsPeriodResolverTest {
         assertThat(labels).doesNotHaveDuplicates();
     }
 
-    // ── SEMESTRAL — delta truncation for closed semester ─────────────────────
+    // ── SEMESTER — delta truncation for closed semester ─────────────────────
 
     @Test
     void semestral_closedSemester_previousSemesterTakenComplete() {
@@ -274,7 +274,7 @@ class StatisticsPeriodResolverTest {
                 .thenReturn(Optional.of(prev));
 
         Optional<ResolvedPeriod> result = resolver.resolve(
-                StatisticsScope.SEMESTRAL, semesterUuid.toString());
+                StatisticsScope.SEMESTER, semesterUuid.toString());
 
         assertThat(result).isPresent();
         ResolvedPeriod p = result.get();
@@ -292,13 +292,13 @@ class StatisticsPeriodResolverTest {
 
     @Test
     void mensual_firstEverMonth_prevFromIsNull() {
-        // We can't easily test this for MENSUAL since there's always a previous month.
-        // Instead we verify the SEMESTRAL case where no previous semester exists.
+        // We can't easily test this for MONTHLY since there's always a previous month.
+        // Instead we verify the SEMESTER case where no previous semester exists.
         when(semesterRepository.findCurrent(any())).thenReturn(Optional.of(semester2026_1));
         when(semesterRepository.findFirstByStartDateLessThanOrderByStartDateDesc(any()))
                 .thenReturn(Optional.empty());
 
-        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTRAL, null);
+        Optional<ResolvedPeriod> result = resolver.resolve(StatisticsScope.SEMESTER, null);
 
         assertThat(result).isPresent();
         assertThat(result.get().prevFrom()).isNull();

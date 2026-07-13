@@ -36,7 +36,7 @@ public interface ReportStatisticsRepository extends JpaRepository<ReservInstance
     /**
      * Counts active reservation instances within a date range.
      *
-     * <p>Used both for the current period ({@code totalReservas} KPI) and for the previous
+     * <p>Used both for the current period ({@code totalReservations} KPI) and for the previous
      * comparable period (delta calculation). The previous period's range is already truncated
      * proportionally by {@link mx.unam.icf.aulas.modules.reports.app.StatisticsPeriodResolver}
      * so both calls receive date ranges of comparable length.</p>
@@ -71,7 +71,7 @@ public interface ReportStatisticsRepository extends JpaRepository<ReservInstance
      * @param limit  maximum number of rows to return (use {@code Limit.of(5)} for the top-5 KPI)
      * @return list of {@link ClassroomSlotsView} projections, ordered most-occupied first
      */
-    @Query("SELECT c.name AS nombre, COUNT(rs) AS totalSlots " +
+    @Query("SELECT c.name AS name, COUNT(rs) AS totalSlots " +
            "FROM ReservSlot rs " +
            "JOIN rs.instance ri " +
            "JOIN ri.classroom c " +
@@ -91,7 +91,7 @@ public interface ReportStatisticsRepository extends JpaRepository<ReservInstance
     /**
      * Returns the top-N users ordered by reservation count (descending) within a date range.
      *
-     * <p>The full name is sanitized in the query using
+     * <p>The full name ({@code AS name}) is sanitized in the query using
      * {@code TRIM(CONCAT(firstName, ' ', COALESCE(lastNames, '')))}: the {@code COALESCE}
      * prevents MySQL from returning {@code NULL} for the entire concatenation when
      * {@code lastNames} is {@code NULL}, and {@code TRIM} removes the trailing space that
@@ -103,8 +103,8 @@ public interface ReportStatisticsRepository extends JpaRepository<ReservInstance
      * @param limit  maximum number of rows to return (use {@code Limit.of(5)} for the top-5 KPI)
      * @return list of {@link UserReservationsView} projections, ordered highest-count first
      */
-    @Query("SELECT TRIM(CONCAT(u.firstName, ' ', COALESCE(u.lastNames, ''))) AS nombre, " +
-           "COUNT(ri) AS reservas " +
+    @Query("SELECT TRIM(CONCAT(u.firstName, ' ', COALESCE(u.lastNames, ''))) AS name, " +
+           "COUNT(ri) AS reservations " +
            "FROM ReservInstance ri " +
            "JOIN ri.group g " +
            "JOIN g.user u " +
@@ -128,10 +128,10 @@ public interface ReportStatisticsRepository extends JpaRepository<ReservInstance
      * per-group count).
      *
      * <p>The caller ({@link mx.unam.icf.aulas.modules.reports.app.ReservationStatisticsService})
-     * classifies each row: a group with {@code count > 1} is <em>recurrente</em> (a booking that
+     * classifies each row: a group with {@code count > 1} is <em>recurring</em> (a booking that
      * repeats within the period, e.g. a weekly class with several sessions this month); a group
-     * with {@code count == 1} is <em>eventual</em>. This counts <b>reservations (groups)</b>, not
-     * instances — a 12-session weekly class contributes exactly {@code 1} to "recurrentes", not 12.</p>
+     * with {@code count == 1} is <em>one-time</em>. This counts <b>reservations (groups)</b>, not
+     * instances — a 12-session weekly class contributes exactly {@code 1} to the recurring count, not 12.</p>
      *
      * <p>A single aggregated {@code GROUP BY} query is used instead of a correlated {@code EXISTS}
      * subquery per row: it performs one range scan over {@code [from, to]} and lets the database
@@ -185,7 +185,7 @@ public interface ReportStatisticsRepository extends JpaRepository<ReservInstance
      *
      * <p>The result is intentionally sparse (no rows for dates with zero reservations). The
      * caller fills in zero-count buckets by iterating over the full scaffold from
-     * {@link mx.unam.icf.aulas.modules.reports.app.ResolvedPeriod#tendenciaLabels()} and
+     * {@link mx.unam.icf.aulas.modules.reports.app.ResolvedPeriod#trendLabels()} and
      * looking each label up in the map derived from these rows.</p>
      *
      * <p>Using {@code ri.date} for grouping (a portable JPQL path) rather than MySQL-specific
