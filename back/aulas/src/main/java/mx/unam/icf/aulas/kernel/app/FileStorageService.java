@@ -1,6 +1,7 @@
 package mx.unam.icf.aulas.kernel.app;
 
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Contract for storing and retrieving raw file content on behalf of any bounded context.
@@ -45,4 +46,28 @@ public interface FileStorageService {
      * @return {@code true} if the file exists
      */
     boolean exists(String folder, String filename);
+
+    /**
+     * Lazily lists every file in {@code folder} with its metadata, one entry at a time —
+     * the catalog is never materialized in memory, so folders with thousands of files can
+     * be swept without heap pressure.
+     *
+     * <p><b>Resource contract: the caller owns the returned stream and MUST close it</b>
+     * (try-with-resources). The local-filesystem implementation keeps an OS directory
+     * handle open until the stream is closed; leaking it leaks a file descriptor.</p>
+     *
+     * @param folder subfolder relative to the configured storage root
+     * @return lazy stream of {@link StoredFile} entries; empty when the folder does not exist
+     * @throws mx.unam.icf.aulas.kernel.infrastructure.exceptions.FileStorageException when the listing fails
+     */
+    Stream<StoredFile> list(String folder);
+
+    /**
+     * Deletes {@code folder/filename} if it exists; a missing file is a no-op.
+     *
+     * @param folder   subfolder relative to the configured storage root
+     * @param filename target file name within {@code folder}
+     * @throws mx.unam.icf.aulas.kernel.infrastructure.exceptions.FileStorageException when the delete fails
+     */
+    void delete(String folder, String filename);
 }

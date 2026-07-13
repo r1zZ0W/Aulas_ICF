@@ -4,7 +4,8 @@ import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
-import mx.unam.icf.aulas.modules.reservations.students.app.StudentListService;
+import mx.unam.icf.aulas.modules.reservations.students.app.ReservationStudentService;
+import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentUploadResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
 import org.springframework.http.ContentDisposition;
@@ -22,15 +23,16 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * REST controller for the student-roster sub-resource of a reservation group.
  *
- * <p>Exposed under {@code /api/v1/reservations/groups/{groupUuid}/students}, kept as a
- * separate endpoint from the JSON booking creation
- * ({@code POST /api/v1/reservations/booking}) so the existing {@code @Valid @RequestBody}
- * flow is untouched — no client migrates to {@code multipart/form-data} to keep booking.</p>
+ * <p>Exposed under {@code /api/v1/reservations/groups/{groupUuid}/students}. Since the
+ * booking endpoint became multipart and receives the mandatory roster itself
+ * ({@code POST /api/v1/reservations/booking}), this upload endpoint serves
+ * <em>re-uploads</em> — replacing the roster of an already-created group.</p>
  *
  * <p>No class-level {@code produces} is declared (unlike {@code ReservInstanceController})
  * because this controller mixes JSON responses with a raw PDF download; each method
@@ -41,7 +43,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StudentListController implements ResponseHandler {
 
-    private final StudentListService service;
+    private final ReservationStudentService service;
 
     /**
      * Uploads (or replaces) the student roster for a reservation group.
@@ -76,7 +78,7 @@ public class StudentListController implements ResponseHandler {
      * GET /api/v1/reservations/groups/{groupUuid}/students/pdf
      *
      * <p>The PDF always reflects the group's <em>current</em> roster — there is no
-     * per-date historical snapshot (see {@link StudentListService} class docs).</p>
+     * per-date historical snapshot (see {@link ReservationStudentService} class docs).</p>
      *
      * @param groupUuid public UUID of the reservation group
      * @return PDF bytes as {@code application/pdf} with a {@code Content-Disposition: attachment} header
@@ -106,6 +108,24 @@ public class StudentListController implements ResponseHandler {
     @GetMapping(value = "/exists", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<Boolean>> exists(@PathVariable UUID groupUuid) {
         return ok(service.exists(groupUuid));
+    }
+
+    /**
+     * Lists the students in the current roster of a reservation group as structured JSON.
+     * Requires ADMIN role. GET /api/v1/reservations/groups/{groupUuid}/students
+     *
+     * <p>Reuses the same Excel-parsing logic as {@link #downloadPdf} (via
+     * {@link ReservationStudentService#listStudents}); this endpoint exists so the admin
+     * "view students" UI can render structured, searchable data instead of a PDF. Returns
+     * an empty list (not a 404) when no roster has been uploaded yet.</p>
+     *
+     * @param groupUuid public UUID of the reservation group
+     * @return the group's students, or an empty list if no roster has been uploaded
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<List<StudentResponseDTO>>> list(@PathVariable UUID groupUuid) {
+        return ok(service.listStudents(groupUuid));
     }
 
     /**

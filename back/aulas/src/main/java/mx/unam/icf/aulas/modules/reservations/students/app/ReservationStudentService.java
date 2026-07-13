@@ -11,6 +11,7 @@ import mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroupStat
 import mx.unam.icf.aulas.modules.reservations.groups.infrastructure.ReservationGroupRepository;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 import mx.unam.icf.aulas.modules.reservations.instances.infrastructure.ReservInstanceRepository;
+import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentUploadResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.DuplicateStudentException;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.EmptyStudentListException;
@@ -23,41 +24,37 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Application service orchestrating student roster uploads and PDF export.
+ * Application service orchestrating student roster uploads, PDF export, and the JSON
+ * student-list read used by the admin-only "view students" feature.
  *
  * <p>A roster belongs to a {@link ReservationGroup} (the recurring reservation), not to
  * any individual {@link ReservInstance} date occurrence — the roster is the same across
  * every session of the group. The file is stored as {@code {group_uuid}.xlsx} via the
  * kernel's {@link FileStorageService}. This design accepts that the system keeps no
- * per-date history: {@link #generatePdf} always reflects the group's <em>current</em>
- * roster, even when queried in the context of a past session.</p>
+ * per-date history: both {@link #generatePdf} and {@link #listStudents} always reflect
+ * the group's <em>current</em> roster, even when queried in the context of a past session.</p>
  *
  * <h3>Roster-confirmation lifecycle</h3>
- * <p>{@code ReservInstanceService.createBooking} persists new groups as
- * {@link ReservationGroupStatus#PENDING_ROSTER} and does <em>not</em> notify admins.
- * {@link #upload} is the only path that transitions a group to
- * {@link ReservationGroupStatus#ACTIVE} and fires {@link ReservInstanceCreatedEventDTO} —
- * and only the first time (subsequent re-uploads on an already-{@code ACTIVE} group update
- * the roster silently, since the reservation was already confirmed and notified).</p>
+ * <p>Since the atomic multipart booking flow, the roster arrives <em>with</em> the booking
+ * ({@code ReservInstanceService.createBooking} validates it, stores the file, and publishes
+ * the creation notification itself). {@link #upload} therefore serves <b>re-uploads</b>: for
+ * a booking-created group the roster file already exists on disk, so {@code firstConfirmation}
+ * is {@code false} and no duplicate notification fires. The first-confirmation branch remains
+ * for legacy groups created before the roster became mandatory at booking time.</p>
  *
  * @author Ithera
- * @version 1.0
+ * @version 2.1
  */
 @Service
 @RequiredArgsConstructor
-public class StudentListService {
-
-    /** OOXML (.xlsx / .docx / .zip-based) magic number: {@code PK\x03\x04}. */
-    private static final byte[] OOXML_MAGIC_NUMBER = {0x50, 0x4B, 0x03, 0x04};
+public class ReservationStudentService {
 
     private final ReservationGroupRepository  groupRepository;
     private final ReservInstanceRepository    reservInstanceRepository;
@@ -65,12 +62,13 @@ public class StudentListService {
     private final FileStorageService          fileStorage;
     private final StudentListStorageProperties properties;
     private final StudentExcelReader          excelReader;
+    private final StudentRosterValidator      rosterValidator;
     private final StudentListPdfGenerator     pdfGenerator;
     private final ApplicationEventPublisher   eventPublisher;
 
     /**
      * Validates and stores a student roster for a reservation group, confirming the
-     * group ({@code PENDING_ROSTER} → {@code ACTIVE}) on first upload.
+     * group to {@code ACTIVE} on first upload when a roster file did not previously exist.
      *
      * <p>Validation order (any failure aborts the whole operation — nothing is
      * persisted or written to disk):</p>
@@ -105,15 +103,15 @@ public class StudentListService {
         if (!isAdmin && !group.getUser().getUuid().equals(principalUuid))
             throw new AccessDeniedException("You can only upload a roster for your own reservation groups");
 
-        validateMagicNumber(fileBytes);
+        // Full validation pipeline (magic number, parse, non-empty, duplicates) is shared
+        // with the atomic booking flow via StudentRosterValidator.
+        List<Student> students = rosterValidator.validate(fileBytes);
 
-        List<ParsedStudentRow> rows = excelReader.read(fileBytes);
-        if (rows.isEmpty())
-            throw new EmptyStudentListException("The uploaded roster has no student rows.");
+        // Determine first confirmation by checking whether a roster file already exists
+        // on disk. If no file existed before this upload, this is the first confirmation.
+        boolean firstConfirmation = !fileStorage.exists(properties.getStorageDir(), rosterFileName(groupUuid));
 
-        List<Student> students = rejectDuplicatesOrCollect(rows);
-
-        boolean firstConfirmation = group.getStatus() == ReservationGroupStatus.PENDING_ROSTER;
+        // Persist the ACTIVE status (groups are created ACTIVE in the new flow).
         group.setStatus(ReservationGroupStatus.ACTIVE);
         groupRepository.save(group);
 
@@ -140,18 +138,49 @@ public class StudentListService {
         ReservationGroup group = groupRepository.findByUuid(groupUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation group not found: " + groupUuid));
 
+        // A PDF with no roster makes no sense: absence of the file is a 404 here, unlike
+        // listStudents (below), which treats absence as a legitimate empty result.
         byte[] fileBytes = fileStorage.load(properties.getStorageDir(), rosterFileName(groupUuid))
                 .orElseThrow(() -> new StudentListNotFoundException(
                         "No student roster has been uploaded for reservation group: " + groupUuid));
 
-        List<Student> students = excelReader.read(fileBytes).stream()
-                .map(ParsedStudentRow::student)
-                .toList();
+        List<Student> students = parseRoster(fileBytes);
 
         StudentRosterContext context = new StudentRosterContext(
                 resolveGroupLabel(group), group.getUser().getFullName(), students.size());
 
         return pdfGenerator.generate(students, context);
+    }
+
+    /**
+     * Returns the current roster of a reservation group as plain student data, for the
+     * admin-only "view students" JSON endpoint. Reuses the exact same Excel-parsing logic
+     * as {@link #generatePdf} via {@link #parseRoster}.
+     *
+     * <p>Unlike {@link #generatePdf}, a missing roster file is <b>not</b> an error here: it
+     * is a legitimate state for legacy groups created before the roster became mandatory,
+     * and is reported as an empty list so the frontend can render an empty state. A file
+     * that exists but fails to parse (corrupted workbook, I/O failure) is a genuine
+     * infrastructure fault and is left to propagate as an unhandled exception (mapped to a
+     * 500 by the global exception handler) rather than being silently swallowed into an
+     * empty list — the two situations must not be confused.</p>
+     *
+     * @param groupUuid public UUID of the reservation group
+     * @return the group's students, or an empty list if no roster has been uploaded
+     * @throws ResourceNotFoundException when the group does not exist
+     */
+    @Transactional(readOnly = true)
+    public List<StudentResponseDTO> listStudents(UUID groupUuid) {
+        groupRepository.findByUuid(groupUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation group not found: " + groupUuid));
+
+        Optional<byte[]> fileBytes = fileStorage.load(properties.getStorageDir(), rosterFileName(groupUuid));
+        if (fileBytes.isEmpty())
+            return List.of();
+
+        return parseRoster(fileBytes.get()).stream()
+                .map(s -> new StudentResponseDTO(s.firstName(), s.lastName(), s.email()))
+                .toList();
     }
 
     /**
@@ -166,42 +195,23 @@ public class StudentListService {
         return fileStorage.exists(properties.getStorageDir(), rosterFileName(groupUuid));
     }
 
-    // ── Validation helpers ───────────────────────────────────────────────────
+    // ── Roster parsing ───────────────────────────────────────────────────────
 
     /**
-     * Confirms the first four bytes match the OOXML magic number without exhausting any
-     * stream — the caller always hands over the full {@code byte[]} already read into memory
-     * (from {@code MultipartFile#getBytes()}), so Apache POI can freely re-read it afterward
-     * from a fresh {@code ByteArrayInputStream}.
+     * Parses raw {@code .xlsx} bytes into the ordered list of students they contain.
+     *
+     * <p>Pure transformation — it does not know or care whether the file exists on disk;
+     * that decision (404 vs. empty list) belongs to each public entry point above. Any
+     * parsing failure (corrupted workbook, unreadable structure) propagates from
+     * {@link StudentExcelReader#read} unchanged, so callers must not catch it here.</p>
+     *
+     * @param fileBytes raw {@code .xlsx} bytes already loaded from storage
+     * @return students in file order
      */
-    private void validateMagicNumber(byte[] fileBytes) {
-        if (fileBytes.length < OOXML_MAGIC_NUMBER.length)
-            throw new InvalidExcelFileException("The uploaded file is empty or too small to be a valid .xlsx document.");
-
-        for (int i = 0; i < OOXML_MAGIC_NUMBER.length; i++) {
-            if (fileBytes[i] != OOXML_MAGIC_NUMBER[i])
-                throw new InvalidExcelFileException(
-                        "The uploaded file is not a valid .xlsx (OOXML) document. " +
-                        "Renamed .xls files and other formats are rejected.");
-        }
-    }
-
-    /**
-     * Detects intra-file duplicate students by full name using a {@link HashSet}, aborting
-     * at the first collision with the offending row and name.
-     */
-    private List<Student> rejectDuplicatesOrCollect(List<ParsedStudentRow> rows) {
-        Set<String> seenNames = new HashSet<>();
-        List<Student> students = new ArrayList<>(rows.size());
-
-        for (ParsedStudentRow row : rows) {
-            Student student = row.student();
-            if (!seenNames.add(student.duplicateKey()))
-                throw new DuplicateStudentException(row.rowNumber(), student.fullName());
-            students.add(student);
-        }
-
-        return students;
+    private List<Student> parseRoster(byte[] fileBytes) {
+        return excelReader.read(fileBytes).stream()
+                .map(ParsedStudentRow::student)
+                .toList();
     }
 
     // ── Notification ─────────────────────────────────────────────────────────

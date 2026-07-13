@@ -6,6 +6,8 @@ import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 /**

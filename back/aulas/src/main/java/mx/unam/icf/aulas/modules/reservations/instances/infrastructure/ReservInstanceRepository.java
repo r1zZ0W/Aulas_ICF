@@ -230,7 +230,7 @@ public interface ReservInstanceRepository
 
     /**
      * Returns every instance of a reservation group with classroom and slots eagerly
-     * joined, ordered by date ascending. Used by {@code StudentListService} to resolve
+     * joined, ordered by date ascending. Used by {@code ReservationStudentService} to resolve
      * classroom name and time block for the admin-notification event once the group's
      * student roster is confirmed — the notification is deliberately deferred from
      * booking time (see {@link mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroupStatus#PENDING_ROSTER}),

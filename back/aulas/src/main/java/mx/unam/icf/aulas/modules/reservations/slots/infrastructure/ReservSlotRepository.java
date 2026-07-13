@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -113,5 +114,27 @@ public interface ReservSlotRepository extends JpaRepository<ReservSlot, ReservSl
             @Param("userId")  Long userId,
             @Param("slotIds") List<Integer> slotIds,
             @Param("dates")   List<java.time.LocalDate> dates
+    );
+
+    // ── Availability lookup for the "available time slots" endpoint ───────────
+
+    /**
+     * Returns the time-slot IDs already booked for the given classroom on the given date.
+     * No status predicate is needed: a cancelled reservation already had its {@code ReservSlot}
+     * rows deleted, so the mere presence of a row means the slot is occupied (same reasoning
+     * as {@link mx.unam.icf.aulas.modules.reservations.instances.infrastructure.ReservInstanceRepository#existsConflict}).
+     *
+     * <p>Used by {@code ReservInstanceService.findAvailableSlots} to compute
+     * {@code available = full catalog − occupied} for a classroom/date pair.</p>
+     *
+     * @param classroomId internal PK of the classroom
+     * @param date        date to check
+     * @return time-slot IDs currently occupied for that classroom/date; empty if none
+     */
+    @Query("SELECT rs.timeSlot.id FROM ReservSlot rs " +
+           "WHERE rs.classroomId = :classroomId AND rs.date = :date")
+    List<Integer> findOccupiedTimeSlotIds(
+            @Param("classroomId") Long classroomId,
+            @Param("date") LocalDate date
     );
 }

@@ -9,6 +9,7 @@ import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteriaArgumentResolver;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
+import mx.unam.icf.aulas.modules.academic.timeslots.app.dtos.TimeSlotDTO;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsImp;
 import mx.unam.icf.aulas.modules.reservations.instances.app.ReservInstanceService;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.BookingRequestDTO;
@@ -17,6 +18,7 @@ import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceF
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
+import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
@@ -31,8 +33,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -171,21 +176,61 @@ public class ReservInstanceController implements ResponseHandler {
     }
 
     /**
+     * Returns the time slots currently available (not yet booked) for a classroom on a given date.
+     * GET /api/v1/reservations/available-slots?classroomUuid=...&date=...
+     *
+     * <p>Computed as {@code full catalog − occupied slots}; ordered by {@code startTime} ascending
+     * so the frontend can walk chronological contiguity when deriving "end time" options.</p>
+     *
+     * @param classroomUuid public UUID of the classroom
+     * @param date          date to check availability for (ISO {@code yyyy-MM-dd})
+     * @throws mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException when the classroom is not found
+     */
+    @GetMapping("/available-slots")
+    public ResponseEntity<ApiResponse<List<TimeSlotDTO>>> findAvailableSlots(
+            @RequestParam UUID classroomUuid,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ok(service.findAvailableSlots(classroomUuid, date));
+    }
+
+    /**
      * Atomically creates a reservation group and all its instances in a single transaction.
-     * POST /api/v1/reservations/booking
+     * POST /api/v1/reservations/booking (multipart/form-data)
      *
-     * <p>The frontend sends the booking intent once (classroom, time block, optional recurrence);
-     * the backend generates every date occurrence. No client-side weekly loop is needed.</p>
+     * <p>The request carries two parts: {@code data} — the JSON booking intent (classroom,
+     * time block, optional recurrence) — and {@code file} — the mandatory student roster
+     * ({@code .xlsx}). The backend validates the roster (including that its student count
+     * equals {@code attendeeCount}) <em>before</em> creating anything; the frontend never
+     * parses the Excel. The backend generates every date occurrence — no client-side loop.</p>
      *
+     * @param dto       booking intent, sent as the {@code data} part with {@code application/json} type
+     * @param file      the roster {@code .xlsx}, sent as the {@code file} part
+     * @param principal authenticated user making the request
      * @return list of created instances (one per target date)
      * @throws mx.unam.icf.aulas.kernel.domain.exceptions.DomainException             on rule violations (400)
+     * @throws mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException when the file is not a valid .xlsx (400)
+     * @throws mx.unam.icf.aulas.modules.reservations.students.app.exceptions.StudentCountMismatchException when roster size != attendeeCount (422)
      * @throws mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException on slot conflict (409)
      */
-    @PostMapping("/booking")
+    @PostMapping(value = "/booking", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<List<ReservInstanceResponseDTO>>> createBooking(
-            @Valid @RequestBody BookingRequestDTO dto,
+            @Valid @RequestPart("data") BookingRequestDTO dto,
+            @RequestPart("file") MultipartFile file,
             @AuthenticationPrincipal UserDetailsImp principal) {
-        return created(service.createBooking(dto, principal.getUuid()));
+        return created(service.createBooking(dto, readBytes(file), principal.getUuid()));
+    }
+
+    /**
+     * Reads the multipart roster into memory, translating a transport-level
+     * {@link IOException} into the same 400 response used for structurally invalid files
+     * (mirrors {@code StudentListController#readBytes}).
+     */
+    private byte[] readBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new InvalidExcelFileException("Could not read the uploaded file.", e);
+        }
     }
 
     /**

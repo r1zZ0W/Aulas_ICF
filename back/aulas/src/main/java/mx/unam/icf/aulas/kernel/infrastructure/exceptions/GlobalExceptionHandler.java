@@ -10,11 +10,14 @@ import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidTokenExceptio
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.MissingTokenException;
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.TokenRevokedException;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
+import mx.unam.icf.aulas.modules.reports.app.exceptions.ReportGenerationException;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ConflictDetailDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException;
+import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentCountMismatchDTO;
 import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentValidationErrorDTO;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.DuplicateStudentException;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.EmptyStudentListException;
+import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.StudentCountMismatchException;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -25,7 +28,10 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -104,6 +110,24 @@ public class GlobalExceptionHandler {
                         .error(true)
                         .message(ex.getMessage())
                         .data(detail)
+                        .build());
+    }
+
+    /**
+     * Handles a roster whose student count does not match the booking's declared
+     * {@code attendeeCount} ({@code POST /api/v1/reservations/booking}). Returns HTTP 422
+     * with a structured {@link StudentCountMismatchDTO} so the frontend can render a
+     * message with both counts, mirroring {@link #handleStudentListValidation}'s pattern.
+     */
+    @ExceptionHandler(StudentCountMismatchException.class)
+    public ResponseEntity<ApiResponse<StudentCountMismatchDTO>> handleStudentCountMismatch(
+            StudentCountMismatchException ex) {
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.<StudentCountMismatchDTO>builder()
+                        .error(true)
+                        .message(ex.getMessage())
+                        .data(new StudentCountMismatchDTO(ex.getExpected(), ex.getActual()))
                         .build());
     }
 
@@ -204,6 +228,49 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles method-level validation failures raised by Spring Framework 6.1+'s built-in
+     * method validation, which — depending on how the constraint is attached to a
+     * {@code @RequestPart}/{@code @RequestParam} parameter — may fire instead of
+     * {@link MethodArgumentNotValidException}. Defensive twin of {@link #handleValidation}
+     * so multipart binding failures never fall through to the 500 catch-all.
+     */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodValidation(HandlerMethodValidationException ex) {
+        String message = isDev()
+                ? ex.getAllErrors().stream()
+                        .map(err -> String.valueOf(err.getDefaultMessage()))
+                        .collect(Collectors.joining("; "))
+                : "The submitted data is not valid.";
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(message));
+    }
+
+    /**
+     * Handles a multipart request that is missing a required part (e.g. the {@code file}
+     * part of {@code POST /api/v1/reservations/booking}); returns 400 with the part name.
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingPart(MissingServletRequestPartException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("Required request part is missing: " + ex.getRequestPartName()));
+    }
+
+    /**
+     * Handles uploads exceeding {@code spring.servlet.multipart.max-file-size}; returns 413.
+     * Without this handler the exception fell through to the generic 500 catch-all, hiding
+     * the actionable cause from the client.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        log.debug("Upload rejected, exceeds max size: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ApiResponse.error("The uploaded file exceeds the maximum allowed size."));
+    }
+
+    /**
      * Handles path variable type mismatches (e.g., non-UUID string in a UUID path variable)
      * and explicit {@link IllegalArgumentException} from service/domain code; returns 400.
      * In {@code dev} profile the raw message is forwarded; in production a generic message is used.
@@ -266,6 +333,22 @@ public class GlobalExceptionHandler {
         String message = isDev() && ex.getMessage() != null && !ex.getMessage().isBlank()
                 ? ex.getMessage()
                 : "The file could not be processed. Please try again later.";
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(message));
+    }
+
+    /**
+     * Handles failures while producing the reservations report PDF (template rendering,
+     * embedded font loading, HTML-to-PDF conversion); returns 500. In {@code dev} profile
+     * the raw message is forwarded; in production a generic message is used.
+     */
+    @ExceptionHandler(ReportGenerationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleReportGeneration(ReportGenerationException ex) {
+        log.error("Report generation error", ex);
+        String message = isDev() && ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "The report could not be generated. Please try again later.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(message));

@@ -12,9 +12,12 @@ import mx.unam.icf.aulas.modules.reservations.history.app.ReservationHistoryServ
 import mx.unam.icf.aulas.modules.reservations.history.domain.ReservationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import mx.unam.icf.aulas.modules.academic.semesters.domain.Semester;
 import mx.unam.icf.aulas.modules.academic.semesters.infrastructure.SemesterRepository;
+import mx.unam.icf.aulas.modules.academic.timeslots.app.dtos.TimeSlotDTO;
+import mx.unam.icf.aulas.modules.academic.timeslots.app.mappers.TimeSlotMapper;
 import mx.unam.icf.aulas.modules.academic.timeslots.domain.TimeSlot;
 import mx.unam.icf.aulas.modules.academic.timeslots.infrastructure.TimeSlotRepository;
 import mx.unam.icf.aulas.modules.access.users.domain.User;
@@ -33,9 +36,14 @@ import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
 import mx.unam.icf.aulas.modules.reservations.instances.infrastructure.ReservInstanceRepository;
 import mx.unam.icf.aulas.modules.reservations.instances.infrastructure.ReservInstanceSpecification;
+import mx.unam.icf.aulas.kernel.app.FileStorageService;
 import mx.unam.icf.aulas.modules.reservations.slots.domain.ReservSlot;
 import mx.unam.icf.aulas.modules.reservations.slots.domain.ReservSlotId;
 import mx.unam.icf.aulas.modules.reservations.slots.infrastructure.ReservSlotRepository;
+import mx.unam.icf.aulas.modules.reservations.students.app.StudentListStorageProperties;
+import mx.unam.icf.aulas.modules.reservations.students.app.StudentRosterValidator;
+import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.StudentCountMismatchException;
+import mx.unam.icf.aulas.modules.reservations.students.domain.Student;
 import mx.unam.icf.aulas.modules.resources.classrooms.domain.Classroom;
 import mx.unam.icf.aulas.modules.resources.classrooms.infrastructure.ClassroomRepository;
 import org.springframework.stereotype.Service;
@@ -90,11 +98,15 @@ public class ReservInstanceService {
     private final ReservationGroupRepository groupRepository;
     private final ClassroomRepository        classroomRepository;
     private final TimeSlotRepository         timeSlotRepository;
+    private final TimeSlotMapper             timeSlotMapper;
     private final ReservSlotRepository       slotRepository;
     private final UserRepository             userRepository;
     private final SemesterRepository         semesterRepository;
     private final ApplicationEventPublisher  eventPublisher;
     private final ReservationHistoryService  historyService;
+    private final StudentRosterValidator     rosterValidator;
+    private final FileStorageService         fileStorage;
+    private final StudentListStorageProperties rosterStorageProperties;
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -172,18 +184,56 @@ public class ReservInstanceService {
         return mapper.toDtoList(instances);
     }
 
+    /**
+     * Returns the time slots that are currently available (not yet booked) for a given
+     * classroom on a given date, computed as {@code full catalog − occupied slots}.
+     *
+     * <p>Ordering is by {@code startTime} (the semantic field), not by the catalog's
+     * autoincrement {@code id}: the frontend relies on the returned order to walk
+     * chronological contiguity when building the "end time" options, and sorting by
+     * {@code id} would silently break if a slot were ever inserted out of chronological
+     * order relative to its id.</p>
+     *
+     * <p>No "already past" filtering is applied here — that is a UI concern (the frontend
+     * already enforces the "at least 15 minutes from now" rule for today's date). This
+     * method purely reports which catalog slots have no {@link ReservSlot} row yet.</p>
+     *
+     * @param classroomUuid public UUID of the classroom
+     * @param date          date to check availability for
+     * @return available time slots ordered by {@code startTime} ascending
+     * @throws ResourceNotFoundException when the classroom is not found
+     */
+    @Transactional(readOnly = true)
+    public List<TimeSlotDTO> findAvailableSlots(UUID classroomUuid, LocalDate date) {
+        Classroom classroom = classroomRepository.findByUuid(classroomUuid)
+            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + classroomUuid));
+
+        Set<Integer> occupiedIds = new HashSet<>(
+            slotRepository.findOccupiedTimeSlotIds(classroom.getId(), date));
+
+        return timeSlotRepository.findAll(Sort.by(Sort.Direction.ASC, "startTime")).stream()
+            .filter(ts -> !occupiedIds.contains(ts.getId()))
+            .map(timeSlotMapper::toDto)
+            .toList();
+    }
+
     // ── Creation ──────────────────────────────────────────────────────────────
 
     /**
      * Atomically creates a {@link ReservationGroup} and all its {@link ReservInstance} +
-     * {@link ReservSlot} rows in a single database transaction.
+     * {@link ReservSlot} rows in a single database transaction, with the mandatory student
+     * roster validated up-front and stored as the transaction's last step.
      *
      * <p>The frontend sends the booking <em>intent</em> once (classroom, time block,
-     * optional recurrence pattern); the backend generates every date occurrence.
-     * No client-side loops; no partial saves on error.</p>
+     * optional recurrence pattern) plus the roster {@code .xlsx} in the same multipart
+     * request; the backend generates every date occurrence. No client-side loops; no
+     * partial saves on error.</p>
      *
      * <p>Business rules (enforced in order):</p>
       * <ol>
+      *   <li><b>Roster first, before any database write</b>: the file must be a valid
+      *       {@code .xlsx} with no duplicate students, and its student count must equal
+      *       {@code attendeeCount} exactly — otherwise the reservation is never created.</li>
       *   <li>Classroom must be active.</li>
       *   <li>The requested {@code startDate} must not be after the currently active semester's end date.
       *       Requests beyond the active semester are rejected (400) immediately.</li>
@@ -194,15 +244,34 @@ public class ReservInstanceService {
       *       conflict found is returned as a structured 409 payload.</li>
       * </ol>
      *
-     * @param dto           atomic booking request
+     * <h4>Storage/notification ordering</h4>
+     * <p>The roster file is written as the <em>last</em> statement of the transactional
+     * method: a storage failure rolls the whole booking back, so no group ever exists
+     * without a readable roster. The inverse residue (file written, then the database
+     * commit itself fails) cannot be prevented by ordering — the filesystem is not
+     * transactional — and is cleaned by {@code StudentRosterCleanupJob.reapOrphanFiles}.
+     * The creation notification is published via {@code ReservInstanceCreatedEventDTO};
+     * its listener ({@code kernel/app/listeners/ReservInstanceCreatedEvent}) is
+     * {@code @TransactionalEventListener(AFTER_COMMIT)}, so the emails fire only once the
+     * commit is consolidated — never for a rolled-back booking.</p>
+     *
+     * @param dto           atomic booking request (the {@code data} multipart part)
+     * @param rosterBytes   raw bytes of the roster {@code .xlsx} (the {@code file} part)
      * @param principalUuid public UUID of the authenticated user making the request
      * @return list of created instances (one per target date), each with time slots populated
      * @throws ResourceNotFoundException       when the classroom or user is not found
      * @throws DomainException                 when a business rule is violated (400)
+     * @throws StudentCountMismatchException   when roster size != attendeeCount (→ 422)
      * @throws ReservationConflictException    when a slot is already taken (→ 409)
      */
     @Transactional(rollbackFor = Exception.class)
-    public List<ReservInstanceResponseDTO> createBooking(BookingRequestDTO dto, UUID principalUuid) {
+    public List<ReservInstanceResponseDTO> createBooking(BookingRequestDTO dto, byte[] rosterBytes, UUID principalUuid) {
+
+        // 0. Validate the roster BEFORE touching the database: invalid file, duplicates,
+        //    or a count mismatch must abort with nothing persisted anywhere.
+        List<Student> students = rosterValidator.validate(rosterBytes);
+        if (students.size() != dto.attendeeCount())
+            throw new StudentCountMismatchException(dto.attendeeCount(), students.size());
 
         // 1. Resolve classroom
         Classroom classroom = classroomRepository.findByUuid(dto.classroomUuid())
@@ -210,9 +279,12 @@ public class ReservInstanceService {
         if (!Boolean.TRUE.equals(classroom.getIsActive()))
             throw new DomainException("The requested classroom is inactive and cannot be reserved");
 
-        // 2. Resolve user
-        User user = userRepository.findByUuid(principalUuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found: " + principalUuid));
+        // 2.1 Resolve user by its UUID
+        UUID target = dto.userUuid() != null ? dto.userUuid() : principalUuid;
+
+        // 2.2 Fetch it into the database
+        User user = userRepository.findByUuid(target)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with UUID: " + target));
 
         // 3. Ensure the requested start date does not exceed the currently active semester
         Semester currentSemester = semesterRepository.findCurrent(LocalDate.now())
@@ -226,18 +298,14 @@ public class ReservInstanceService {
             ? Set.of(dto.startDate().getDayOfWeek())
             : new HashSet<>(dto.daysOfWeek());
 
-        // 6. Create and persist the group (owns all generated instances).
-        // Status starts as PENDING_ROSTER, not ACTIVE: the group only becomes ACTIVE once
-        // the mandatory student roster (.xlsx) is uploaded via StudentListService.upload,
-        // which also fires the admin-notification event below. This prevents notifying
-        // admins about a reservation that never receives its roster. See
-        // ReservationGroupStatus#PENDING_ROSTER and StudentRosterCleanupJob for the reaper
-        // that removes groups abandoned in this state past the grace period.
+        // 6. Create and persist the group (owns all generated instances). Groups are
+        // created ACTIVE: the roster was already validated in step 0 and its file is
+        // stored at the end of this same transaction.
         ReservationGroup group = new ReservationGroup();
         group.setUser(user);
         group.setSemester(currentSemester);
         group.setDaysOfWeek(days);
-        group.setStatus(ReservationGroupStatus.PENDING_ROSTER);
+        group.setStatus(ReservationGroupStatus.ACTIVE);
         group = groupRepository.save(group);
 
         // 7. Build target dates in memory — only the startDate is considered if daysOfWeek is not specified
@@ -343,10 +411,30 @@ public class ReservInstanceService {
         // 13. Record history for every created instance in a single batch
         historyService.registerAll(saved, ReservationEvent.CREATED, "Reservation created");
 
-        // 14. No admin-notification event here (intentional): the group is still
-        // PENDING_ROSTER. StudentListService.upload publishes ReservInstanceCreatedEventDTO
-        // once the mandatory student roster is confirmed, so admins only ever see
-        // reservations with a real roster attached.
+        // 14. Notify owner and admins. The event is only *registered* here — its listener
+        // is @TransactionalEventListener(AFTER_COMMIT), so no email fires unless the commit
+        // below actually consolidates. (The old flow deferred this to ReservationStudentService
+        // .upload; the roster now arrives with the booking, so the notification does too.)
+        ReservInstance first = saved.getFirst();
+        List<String> adminEmails = userRepository.findByRoleName("ADMIN")
+            .stream().map(User::getEmail).collect(Collectors.toList());
+        eventPublisher.publishEvent(new ReservInstanceCreatedEventDTO(
+            user.getEmail(),
+            user.getFullName(),
+            first.getClassroom().getName(),
+            first.getDate(),
+            slotStartTime(timeSlots),
+            slotEndTime(timeSlots),
+            group.getUuid(),
+            adminEmails
+        ));
+
+        // 15. Store the roster file as the transaction's LAST statement: if this write
+        // throws (FileStorageException), everything above rolls back and the reservation
+        // never existed. The inverse case (write OK, commit fails afterwards) leaves an
+        // orphan file that StudentRosterCleanupJob.reapOrphanFiles removes.
+        fileStorage.store(rosterStorageProperties.getStorageDir(),
+            group.getUuid() + ".xlsx", rosterBytes);
 
         return mapper.toDtoList(saved);
     }

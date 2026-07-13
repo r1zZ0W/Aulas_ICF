@@ -34,7 +34,6 @@ import java.util.UUID;
         @Index(name = "idx_reserv_instances_group_status", columnList = "group_id, status"),
         // Covers ReportStatisticsRepository.countInstancesPerGroup's `status + date` range scan
         // followed by GROUP BY group_id (recurrence donut/tasa on Reportes y Estadísticas).
-        // See docs/migration_v1.4__reports_status_date_group_index.sql for the manual DDL.
         @Index(name = "idx_reserv_instances_status_date_group", columnList = "status, date, group_id")
 })
 @Getter @Setter

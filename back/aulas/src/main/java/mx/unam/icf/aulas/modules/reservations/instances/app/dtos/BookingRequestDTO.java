@@ -33,7 +33,8 @@ import java.util.UUID;
  *                       (e.g. "Programación I — parcial"); max 150 characters.
  *                       The frontend must {@code .trim()} the value before sending —
  *                       {@code @Size} validates the raw string, so 151 spaces would be
- *                       rejected with 400. The backend normalises blank/empty to {@code null}.
+ *                       rejected with 400. The backend normalizes blank/empty to {@code null}.
+ * @param userUuid       public UUID for searching users into the database
  *
  * @author Ithera
  * @version 1.1
@@ -62,5 +63,6 @@ public record BookingRequestDTO(
         List<DayOfWeek> daysOfWeek,
 
         @Size(max = 150, message = "Title must not exceed 150 characters")
-        String title
+        String title,
+        UUID userUuid
 ) {}
