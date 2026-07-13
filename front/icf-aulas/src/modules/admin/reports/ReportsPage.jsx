@@ -13,7 +13,8 @@ import {
 
 import { useReportStatistics } from './hooks/useReportStatistics';
 import { useAvailableMonths } from './hooks/useAvailableMonths';
-import { buildPdfReportUrl } from '../../../api/reports';
+import { downloadReservationReportPdf } from '../../../api/reports';
+import { toast } from '../../../utils/toast';
 import Select from '../../../components/Select/Select';
 import EmptyState from '../../../components/EmptyState/EmptyState';
 import { useSemesters } from '../../shared/semesters/hooks/useSemesters';
@@ -135,23 +136,6 @@ function SimpleTooltip({ active, payload, label, unit = '' }) {
   );
 }
 
-// ── Donut center label (recharts renderCustomizedLabel) ────────────────────────
-
-function DonutCenterLabel({ cx, cy, pct }) {
-  return (
-    <g>
-      <text x={cx} y={cy - 8} textAnchor="middle" dominantBaseline="central"
-        style={{ fontSize: 26, fontWeight: 700, fill: '#111827' }}>
-        {pct}%
-      </text>
-      <text x={cx} y={cy + 18} textAnchor="middle" dominantBaseline="central"
-        style={{ fontSize: 11, fill: '#9ca3af' }}>
-        Recurrentes
-      </text>
-    </g>
-  );
-}
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
 /**
@@ -163,16 +147,24 @@ function DonutCenterLabel({ cx, cy, pct }) {
  */
 export default function ReportsPage() {
   // ── Period filter state ────────────────────────────────────────────────────
-  const [scope, setScope] = useState('MENSUAL');
+  const [scope, setScope] = useState('MONTHLY');
   const { semesters: semestersList } = useSemesters();
   const { months: availableMonths } = useAvailableMonths();
 
-  const monthOptions = useMemo(() => {
-    return availableMonths.map(m => ({ value: m, label: formatMonthLabel(m) }));
+  const filteredMonths = useMemo(() => {
+    if (!availableMonths || availableMonths.length === 0) return [];
+
+    const now = new Date();
+    const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+    return availableMonths.filter(month => month <= currentMonth);
   }, [availableMonths]);
 
-  // Months come back newest-first (see useAvailableMonths/getAvailableMonths).
-  const latestAvailableMonth = availableMonths[0] ?? '';
+  const monthOptions = useMemo(() => {
+    return filteredMonths.map(m => ({ value: m, label: formatMonthLabel(m) }));
+  }, [filteredMonths]);
+
+  const latestAvailableMonth = filteredMonths[0] ?? '';
 
   const semesterOptions = useMemo(() => {
     return semestersList.map(s => ({
@@ -188,39 +180,65 @@ export default function ReportsPage() {
   }, [semestersList]);
 
   const defaultAnchor = useMemo(() => {
-    if (scope === 'MENSUAL') return latestAvailableMonth;
+    if (scope === 'MONTHLY') return latestAvailableMonth;
     return activeSemesterUuid;
   }, [scope, latestAvailableMonth, activeSemesterUuid]);
 
   // Both start blank — the list of months/semesters loads asynchronously, so there's no
   // synchronous default to seed the state with. The render-time fallback below (`|| …`)
   // resolves to the newest month / active semester as soon as that data arrives.
-  const [anchorMensual, setAnchorMensual] = useState('');
-  const [anchorSemestral, setAnchorSemestral] = useState('');
+  const [anchorMonthly, setAnchorMonthly] = useState('');
+  const [anchorSemester, setAnchorSemester] = useState('');
 
-  const anchor = scope === 'MENSUAL'
-    ? (anchorMensual || latestAvailableMonth)
-    : (anchorSemestral || activeSemesterUuid);
-  const setAnchor = scope === 'MENSUAL' ? setAnchorMensual : setAnchorSemestral;
+  const anchor = scope === 'MONTHLY'
+    ? (anchorMonthly || latestAvailableMonth)
+    : (anchorSemester || activeSemesterUuid);
+  const setAnchor = scope === 'MONTHLY' ? setAnchorMonthly : setAnchorSemester;
 
-  const anchorOptions = scope === 'MENSUAL' ? monthOptions : semesterOptions;
+  const anchorOptions = scope === 'MONTHLY' ? monthOptions : semesterOptions;
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const { stats, loading } = useReportStatistics({ scope, anchor: anchor || defaultAnchor });
 
   // ── Exportar PDF ───────────────────────────────────────────────────────────
-  const pdfUrl = buildPdfReportUrl({ period: 'MES_EN_CURSO' });
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExportPdf() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const { blob, filename } = await downloadReservationReportPdf({ period: 'CURRENT_MONTH' });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      // Deferred cleanup: revoking synchronously after click() can invalidate the
+      // objectURL before the browser's download subsystem opens the Blob stream
+      // (intermittent 0-byte downloads in Chromium under load).
+      setTimeout(() => {
+        link.remove();
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   // ── Derived values ─────────────────────────────────────────────────────────
-  const tasaPct = stats?.tasaRecurrenciaPct ?? 0;
-  const recurrentes = stats?.recurrencia.recurrentes ?? 0;
-  const eventuales = stats?.recurrencia.eventuales ?? 0;
-  const paddingAngle = (recurrentes > 0 && eventuales > 0) ? 2 : 0;
+  const ratePct = stats?.recurrenceRatePct ?? 0;
+  const recurringCount = stats?.recurrence.recurring ?? 0;
+  const oneTimeCount = stats?.recurrence.oneTime ?? 0;
+  const paddingAngle = (recurringCount > 0 && oneTimeCount > 0) ? 2 : 0;
 
   const donutData = stats
     ? [
-      { name: 'Recurrentes', value: recurrentes },
-      { name: 'Eventuales', value: eventuales },
+      { name: 'Recurrentes', value: recurringCount },
+      { name: 'Eventuales', value: oneTimeCount },
     ]
     : [];
 
@@ -239,16 +257,16 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <a
-          href={pdfUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={handleExportPdf}
+          disabled={exporting}
           className="reports-page__export-btn"
           title="Descargar reporte PDF del mes en curso"
         >
           <Download size={15} />
-          Exportar PDF
-        </a>
+          {exporting ? 'Generando…' : 'Exportar PDF'}
+        </button>
       </div>
 
       {/* ── Info panel ───────────────────────────────────────────────────── */}
@@ -275,8 +293,8 @@ export default function ReportsPage() {
 
         <div className="reports-page__scope-toggle" role="group" aria-label="Granularidad del periodo">
           {[
-            { value: 'MENSUAL', label: 'Mensual' },
-            { value: 'SEMESTRAL', label: 'Semestral' },
+            { value: 'MONTHLY', label: 'Mensual' },
+            { value: 'SEMESTER', label: 'Semestral' },
           ].map(opt => (
             <button
               key={opt.value}
@@ -304,7 +322,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ── KPI cards ─────────────────────────────────────────────────────── */}
-      {!loading && stats && stats.totalReservas === 0 ? (
+      {!loading && stats && stats.totalReservations === 0 ? (
         <div style={{ marginTop: '24px', padding: '40px 0' }}>
           <EmptyState message="No hay datos de reservaciones para el periodo seleccionado." />
         </div>
@@ -314,25 +332,25 @@ export default function ReportsPage() {
             <StatCard
               icon={BookOpen}
               label="Total Reservaciones"
-              value={stats ? stats.totalReservas.toLocaleString('es-MX') : undefined}
-              delta={stats?.totalReservasDeltaPct}
+              value={stats ? stats.totalReservations.toLocaleString('es-MX') : undefined}
+              delta={stats?.totalReservationsDeltaPct}
             />
             <StatCard
               icon={Building2}
               label="Aula Más Ocupada"
-              value={stats ? (stats.aulaMasOcupada?.nombre ?? '—') : undefined}
-              sub={stats?.aulaMasOcupada ? `${stats.aulaMasOcupada.horas} horas ocupadas` : undefined}
+              value={stats ? (stats.mostOccupiedClassroom?.name ?? '—') : undefined}
+              sub={stats?.mostOccupiedClassroom ? `${stats.mostOccupiedClassroom.hours} horas ocupadas` : undefined}
             />
             <StatCard
               icon={UserCheck}
               label="Mayor Usuario"
-              value={stats ? (stats.mayorUsuario?.nombre ?? '—') : undefined}
-              sub={stats?.mayorUsuario ? `${stats.mayorUsuario.reservas} reservaciones` : undefined}
+              value={stats ? (stats.topUser?.name ?? '—') : undefined}
+              sub={stats?.topUser ? `${stats.topUser.reservations} reservaciones` : undefined}
             />
             <StatCard
               icon={RefreshCw}
               label="Tasa de Recurrencia"
-              value={stats ? `${formatPct(stats.tasaRecurrenciaPct)}%` : undefined}
+              value={stats ? `${formatPct(stats.recurrenceRatePct)}%` : undefined}
               sub="de las reservas son recurrentes"
             />
           </div>
@@ -347,15 +365,16 @@ export default function ReportsPage() {
               loading={loading}
             >
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={stats?.aulasMasOcupadas ?? []} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                <BarChart data={stats?.mostOccupiedClassrooms ?? []} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="nombre" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                   <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit=" h" />} />
-                  <Bar dataKey="horas" radius={[4, 4, 0, 0]} maxBarSize={50}>
-                    {(stats?.aulasMasOcupadas ?? []).map((_, i) => (
+                  <Bar dataKey="hours" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                    {(stats?.mostOccupiedClassrooms ?? []).map((_, i) => (
                       <Cell key={i} fill={COLOR_BARS[i % COLOR_BARS.length]} />
-                    ))}
+                    ))
+                    }
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -370,15 +389,15 @@ export default function ReportsPage() {
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart
                   layout="vertical"
-                  data={stats?.usuariosMasReservas ?? []}
+                  data={stats?.topUsers ?? []}
                   margin={{ top: 8, right: 24, left: 8, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="nombre" width={90} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                   <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit="" />} />
-                  <Bar dataKey="reservas" radius={[0, 4, 4, 0]} maxBarSize={22}>
-                    {(stats?.usuariosMasReservas ?? []).map((_, i) => (
+                  <Bar dataKey="reservations" radius={[0, 4, 4, 0]} maxBarSize={22}>
+                    {(stats?.topUsers ?? []).map((_, i) => (
                       <Cell key={i} fill={i === 0 ? COLOR_PRIMARY : COLOR_LIGHT} />
                     ))}
                   </Bar>
@@ -389,7 +408,7 @@ export default function ReportsPage() {
             {/* Recurrencia de Reservas — PieChart (donut) */}
             <ChartCard
               title="Recurrencia de Reservas"
-              subtitle="Proporción de eventos recurrentes (ej. clases) vs eventuales"
+              subtitle="Proporción de eventos recurrentes vs eventuales"
               loading={loading}
             >
               <div style={{ position: 'relative', width: '100%', height: 250 }}>
@@ -427,10 +446,10 @@ export default function ReportsPage() {
                     pointerEvents: 'none',
                   }}>
                     <span style={{ fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1 }}>
-                      {tasaPct > 50 ? `${formatPct(tasaPct)}%` : `${formatPct(100 - tasaPct)}%`}
+                      {ratePct > 50 ? `${formatPct(ratePct)}%` : `${formatPct(100 - ratePct)}%`}
                     </span>
                     <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                      {tasaPct > 50 ? 'Recurrentes' : 'Eventuales'}
+                      {ratePct > 50 ? 'Recurrentes' : 'Eventuales'}
                     </span>
                   </div>
                 )}
@@ -445,14 +464,14 @@ export default function ReportsPage() {
             >
               <ResponsiveContainer width="100%" height={250}>
                 <AreaChart
-                  data={stats?.tendencia ?? []}
+                  data={stats?.trend ?? []}
                   margin={{
                     top: 8, right: 8,
-                    // SEMESTRAL rotates its labels -30° with textAnchor="end", which shifts
+                    // SEMESTER rotates its labels -30° with textAnchor="end", which shifts
                     // the first tick left and every tick's descenders down — extra left/bottom
                     // margin keeps them from clipping against the chart edges.
-                    left: scope === 'SEMESTRAL' ? 20 : -10,
-                    bottom: scope === 'SEMESTRAL' ? 12 : 0,
+                    left: scope === 'SEMESTER' ? 20 : -10,
+                    bottom: scope === 'SEMESTER' ? 12 : 0,
                   }}
                 >
                   <defs>
@@ -467,21 +486,21 @@ export default function ReportsPage() {
                     tick={{ fontSize: 11, fill: '#6b7280' }}
                     axisLine={false}
                     tickLine={false}
-                    // MENSUAL has 28-31 day labels — thin them out to start/end only.
-                    // SEMESTRAL has ~6 month labels; interval={0} forces recharts to render
+                    // MONTHLY has 28-31 day labels — thin them out to start/end only.
+                    // SEMESTER has ~6 month labels; interval={0} forces recharts to render
                     // every one instead of its collision heuristic skipping/duplicating ticks
                     // (the reported bug). Rotating them keeps them legible on narrower screens
                     // now that the collision-avoidance algorithm is disabled.
-                    interval={scope === 'MENSUAL' ? 'preserveStartEnd' : 0}
-                    angle={scope === 'SEMESTRAL' ? -30 : 0}
-                    textAnchor={scope === 'SEMESTRAL' ? 'end' : 'middle'}
-                    height={scope === 'SEMESTRAL' ? 42 : 30}
+                    interval={scope === 'MONTHLY' ? 'preserveStartEnd' : 0}
+                    angle={scope === 'SEMESTER' ? -30 : 0}
+                    textAnchor={scope === 'SEMESTER' ? 'end' : 'middle'}
+                    height={scope === 'SEMESTER' ? 42 : 30}
                   />
                   <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<SimpleTooltip />} />
                   <Area
                     type="monotone"
-                    dataKey="reservas"
+                    dataKey="reservations"
                     stroke={COLOR_AREA}
                     strokeWidth={2}
                     fill="url(#areaGrad)"

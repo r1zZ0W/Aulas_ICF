@@ -2,11 +2,11 @@
  * @fileoverview API client for the Reportes y Estadísticas module.
  *
  * `getReservationStatistics` calls the real backend endpoint:
- *   GET /api/v1/reports/statistics?scope=MENSUAL|SEMESTRAL[&anchor=...]
+ *   GET /api/v1/reports/statistics?scope=MONTHLY|SEMESTER[&anchor=...]
  *
  * The response is an `ApiResponse<ReservationStatisticsDTO>` whose `.data` field
  * is validated against `ReservationStatisticsSchema` before being returned.
- * `buildPdfReportUrl` builds the URL for the existing PDF download endpoint.
+ * `downloadReservationReportPdf` fetches the PDF report as an authenticated Blob.
  */
 import { createApiClient, HttpError } from './base.js';
 import { ReservationStatisticsSchema, AvailableMonthsSchema } from '../schemas/report.js';
@@ -40,14 +40,14 @@ function resolveErrorMessage(error) {
  * Calls `GET /api/v1/reports/statistics?scope=…[&anchor=…]` and validates
  * the response payload against {@link ReservationStatisticsSchema}.
  *
- * @param {{ scope?: 'MENSUAL'|'SEMESTRAL', anchor?: string }} [params={}]
- *   `scope`  — period granularity (default `'MENSUAL'`).
- *   `anchor` — `yyyy-MM` for MENSUAL scope, or semester UUID for SEMESTRAL scope.
+ * @param {{ scope?: 'MONTHLY'|'SEMESTER', anchor?: string }} [params={}]
+ *   `scope`  — period granularity (default `'MONTHLY'`).
+ *   `anchor` — `yyyy-MM` for MONTHLY scope, or semester UUID for SEMESTER scope.
  *              Omit or pass an empty string to let the backend use the default period.
  * @returns {Promise<import('../schemas/report.js').ReservationStatisticsSchema._type>}
  * @throws {Error} with a user-friendly message on network or server errors.
  */
-export async function getReservationStatistics({ scope = 'MENSUAL', anchor = '' } = {}) {
+export async function getReservationStatistics({ scope = 'MONTHLY', anchor = '' } = {}) {
   try {
     const qs = new URLSearchParams({ scope });
     if (anchor) qs.set('anchor', anchor);
@@ -64,7 +64,7 @@ export async function getReservationStatistics({ scope = 'MENSUAL', anchor = '' 
  * Returns the `yyyy-MM` months that have at least one active reservation, newest first.
  *
  * Calls `GET /api/v1/reports/available-months` and validates the response payload against
- * {@link AvailableMonthsSchema}. Used to populate the MENSUAL scope's period dropdown so it
+ * {@link AvailableMonthsSchema}. Used to populate the MONTHLY scope's period dropdown so it
  * only lists months that actually have data.
  *
  * @returns {Promise<string[]>} distinct `yyyy-MM` strings, newest first
@@ -81,15 +81,37 @@ export async function getAvailableMonths() {
 }
 
 /**
- * Builds the URL for the existing PDF report endpoint.
- * Used by the "Exportar PDF" button in ReportsPage — opened in a new tab.
+ * Downloads the reservations report PDF as an authenticated Blob.
  *
- * @param {{ period?: 'MES_EN_CURSO'|'MES_ANTERIOR', classroomUuid?: string }} [params={}]
- * @returns {string} Full URL to the PDF download endpoint.
+ * Calls `GET /api/v1/reports/reservations?period=…[&classroomUuid=…]` through the shared
+ * client so the Bearer token is injected (the previous `<a target="_blank">` approach sent
+ * no Authorization header). The backend responds with `application/pdf`, which `base.js`
+ * parses into a Blob; error responses stay JSON and surface through {@link HttpError}.
+ *
+ * The filename is computed client-side, mirroring the backend's `Content-Disposition`
+ * logic (ReportController): reading the header would require exposing it via CORS.
+ *
+ * @param {{ period?: 'CURRENT_MONTH'|'PREVIOUS_MONTH', classroomUuid?: string }} [params={}]
+ * @returns {Promise<{ blob: Blob, filename: string }>} PDF content plus suggested filename.
+ * @throws {Error} with a user-friendly message on network or server errors.
  */
-export function buildPdfReportUrl({ period = 'MES_EN_CURSO', classroomUuid } = {}) {
-  const base = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
-  const qs = new URLSearchParams({ period });
-  if (classroomUuid) qs.set('classroomUuid', classroomUuid);
-  return `${base}/api/v1/reports/reservations?${qs}`;
+export async function downloadReservationReportPdf({ period = 'CURRENT_MONTH', classroomUuid } = {}) {
+  try {
+    const qs = new URLSearchParams({ period });
+    if (classroomUuid) qs.set('classroomUuid', classroomUuid);
+
+    const { data } = await api.get(`/api/v1/reports/reservations?${qs}`, {
+      headers: { Accept: 'application/pdf' },
+    });
+
+    // Mirror of the backend's filename: yyyy-MM of the *selected* month, not always today's.
+    const now = new Date();
+    if (period === 'PREVIOUS_MONTH') now.setMonth(now.getMonth() - 1, 1);
+    const yyyyMM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    return { blob: data, filename: `reporte-reservas-${yyyyMM}.pdf` };
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
 }

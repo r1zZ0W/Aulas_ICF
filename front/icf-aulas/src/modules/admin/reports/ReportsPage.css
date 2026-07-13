@@ -69,6 +69,12 @@
   transform: translateY(-1px);
 }
 
+.reports-page__export-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+  transform: none;
+}
+
 /* ── Info panel ───────────────────────────────────────────────────────────────── */
 
 .reports-page__info-panel {

@@ -13,8 +13,8 @@ import { getReservationStatistics } from '../../../../api/reports.js';
 
 /**
  * @param {object}                    params
- * @param {'MENSUAL'|'SEMESTRAL'}     [params.scope='MENSUAL']  Period granularity.
- * @param {string}                    [params.anchor='']         yyyy-MM (MENSUAL) or semester UUID (SEMESTRAL).
+ * @param {'MONTHLY'|'SEMESTER'}      [params.scope='MONTHLY']  Period granularity.
+ * @param {string}                    [params.anchor='']         yyyy-MM (MONTHLY) or semester UUID (SEMESTER).
  *
  * @returns {{
  *   stats:   import('../../../../schemas/report.js').ReservationStatisticsSchema._type | undefined,
@@ -22,7 +22,7 @@ import { getReservationStatistics } from '../../../../api/reports.js';
  *   error:   Error | null,
  * }}
  */
-export function useReportStatistics({ scope = 'MENSUAL', anchor = '' } = {}) {
+export function useReportStatistics({ scope = 'MONTHLY', anchor = '' } = {}) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['reports', 'statistics', { scope, anchor }],
     queryFn: () => getReservationStatistics({ scope, anchor }),

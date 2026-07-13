@@ -1,6 +1,6 @@
 /**
  * @fileoverview Custom hook that fetches the months with reservation data for the
- * Reportes y Estadísticas dashboard's MENSUAL period dropdown.
+ * Reportes y Estadísticas dashboard's MONTHLY period dropdown.
  *
  * Query key structure:
  *   ['reports', 'available-months']
