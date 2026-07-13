@@ -1,0 +1,15 @@
+/* ── Modal shell ─────────────────────────────────────────── */
+.modal-content.reserva-students-modal {
+  width: 100%;
+  max-width: min(680px, calc(100vw - 48px));
+  border-radius: 32px;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* ── Roster/attendeeCount drift notice ──────────────────────
+   Subtle, not danger-red: same info-blue card as the summary,
+   just an extra line — a mismatch is worth noting, not alarming. */
+.reserva-students-modal__mismatch span {
+  color: #6b5400;
+}

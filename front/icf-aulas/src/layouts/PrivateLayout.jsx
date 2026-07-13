@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar/Sidebar';
 import ReservaModal from '../components/ReservaModal/ReservaModal';
 import ReservaInfoModal from '../components/ReservaInfoModal/ReservaInfoModal';
 import ReasignarModal from '../components/ReasignarModal/ReasignarModal';
+import ReservaStudentsModal from '../components/ReservaStudentsModal/ReservaStudentsModal';
 import { ReservationProvider, useReservation } from '../context/ReservationContext';
 import './PrivateLayout.css';
 
@@ -12,6 +13,7 @@ function Layout() {
     modalOpen, closeModal, modalSlot,
     infoModalOpen, selectedReservation, closeInfoModal, openReschedule,
     rescheduleOpen, closeReschedule,
+    studentsModalOpen, closeStudentsModal,
   } = useReservation();
 
   return (
@@ -38,6 +40,12 @@ function Layout() {
       <ReasignarModal
         open={rescheduleOpen}
         onClose={closeReschedule}
+        reservation={selectedReservation}
+      />
+
+      <ReservaStudentsModal
+        open={studentsModalOpen}
+        onClose={closeStudentsModal}
         reservation={selectedReservation}
       />
 

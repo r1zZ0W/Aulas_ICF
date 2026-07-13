@@ -576,3 +576,81 @@
   font-size: 0.78rem;
   color: #6b7280;
 }
+/* ── Student roster file field ───────────────────────────── */
+.reserva-modal__file-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  width: 100%;
+  padding: 0 16px;
+  border: 1px dashed #b9c2cc;
+  border-radius: 12px;
+  background: #fff;
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: #005687;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.reserva-modal__file-btn:hover {
+  border-color: #005687;
+  background: #f0f7ff;
+}
+
+.reserva-modal__file-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 50px;
+  padding: 0 12px 0 16px;
+  border: 1px solid #e2e2e2;
+  border-radius: 12px;
+  background: #f0f7ff;
+  box-sizing: border-box;
+}
+
+.reserva-modal__file-name {
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  color: var(--moon-bulma);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reserva-modal__file-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #b3261e;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.reserva-modal__file-remove:hover {
+  background: #fdecea;
+}
+
+.reserva-modal__file-hint {
+  font-family: var(--moon-font-sans);
+  font-size: 11px;
+  color: #8a9098;
+  line-height: 1.4;
+}
+
+.reserva-modal__file-error {
+  font-family: var(--moon-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: #b3261e;
+}

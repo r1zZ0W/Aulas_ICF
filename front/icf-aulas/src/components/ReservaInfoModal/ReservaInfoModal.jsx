@@ -31,10 +31,12 @@ function fmtTime(date) {
  *  - `reservation.timeSlots` + `reservation.date` → start/end times
  *  - `reservation.numAsistentes` → attendee count (informational, not shown currently)
  *
- * Visibility rules (applied only when !isPast && status === 'ACTIVE'):
- *  - Admin              → "Cancelar" (admin mutation) + "Reasignar"
- *  - Teacher (owner)    → "Cancelar" (user mutation)
- *  - Teacher (not owner) → read-only, no action buttons
+ * Visibility rules:
+ *  - Admin               → "Ver estudiantes" always (any status, past or future — opens
+ *                          {@link ReservaStudentsModal}); "Cancelar" (admin mutation) +
+ *                          "Reasignar" only when !isPast && status === 'ACTIVE'.
+ *  - Teacher (owner)     → "Cancelar" (user mutation) only when !isPast && status === 'ACTIVE'.
+ *  - Teacher (not owner) → read-only, no action buttons.
  *
  * @param {{
  *   open:        boolean,
@@ -51,6 +53,7 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
     roomById,
     cancelReservationMutation,
     cancelReservationAdminMutation,
+    openStudentsModal,
   } = useReservation();
 
   if (!open || !reservation) return null;
@@ -172,6 +175,21 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
             >
               Cerrar
             </button>
+
+            {/* ── Admin: view students ──────────────────────────────────
+                 Visible to admins regardless of reservation status (active, past,
+                 or cancelled) — the roster belongs to the group and stays queryable
+                 independent of `canAct`, unlike Cancelar/Reasignar below. */}
+            {isAdmin && (
+              <button
+                type="button"
+                className="reserva-modal__btn reserva-modal__btn--cancel"
+                onClick={openStudentsModal}
+              >
+                <Users size={16} />
+                Ver estudiantes
+              </button>
+            )}
 
             {/* ── Admin actions ─────────────────────────────────────────
                  Visible only to admins on active, future reservations. */}

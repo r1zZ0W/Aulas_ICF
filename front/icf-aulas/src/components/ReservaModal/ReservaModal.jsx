@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Info, Users, Clock, ChevronDown, Plus, ArrowLeft, Calendar, Repeat } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { X, Info, Users, Clock, ChevronDown, Plus, ArrowLeft, Calendar, Repeat, Upload, Trash2 } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import { typeLabel } from '../../schemas/classroom';
 import { useReservaModal, WEEKDAY_OPTIONS } from './useReservaModal';
@@ -11,6 +11,13 @@ const MONTHS_ES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 const WEEKDAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+/** Formats a raw "HH:MM:SS" time string as "H:MM" for display (e.g. "07:30:00" → "7:30"). */
+const fmtHM = (hms) => {
+  if (!hms) return '';
+  const [h, m] = hms.split(':');
+  return `${Number(h)}:${m}`;
+};
 
 // ── DatePicker sub-component ──────────────────────────────────────────────────
 
@@ -124,10 +131,14 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
     repeatUntil,
     setRepeatUntil,
     selectedDays,
+    file,
+    fileError,
+    handleFileChange,
     availableRooms,
     room,
     startSlots,
     endSlots,
+    slotsLoading,
     canSubmit,
     maxAttendees,
     semesterEnd,
@@ -140,6 +151,17 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
     handleSubmit,
     createBookingMutation,
   } = useReservaModal({ open, onClose, initialStart, initialEnd });
+
+  // Hidden native input; the styled button forwards clicks to it. A ref (not an id)
+  // avoids collisions if two modals ever mount at once.
+  const fileInputRef = useRef(null);
+
+  const onFileInputChange = (e) => {
+    handleFileChange(e.target.files?.[0] ?? null);
+    // Allow re-selecting the same file after removing it (native inputs suppress the
+    // change event when the value is identical).
+    e.target.value = '';
+  };
 
   return (
     <Modal open={open} className="reserva-modal">
@@ -247,12 +269,17 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                     value={startLabel}
                     onChange={e => handleStartChange(e.target.value)}
                     required
+                    disabled={!roomId || slotsLoading || startSlots.length === 0}
                   >
                     {startSlots.length === 0 && (
-                      <option value="">Sin horarios disponibles</option>
+                      <option value="">
+                        {!roomId ? 'Selecciona un aula primero'
+                          : slotsLoading ? 'Cargando horarios…'
+                          : 'Sin horarios disponibles'}
+                      </option>
                     )}
                     {startSlots.map(s => (
-                      <option key={s.label} value={s.label}>{s.label}</option>
+                      <option key={s.id} value={s.startTime}>{fmtHM(s.startTime)}</option>
                     ))}
                   </select>
                   <ChevronDown size={18} className="reserva-modal__chevron" />
@@ -271,7 +298,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                     disabled={!startLabel || endSlots.length === 0}
                   >
                     {endSlots.map(s => (
-                      <option key={s.label} value={s.label}>{s.label}</option>
+                      <option key={s.id} value={s.value}>{fmtHM(s.value)}</option>
                     ))}
                   </select>
                   <ChevronDown size={18} className="reserva-modal__chevron" />
@@ -299,6 +326,44 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                 </select>
                 <ChevronDown size={18} className="reserva-modal__chevron" />
               </div>
+            </div>
+
+            {/* Student roster (.xlsx) — mandatory; content is validated server-side only */}
+            <div className="reserva-modal__field">
+              <label className="reserva-modal__label">Lista de alumnos (.xlsx)*</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx"
+                onChange={onFileInputChange}
+                hidden
+              />
+              {file ? (
+                <div className="reserva-modal__file-chip">
+                  <span className="reserva-modal__file-name" title={file.name}>{file.name}</span>
+                  <button
+                    type="button"
+                    className="reserva-modal__file-remove"
+                    onClick={() => handleFileChange(null)}
+                    aria-label="Quitar archivo"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="reserva-modal__file-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={16} />
+                  Seleccionar archivo Excel
+                </button>
+              )}
+              <span className="reserva-modal__file-hint">
+                Columnas: Nombre(s), Apellido(s), Correo. Las filas deben coincidir con el número de alumnos.
+              </span>
+              {fileError && <span className="reserva-modal__file-error">{fileError}</span>}
             </div>
 
             {/* Recurring toggle */}

@@ -24,6 +24,9 @@ const ReservationContext = createContext(null);
  *  - `visibleRooms` / `toggleRoom` — calendar room-visibility toggle state.
  *  - `selectedReservation` / `openInfoModal` / `closeInfoModal` — info modal state.
  *    `openInfoModal` now accepts a full `ReservInstanceResponseDTO` object (not an ID).
+ *  - `studentsModalOpen` / `openStudentsModal` / `closeStudentsModal` — admin-only "view
+ *    students" modal, a sub-flow of the info modal. `closeStudentsModal` reopens the info
+ *    modal instead of clearing `selectedReservation`.
  *  - `createBookingMutation`, `cancelReservationMutation`, `cancelReservationAdminMutation`,
  *    `reassignMutation` — React Query mutations with automatic cache invalidation.
  *  - Modal open/close helpers for the create, info, and reassign modals.
@@ -33,10 +36,10 @@ const ReservationContext = createContext(null);
 export function ReservationProvider({ children }) {
   // ── Active classroom list ─────────────────────────────────────────────────
   const { data: pageData } = useQuery({
-    queryKey:        ['classrooms', 'active', 'sidebar'],
-    queryFn:         () => getClassrooms({ size: 200, sort: 'name', direction: 'asc' }),
+    queryKey: ['classrooms', 'active', 'sidebar'],
+    queryFn: () => getClassrooms({ size: 200, sort: 'name', direction: 'asc' }),
     placeholderData: keepPreviousData,
-    staleTime:       60_000,
+    staleTime: 60_000,
   });
 
   /**
@@ -72,12 +75,13 @@ export function ReservationProvider({ children }) {
 
   // ── Modal state ───────────────────────────────────────────────────────────
 
-  const [selectedDate,        setSelectedDate]        = useState(null);
-  const [modalOpen,           setModalOpen]           = useState(false);
-  const [modalSlot,           setModalSlot]           = useState({ start: null, end: null });
-  const [infoModalOpen,       setInfoModalOpen]       = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalSlot, setModalSlot] = useState({ start: null, end: null });
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState(null);
-  const [rescheduleOpen,      setRescheduleOpen]      = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [studentsModalOpen, setStudentsModalOpen] = useState(false);
 
   // ── Modal callbacks ───────────────────────────────────────────────────────
 
@@ -122,6 +126,26 @@ export function ReservationProvider({ children }) {
   }, []);
 
   /**
+   * Opens the "view students" modal (admin-only), swapping out the info modal.
+   * `selectedReservation` is left untouched — this is a sub-flow of the detail view,
+   * not a separate entry point.
+   */
+  const openStudentsModal = useCallback(() => {
+    setInfoModalOpen(false);
+    setStudentsModalOpen(true);
+  }, []);
+
+  /**
+   * Closes the "view students" modal and returns to the reservation detail modal
+   * (acts as "Volver", not a hard close). `selectedReservation` is only cleared by
+   * {@link closeInfoModal}, when the admin actually leaves the detail flow.
+   */
+  const closeStudentsModal = useCallback(() => {
+    setStudentsModalOpen(false);
+    setInfoModalOpen(true);
+  }, []);
+
+  /**
    * Toggles the visibility of a room in the calendar.
    * Clicking the only visible room shows all rooms again (solo → all).
    */
@@ -143,17 +167,21 @@ export function ReservationProvider({ children }) {
   //   • History   — badge must update in real time (Cancelada / Reasignada).
   // createBooking only affects the calendar (new slot appears); the history
   // query will pick up the new entry on its next natural refetch.
+  // ['timeslots', 'available'] is invalidated on every mutation that changes slot occupancy so
+  // the "Nueva Reserva" modal reflects freed/occupied slots immediately if reopened.
   const INVALIDATE_CALENDAR = ['reservations', 'availability'];
-  const INVALIDATE_HISTORY  = ['reservations', 'history'];
-  const INVALIDATE_BOTH     = [INVALIDATE_CALENDAR, INVALIDATE_HISTORY];
+  const INVALIDATE_HISTORY = ['reservations', 'history'];
+  const INVALIDATE_AVAILABLE_SLOTS = ['timeslots', 'available'];
+  const INVALIDATE_BOTH = [INVALIDATE_CALENDAR, INVALIDATE_HISTORY, INVALIDATE_AVAILABLE_SLOTS];
 
   /**
-   * Creates a booking (group + all instances) atomically.
+   * Creates a booking (group + all instances) atomically, sending the mandatory student
+   * roster file in the same multipart request. Callers pass `{ payload, file }`.
    * Invalidates the calendar availability cache so new slots appear immediately.
    */
   const createBookingMutation = useApiMutation({
-    mutationFn:     createBooking,
-    invalidateKey:  [INVALIDATE_CALENDAR],
+    mutationFn: ({ payload, file }) => createBooking(payload, file),
+    invalidateKey: [INVALIDATE_CALENDAR, INVALIDATE_AVAILABLE_SLOTS],
     successMessage: 'Reserva creada exitosamente',
   });
 
@@ -163,10 +191,10 @@ export function ReservationProvider({ children }) {
    * Closes the info modal on success.
    */
   const cancelReservationMutation = useApiMutation({
-    mutationFn:     (uuid) => cancelReservation(uuid),
-    invalidateKey:  INVALIDATE_BOTH,
+    mutationFn: (uuid) => cancelReservation(uuid),
+    invalidateKey: INVALIDATE_BOTH,
     successMessage: 'Reserva cancelada',
-    onSuccess:      () => setInfoModalOpen(false),
+    onSuccess: () => setInfoModalOpen(false),
   });
 
   /**
@@ -175,10 +203,10 @@ export function ReservationProvider({ children }) {
    * Closes the info modal on success.
    */
   const cancelReservationAdminMutation = useApiMutation({
-    mutationFn:     (uuid) => cancelReservationAdmin(uuid),
-    invalidateKey:  INVALIDATE_BOTH,
+    mutationFn: (uuid) => cancelReservationAdmin(uuid),
+    invalidateKey: INVALIDATE_BOTH,
     successMessage: 'Reserva cancelada por administrador',
-    onSuccess:      () => setInfoModalOpen(false),
+    onSuccess: () => setInfoModalOpen(false),
   });
 
   /**
@@ -187,10 +215,10 @@ export function ReservationProvider({ children }) {
    * Closes the reschedule modal on success.
    */
   const reassignMutation = useApiMutation({
-    mutationFn:     ({ uuid, ...payload }) => reassignReservation(uuid, payload),
-    invalidateKey:  INVALIDATE_BOTH,
+    mutationFn: ({ uuid, ...payload }) => reassignReservation(uuid, payload),
+    invalidateKey: INVALIDATE_BOTH,
     successMessage: 'Reserva reasignada exitosamente',
-    onSuccess:      () => setRescheduleOpen(false),
+    onSuccess: () => setRescheduleOpen(false),
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -220,6 +248,10 @@ export function ReservationProvider({ children }) {
       rescheduleOpen,
       openReschedule,
       closeReschedule,
+      // View students modal (admin-only)
+      studentsModalOpen,
+      openStudentsModal,
+      closeStudentsModal,
       // Mutations (shared across modals)
       createBookingMutation,
       cancelReservationMutation,
