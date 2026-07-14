@@ -1,0 +1,219 @@
+.async-combobox {
+  position: relative;
+  width: 100%;
+}
+
+.async-combobox--disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ── Search input mode ───────────────────────────────────── */
+.async-combobox__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.async-combobox__search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--moon-content-text-secondary, #6a7282);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.async-combobox__input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px 0 40px;
+  border: 1.337px solid var(--moon-content-border, #e2e2e2);
+  border-radius: 12px;
+  background: #fff;
+  font-family: var(--moon-font-sans);
+  font-size: 15px;
+  color: var(--moon-content-text, #232222);
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.async-combobox__input::placeholder {
+  color: var(--moon-content-text-secondary, #6a7282);
+}
+
+.async-combobox__input:focus {
+  outline: none;
+  border-color: var(--moon-piccolo);
+  box-shadow: 0 0 0 3px var(--moon-piccolo-10);
+}
+
+.async-combobox__input:disabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+}
+
+/* ── Dropdown (portal) ───────────────────────────────────── */
+.async-combobox__dropdown {
+  max-height: 280px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1.337px solid var(--moon-content-border, #e2e2e2);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+}
+
+.async-combobox__state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  color: var(--moon-content-text-secondary, #6a7282);
+}
+
+.async-combobox__state--error {
+  color: #e53e3e;
+}
+
+.async-combobox__spinner {
+  animation: async-combobox-spin 0.8s linear infinite;
+}
+
+@keyframes async-combobox-spin {
+  to { transform: rotate(360deg); }
+}
+
+.async-combobox__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: opacity 0.15s;
+}
+
+/* Anti-flash: a refetch with results already showing just dims them, instead of
+   replacing the list with a loading state (same convention as DataTable.jsx). */
+.async-combobox__list--dim {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.async-combobox__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--moon-font-sans);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.async-combobox__option:hover {
+  background: var(--moon-piccolo-10);
+  color: var(--moon-piccolo-60);
+}
+
+.async-combobox__option-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.async-combobox__option-secondary {
+  font-size: 12px;
+  color: var(--moon-content-text-secondary, #6a7282);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Selected state: chip ────────────────────────────────── */
+.async-combobox__chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 48px;
+  padding: 0 10px 0 16px;
+  border: 1px solid var(--moon-content-border, #e2e2e2);
+  border-radius: 12px;
+  background: #f0f7ff;
+  box-sizing: border-box;
+}
+
+.async-combobox__chip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.async-combobox__chip-label {
+  font-family: var(--moon-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moon-bulma, #232222);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.async-combobox__chip-secondary {
+  font-family: var(--moon-font-sans);
+  font-size: 12px;
+  color: var(--moon-content-text-secondary, #6a7282);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.async-combobox__badge {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 86, 135, 0.1);
+  color: #005687;
+  font-family: var(--moon-font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.async-combobox__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #b3261e;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.async-combobox__clear:hover:not(:disabled) {
+  background: #fdecea;
+}
+
+.async-combobox__clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

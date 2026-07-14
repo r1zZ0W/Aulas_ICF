@@ -203,6 +203,11 @@ public class ReservInstanceController implements ResponseHandler {
      * equals {@code attendeeCount}) <em>before</em> creating anything; the frontend never
      * parses the Excel. The backend generates every date occurrence — no client-side loop.</p>
      *
+     * <p>{@code dto.userUuid()} lets the request book on behalf of a different user
+     * (teacher or admin) instead of the caller — but only an ADMIN may set it to anything
+     * other than their own UUID; any other caller supplying someone else's UUID is rejected
+     * before the service layer is even invoked.</p>
+     *
      * @param dto       booking intent, sent as the {@code data} part with {@code application/json} type
      * @param file      the roster {@code .xlsx}, sent as the {@code file} part
      * @param principal authenticated user making the request
@@ -211,12 +216,22 @@ public class ReservInstanceController implements ResponseHandler {
      * @throws mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException when the file is not a valid .xlsx (400)
      * @throws mx.unam.icf.aulas.modules.reservations.students.app.exceptions.StudentCountMismatchException when roster size != attendeeCount (422)
      * @throws mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException on slot conflict (409)
+     * @throws AccessDeniedException when a non-admin supplies a {@code userUuid} other than their own
      */
     @PostMapping(value = "/booking", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<List<ReservInstanceResponseDTO>>> createBooking(
             @Valid @RequestPart("data") BookingRequestDTO dto,
             @RequestPart("file") MultipartFile file,
             @AuthenticationPrincipal UserDetailsImp principal) {
+        // Only an admin may book on behalf of someone else. Comparing against the caller's
+        // own UUID (rather than just null-checking userUuid) keeps this resilient to a future
+        // frontend that always sends userUuid explicitly (even when it's the caller's own) —
+        // the real rule is "can't impersonate another user", not "can't send this field".
+        if (dto.userUuid() != null
+                && !dto.userUuid().equals(principal.getUuid())
+                && !"ADMIN".equals(principal.getRoleName())
+        )
+            throw new AccessDeniedException("Only administrators can create a reservation on behalf of another user");
         return created(service.createBooking(dto, readBytes(file), principal.getUuid()));
     }
 

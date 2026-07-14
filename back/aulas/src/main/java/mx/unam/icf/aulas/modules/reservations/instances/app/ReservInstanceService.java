@@ -208,8 +208,11 @@ public class ReservInstanceService {
         Classroom classroom = classroomRepository.findByUuid(classroomUuid)
             .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + classroomUuid));
 
+        // Resolve the conflict scope for this classroom (parent + direct children or child + parent)
+        List<Long> scope = resolveConflictClassroomScope(classroom.getId()).stream().toList();
+
         Set<Integer> occupiedIds = new HashSet<>(
-            slotRepository.findOccupiedTimeSlotIds(classroom.getId(), date));
+            slotRepository.findOccupiedTimeSlotIdsInScope(scope, date));
 
         return timeSlotRepository.findAll(Sort.by(Sort.Direction.ASC, "startTime")).stream()
             .filter(ts -> !occupiedIds.contains(ts.getId()))
@@ -315,11 +318,11 @@ public class ReservInstanceService {
         if (dto.daysOfWeek() == null || dto.daysOfWeek().isEmpty()) {
             targetDates.add(dto.startDate());
         } else {
-            for (LocalDate d = dto.startDate(); !d.isAfter(endDate); d = d.plusDays(1)) {
-                if (days.contains(d.getDayOfWeek())) {
+            for (LocalDate d = dto.startDate(); !d.isAfter(endDate); d = d.plusDays(1))
+                if (days.contains(d.getDayOfWeek()))
                     targetDates.add(d);
-                }
-            }
+
+
         }
 
 
@@ -364,17 +367,19 @@ public class ReservInstanceService {
         }
 
         // 10. Bulk conflict detection — exactly 2 SELECTs regardless of how many dates
-        List<ReservSlot> classroomConflicts = slotRepository.findClassroomConflicts(
-            classroom.getId(), dto.timeSlotIds(), targetDates);
+        // Resolve the classroom scope (parent + direct children OR child + parent)
+        List<Long> bookingScope = resolveConflictClassroomScope(classroom.getId()).stream().toList();
+        List<ReservSlot> classroomConflicts = slotRepository.findClassroomConflictsInScope(
+            bookingScope, dto.timeSlotIds(), targetDates);
         if (!classroomConflicts.isEmpty()) {
-            ReservSlot first = classroomConflicts.getFirst();
+            ReservSlot first = classroomConflicts.get(0);
             throw new ReservationConflictException(first.getDate(), first.getTimeSlot().getId());
         }
 
         List<ReservSlot> userConflicts = slotRepository.findUserConflicts(
             user.getId(), dto.timeSlotIds(), targetDates);
         if (!userConflicts.isEmpty()) {
-            ReservSlot first = userConflicts.getFirst();
+            ReservSlot first = userConflicts.get(0);
             throw new ReservationConflictException(first.getDate(), first.getTimeSlot().getId());
         }
 
@@ -415,7 +420,7 @@ public class ReservInstanceService {
         // is @TransactionalEventListener(AFTER_COMMIT), so no email fires unless the commit
         // below actually consolidates. (The old flow deferred this to ReservationStudentService
         // .upload; the roster now arrives with the booking, so the notification does too.)
-        ReservInstance first = saved.getFirst();
+        ReservInstance first = saved.get(0);
         List<String> adminEmails = userRepository.findByRoleName("ADMIN")
             .stream().map(User::getEmail).collect(Collectors.toList());
         eventPublisher.publishEvent(new ReservInstanceCreatedEventDTO(
@@ -502,9 +507,10 @@ public class ReservInstanceService {
         }
 
         // Classroom double-booking check (backed by uk_reserv_slots_classroom_time)
-        if (reservInstanceRepository.existsConflict(classroom.getId(), dto.date(), dto.timeSlotIds()))
-            throw new DomainException(
-                "The requested classroom already has a reservation for one or more of the selected time slots on " + dto.date());
+        List<Long> scopeForSave = resolveConflictClassroomScope(classroom.getId()).stream().toList();
+        if (reservInstanceRepository.existsConflictInScope(scopeForSave, dto.date(), dto.timeSlotIds()))
+             throw new DomainException(
+                 "The requested classroom already has a reservation for one or more of the selected time slots on " + dto.date());
 
         // User self-conflict check (backed by uk_reserv_slots_user_time)
         Long userId = group.getUser().getId();
@@ -641,7 +647,7 @@ public class ReservInstanceService {
      * Restricted to ADMIN role.
      *
      * <p>At least one of {@code dto.newClassroomUuid()} or {@code dto.newTimeSlotIds()} must be
-     * non-null. Both conflict checks ({@link ReservInstanceRepository#existsConflictExcluding} and
+     * non-null. Both conflict checks ({@link ReservInstanceRepository#existsConflictInScope} and
      * {@link ReservInstanceRepository#existsUserConflictExcluding}) run <em>before</em> any slot
      * mutation so a controlled {@link DomainException} fires instead of a raw constraint violation.
      * When slots are replaced, the deletion is explicitly flushed before the re-insert to satisfy
@@ -700,8 +706,9 @@ public class ReservInstanceService {
         }
 
         // 1. Classroom conflict re-check (self-excluding) — must run before any mutation
-        if (reservInstanceRepository.existsConflictExcluding(
-                destClassroom.getId(), instance.getDate(), destTimeSlotIds, instance.getId())) {
+        List<Long> destScope = resolveConflictClassroomScope(destClassroom.getId()).stream().toList();
+        if (reservInstanceRepository.existsConflictExcludingInScope(
+                destScope, instance.getDate(), destTimeSlotIds, instance.getId())) {
             throw new DomainException(
                 "The target classroom already has a reservation for one or more of the selected time slots on " + instance.getDate());
         }
@@ -835,5 +842,54 @@ public class ReservInstanceService {
             .map(s -> s.getTimeSlot().getEndTime())
             .max(Comparator.naturalOrder())
             .orElse(null);
+    }
+
+    /**
+     * Resolves the set of classroom internal IDs that participate in conflict checks
+     * for the provided classroom. The rule is explicit and non-recursive (direct
+     * parent/child only):
+     *
+     * <ul>
+     *   <li>If the classroom is a parent (no {@code linkedRoom}): returns
+     *       {@code { parent } ∪ directChildren }.</li>
+     *   <li>If the classroom is a child ({@code linkedRoom != null}): returns
+     *       {@code { child, parent }} (direct parent only).</li>
+     *   <li>If the classroom does not participate in a parent/child relation:
+     *       returns {@code { itself }}.</li>
+     * </ul>
+     *
+     * This method centralizes the business rule so every conflict or availability
+     * check calls it and repositories stay declarative (`IN (:scope)`).
+     *
+     * @param classroomId internal PK of the classroom
+     * @return set of internal classroom IDs composing the conflict scope
+     */
+    private Set<Long> resolveConflictClassroomScope(Long classroomId) {
+        var scope = new HashSet<Long>();
+        // Try to load the classroom; if absent, fall back to the provided id
+        Classroom c = classroomRepository.findById(classroomId).orElse(null);
+        if (c == null) {
+            scope.add(classroomId);
+            return scope;
+        }
+
+        scope.add(c.getId());
+
+        // If this classroom is a child (points to a parent), include its direct parent
+        Classroom parent = c.getLinkedRoom();
+        if (parent != null) {
+            if (parent.getId() != null)
+                scope.add(parent.getId());
+            return scope;
+        }
+
+        // Otherwise, it's a parent (or standalone) — include direct children (non-recursive)
+        List<Classroom> children = classroomRepository.findByLinkedRoom_Id(c.getId());
+        for (Classroom child : children) {
+            if (child.getId() != null)
+                scope.add(child.getId());
+        }
+
+        return scope;
     }
 }

@@ -18,6 +18,12 @@ export const BookingRequestSchema = z.object({
     z.string().trim().max(150, 'Máximo 150 caracteres').optional()
   ),
   daysOfWeek: z.array(DayOfWeekEnum).nullable().optional(),
+  /**
+   * Admin-only: book on behalf of a different user (teacher or admin) instead of the
+   * caller. Only ever populated when the "Reservar para otro usuario" toggle is on
+   * (see useReservaModal.js); the backend independently rejects it for non-admins.
+   */
+  userUuid: z.string().uuid().optional(),
 });
 
 export default BookingRequestSchema;

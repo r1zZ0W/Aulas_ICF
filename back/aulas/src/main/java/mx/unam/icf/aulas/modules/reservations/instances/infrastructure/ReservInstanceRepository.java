@@ -23,7 +23,7 @@ import java.util.UUID;
  * plain joins on count queries). The {@code slots} collection is loaded lazily in batches
  * via {@code @BatchSize} on the entity.</p>
  *
- * <p>Conflict detection ({@link #existsConflict}, {@link #existsConflictExcluding},
+ * <p>Conflict detection ({@link #existsConflictInScope}, {@link #existsConflictExcludingInScope},
  * {@link #existsUserConflict}, {@link #existsUserConflictExcluding}) operates directly
  * on {@code ReservSlot} rows without a status predicate, because cancelled reservations
  * no longer hold slot rows — the mere presence of a slot means the time is taken.
@@ -50,7 +50,7 @@ public interface ReservInstanceRepository
      * @param classroomUuid public UUID of the classroom
      * @param from          start of the date range (inclusive)
      * @param to            end of the date range (inclusive)
-     * @param status        status to filter by (pass {@link ReservInstanceStatus#ACTIVA})
+     * @param status        status to filter by (pass {@link ReservInstanceStatus#ACTIVE})
      */
     @Query("SELECT DISTINCT ri FROM ReservInstance ri " +
            "JOIN FETCH ri.classroom c " +
@@ -77,7 +77,7 @@ public interface ReservInstanceRepository
      *
      * @param from   start of the date range (inclusive)
      * @param to     end of the date range (inclusive)
-     * @param status status to filter by (pass {@link ReservInstanceStatus#ACTIVA})
+     * @param status status to filter by (pass {@link ReservInstanceStatus#ACTIVE})
      */
     @Query("SELECT DISTINCT ri FROM ReservInstance ri " +
            "JOIN FETCH ri.classroom c " +
@@ -98,44 +98,35 @@ public interface ReservInstanceRepository
     List<ReservInstance> findByUserUuid(@Param("userUuid") UUID userUuid);
 
     /**
-     * Checks whether any slot conflict exists for a given classroom, date, and set of time slots.
-     * No status predicate is applied: cancelled reservations no longer hold slot rows, so the
-     * presence of any matching slot row means the classroom is already booked.
-     * Used to prevent double-booking before persisting a new reservation instance.
-     *
-     * @param classroomId  internal PK of the classroom
-     * @param date         reservation date
-     * @param timeSlotIds  list of time-slot IDs to check
-     * @return {@code true} when at least one conflicting slot exists
+     * Checks whether any slot exists in the provided set of classroom IDs (the conflict
+     * scope) for a given date and set of time slots. No status predicate is applied:
+     * cancelled reservations no longer hold slot rows, so the presence of any matching
+     * slot row means the classroom is already booked. The service builds the scope via
+     * {@code ReservInstanceService.resolveConflictClassroomScope} so the repository
+     * stays dumb and declarative.
      */
     @Query("SELECT COUNT(rs) > 0 FROM ReservSlot rs " +
-           "WHERE rs.classroomId = :classroomId " +
+           "WHERE rs.classroomId IN :scope " +
            "AND rs.date = :date " +
            "AND rs.timeSlot.id IN :timeSlotIds")
-    boolean existsConflict(
-            @Param("classroomId") Long classroomId,
+    boolean existsConflictInScope(
+            @Param("scope") List<Long> scope,
             @Param("date") LocalDate date,
             @Param("timeSlotIds") List<Integer> timeSlotIds
     );
 
     /**
-     * Like {@link #existsConflict} but excludes a specific instance from the check.
-     * Used during reassignment to avoid a false self-conflict when the same
+     * Like {@link #existsConflictInScope} but excludes a specific instance from the
+     * check. Used during reassignment to avoid a false self-conflict when the same
      * classroom/slots are re-requested.
-     *
-     * @param classroomId  internal PK of the classroom
-     * @param date         reservation date
-     * @param timeSlotIds  list of time-slot IDs to check
-     * @param excludeId    internal PK of the instance to exclude from the check
-     * @return {@code true} when at least one conflicting slot exists (excluding self)
      */
     @Query("SELECT COUNT(rs) > 0 FROM ReservSlot rs " +
-           "WHERE rs.classroomId = :classroomId " +
+           "WHERE rs.classroomId IN :scope " +
            "AND rs.date = :date " +
            "AND rs.timeSlot.id IN :timeSlotIds " +
            "AND rs.instance.id <> :excludeId")
-    boolean existsConflictExcluding(
-            @Param("classroomId") Long classroomId,
+    boolean existsConflictExcludingInScope(
+            @Param("scope") List<Long> scope,
             @Param("date") LocalDate date,
             @Param("timeSlotIds") List<Integer> timeSlotIds,
             @Param("excludeId") Long excludeId
@@ -233,7 +224,7 @@ public interface ReservInstanceRepository
      * joined, ordered by date ascending. Used by {@code ReservationStudentService} to resolve
      * classroom name and time block for the admin-notification event once the group's
      * student roster is confirmed — the notification is deliberately deferred from
-     * booking time (see {@link mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroupStatus#PENDING_ROSTER}),
+     * booking time (see {@link mx.unam.icf.aulas.modules.reservations.groups.domain.ReservationGroupStatus#ACTIVE}),
      * so the data captured during {@code createBooking} is no longer in scope and must
      * be re-resolved from the group's UUID.
      *

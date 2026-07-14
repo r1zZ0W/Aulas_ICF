@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useReservation } from '../../context/ReservationContext';
+import { useAuth } from '../../context/AuthContext';
+import { ROLES } from '../../utils/roles';
 import { getAvailableTimeSlots } from '../../api/timeslots';
 import { getActiveSemester } from '../../api/semesters';
 import { labelsToTimeSlotIds, toDateString } from '../../utils/reservations';
@@ -112,6 +114,9 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
   const { rooms, visibleRooms, createBookingMutation } = useReservation();
   const availableRooms = rooms.filter(r => visibleRooms.has(r.uuid));
 
+  const { user } = useAuth();
+  const isAdmin = user?.role === ROLES.ADMIN;
+
   const { data: activeSemester } = useQuery({
     queryKey: ['semesters', 'active'],
     queryFn: getActiveSemester,
@@ -129,6 +134,10 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
   const [recurring, setRecurring] = useState(false);
   const [repeatUntil, setRepeatUntil] = useState('');
   const [selectedDays, setSelectedDays] = useState([]);
+  // Admin-only: book on behalf of another user instead of the caller (see
+  // ReservaModal.jsx — this toggle/picker never renders unless isAdmin).
+  const [reserveForOther, setReserveForOther] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   // Mandatory student roster (.xlsx). React only holds the File object — the content is
   // never parsed client-side; the backend validates format, duplicates, and row count.
   const [file, setFile] = useState(null);
@@ -166,6 +175,8 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     setSelectedDays([]);
     setFile(null);
     setFileError('');
+    setReserveForOther(false);
+    setSelectedUser(null);
 
     if (initialStart) {
       // Display-only hint (see snapToHalfHourHms) — no room is known yet at this point,
@@ -208,6 +219,18 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
         setSelectedDays([]);
         setRepeatUntil('');
       }
+      return !r;
+    });
+  };
+
+  /**
+   * Toggles the "reservar para otro usuario" option (admin-only). Turning it off
+   * clears any previously selected user — mirrors handleRecurringToggle's reset of
+   * dependent state above.
+   */
+  const handleReserveForOtherToggle = () => {
+    setReserveForOther(r => {
+      if (r) setSelectedUser(null);
       return !r;
     });
   };
@@ -340,6 +363,7 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     Number(attendees) >= 1 &&
     Boolean(file) &&
     (!recurring || selectedDays.length > 0) &&
+    (!reserveForOther || Boolean(selectedUser)) &&
     !createBookingMutation.isPending;
 
   const handleSubmit = async (e) => {
@@ -359,6 +383,7 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
       title: className,
       ...(recurring && repeatUntil ? { repeatUntil } : {}),
       ...(recurring && selectedDays.length > 0 ? { daysOfWeek: selectedDays } : {}),
+      ...(reserveForOther && selectedUser ? { userUuid: selectedUser.uuid } : {}),
     };
 
     try {
@@ -410,5 +435,11 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     handleStartChange,
     handleSubmit,
     createBookingMutation,
+    // Admin-only: reserve on behalf of another user
+    isAdmin,
+    reserveForOther,
+    selectedUser,
+    setSelectedUser,
+    handleReserveForOtherToggle,
   };
 }

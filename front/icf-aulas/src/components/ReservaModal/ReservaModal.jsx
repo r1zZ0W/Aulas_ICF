@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { X, Info, Users, Clock, ChevronDown, Plus, ArrowLeft, Calendar, Repeat, Upload, Trash2 } from 'lucide-react';
 import Modal from '../Modal/Modal';
+import UserCombobox from '../UserCombobox/UserCombobox';
 import { typeLabel } from '../../schemas/classroom';
 import { useReservaModal, WEEKDAY_OPTIONS } from './useReservaModal';
 import './ReservaModal.css';
@@ -150,6 +151,11 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
     handleStartChange,
     handleSubmit,
     createBookingMutation,
+    isAdmin,
+    reserveForOther,
+    selectedUser,
+    setSelectedUser,
+    handleReserveForOtherToggle,
   } = useReservaModal({ open, onClose, initialStart, initialEnd });
 
   // Hidden native input; the styled button forwards clicks to it. A ref (not an id)
@@ -365,6 +371,35 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               </span>
               {fileError && <span className="reserva-modal__file-error">{fileError}</span>}
             </div>
+
+            {/* Reservar para otro usuario (admin-only) */}
+            {isAdmin && (
+              <div className="reserva-modal__recurrente">
+                <div className="reserva-modal__recurrente-info">
+                  <span className="reserva-modal__recurrente-label">
+                    <Users size={14} />
+                    Reservar para otro usuario
+                  </span>
+                  <span className="reserva-modal__recurrente-desc">
+                    Asigna esta reserva a un maestro o administrador distinto
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={reserveForOther}
+                  className={`reserva-modal__toggle${reserveForOther ? ' reserva-modal__toggle--on' : ''}`}
+                  onClick={handleReserveForOtherToggle}
+                />
+              </div>
+            )}
+
+            {isAdmin && reserveForOther && (
+              <div className="reserva-modal__field">
+                <label className="reserva-modal__label">Usuario*</label>
+                <UserCombobox value={selectedUser} onChange={setSelectedUser} />
+              </div>
+            )}
 
             {/* Recurring toggle */}
             <div className="reserva-modal__recurrente">
