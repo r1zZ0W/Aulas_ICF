@@ -55,6 +55,8 @@ export {
   default as ResourceSchema,
   ClassroomResourceRequestSchema,
   ClassroomResourceResponseSchema,
+  ClassroomResourceMutationSchema,
+  ResourceCatalogItemSchema,
 } from './resource.js';
 
 // Semester schemas

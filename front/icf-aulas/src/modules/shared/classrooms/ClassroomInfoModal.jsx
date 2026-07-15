@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import Modal from '../../../components/Modal/Modal';
 import Badge from '../../../components/Badge/Badge';
 import { typeLabel } from '../../../schemas/classroom';
 import { getChildren } from '../../../utils/classroomTree';
+import { getClassroomResources } from '../../../api/resources.js';
 import './ClassroomInfoModal.css';
 
 /**
@@ -28,6 +30,14 @@ export default function ClassroomInfoModal({ open, onClose, classroom, allClassr
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
+
+  // Read-only equipment list — visible to all roles (admin edits it via
+  // ClassroomResourcesModal). Gated by `open` so it doesn't fetch on every table render.
+  const { data: resources = [] } = useQuery({
+    queryKey: ['classrooms', classroom?.uuid, 'resources'],
+    queryFn: () => getClassroomResources(classroom.uuid),
+    enabled: open && !!classroom?.uuid,
+  });
 
   if (!classroom) return null;
 
@@ -110,6 +120,18 @@ export default function ClassroomInfoModal({ open, onClose, classroom, allClassr
                 {children.length === 0
                   ? '—'
                   : children.map(c => c.name).join('\n')
+                }
+              </dd>
+            </div>
+
+            {/* Recursos (equipo) — solo lectura; se edita desde ClassroomResourcesModal */}
+            <div className="classroom-info-modal__field">
+              <dt className="classroom-info-modal__label">Recursos</dt>
+              <dd style={{ whiteSpace: 'pre-line' }}
+                className={`classroom-info-modal__value${resources.length === 0 ? ' classroom-info-modal__value--muted' : ''}`}>
+                {resources.length === 0
+                  ? '—'
+                  : resources.map(r => `${r.resourceName} ×${r.quantity}`).join('\n')
                 }
               </dd>
             </div>

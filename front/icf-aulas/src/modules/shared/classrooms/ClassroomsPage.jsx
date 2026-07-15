@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Eye, Pencil, Trash2, Building2, CheckCircle2, XCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Building2, CheckCircle2, XCircle, ToggleLeft, ToggleRight, Boxes } from 'lucide-react';
 
 import { useAuth } from '../../../context/AuthContext';
 import { ROLES } from '../../../utils/roles';
@@ -22,6 +22,7 @@ import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
 import ClassroomFormFields from './ClassroomFormFields';
 import ClassroomInfoModal from './ClassroomInfoModal';
+import ClassroomResourcesModal from './ClassroomResourcesModal';
 import ActiveSemesterButton from '../semesters/ActiveSemesterButton';
 
 import './ClassroomsPage.css';
@@ -47,6 +48,9 @@ export default function ClassroomsPage() {
 
   // ── Client-side status filter (admin sees all, then filters locally) ──────────
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // ── Recursos del aula (modal admin) ────────────────────────────────────────────
+  const [resourcesTarget, setResourcesTarget] = useState(null);
 
   // ── Server state (paginated) ──────────────────────────────────────────────────
   const {
@@ -163,7 +167,7 @@ export default function ClassroomsPage() {
     {
       key: 'acciones',
       header: 'Acciones',
-      width: isAdmin ? '14%' : '8%',
+      width: isAdmin ? '18%' : '8%',
       align: 'right',
       render: (r) => (
         <div className="classrooms__actions">
@@ -189,6 +193,17 @@ export default function ClassroomsPage() {
                 onClick={() => openEdit(r)}
               >
                 <Pencil size={16} />
+              </button>
+
+              {/* Recursos del aula */}
+              <button
+                type="button"
+                className="classrooms__action-btn"
+                title={`Recursos de ${r.name}`}
+                aria-label={`Recursos de ${r.name}`}
+                onClick={() => setResourcesTarget(r)}
+              >
+                <Boxes size={16} />
               </button>
 
               {/* Toggle status (activate / deactivate) */}
@@ -352,6 +367,13 @@ export default function ClassroomsPage() {
       {/* ── Modales de administración (solo ADMIN) ──────────────────────────── */}
       {isAdmin && (
         <>
+          {/* Recursos del aula */}
+          <ClassroomResourcesModal
+            open={!!resourcesTarget}
+            onClose={() => setResourcesTarget(null)}
+            classroom={resourcesTarget}
+          />
+
           {/* Crear */}
           <FormModal
             open={createOpen}

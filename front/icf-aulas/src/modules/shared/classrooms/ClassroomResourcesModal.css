@@ -1,0 +1,181 @@
+.modal-content.classroom-resources-modal {
+  width: 100%;
+  max-width: min(520px, calc(100vw - 48px));
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.classroom-resources-modal__inner {
+  background: var(--moon-goku);
+  display: flex;
+  flex-direction: column;
+  max-height: min(640px, calc(100vh - 48px));
+}
+
+/* Header */
+.classroom-resources-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1.337px solid var(--moon-content-border);
+  background: var(--moon-goku);
+}
+
+.classroom-resources-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--moon-content-text);
+  margin: 0;
+}
+
+.classroom-resources-modal__subtitle {
+  font-size: 13px;
+  color: var(--moon-content-text-secondary);
+  margin: 4px 0 0;
+}
+
+.classroom-resources-modal__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--moon-content-text-secondary);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+.classroom-resources-modal__close:hover:not(:disabled) {
+  background: rgba(211, 48, 74, 0.12);
+  color: var(--moon-dodoria, #d3304a);
+}
+
+.classroom-resources-modal__close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Body */
+.classroom-resources-modal__body {
+  padding: 24px 32px;
+  overflow-y: auto;
+}
+
+.classroom-resources-modal__empty {
+  font-size: 14px;
+  color: var(--moon-trunks, #6a7282);
+  margin: 0 0 20px;
+}
+
+.classroom-resources-modal__list {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.classroom-resources-modal__row {
+  display: grid;
+  grid-template-columns: 1fr 96px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1.337px solid var(--moon-content-border);
+  border-radius: 12px;
+}
+
+.classroom-resources-modal__row-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moon-bulma, #232222);
+}
+
+.classroom-resources-modal__row-qty {
+  width: 100%;
+}
+
+.classroom-resources-modal__row-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--moon-trunks, #6a7282);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.classroom-resources-modal__row-remove:hover:not(:disabled) {
+  background: rgba(211, 48, 74, 0.12);
+  color: var(--moon-dodoria, #d3304a);
+}
+
+.classroom-resources-modal__row-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Agregar recurso */
+.classroom-resources-modal__add {
+  border-top: 1.337px solid var(--moon-content-border);
+  padding-top: 16px;
+}
+
+.classroom-resources-modal__add-fields {
+  display: grid;
+  grid-template-columns: 1fr 88px auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.classroom-resources-modal__add-qty {
+  width: 100%;
+}
+
+.classroom-resources-modal__retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  border: none;
+  background: transparent;
+  color: var(--moon-vegeta, #4f46e5);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.classroom-resources-modal__add-error {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--moon-dodoria, #d3304a);
+}
+
+@media (max-width: 480px) {
+  .classroom-resources-modal__row {
+    grid-template-columns: 1fr 84px auto;
+  }
+  .classroom-resources-modal__add-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Footer */
+.classroom-resources-modal__footer {
+  padding: 16px 32px 24px;
+  border-top: 1.337px solid var(--moon-content-border);
+  display: flex;
+  justify-content: flex-end;
+}
