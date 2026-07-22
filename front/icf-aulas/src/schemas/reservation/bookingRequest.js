@@ -10,7 +10,9 @@ import { DayOfWeekEnum } from './enums.js';
  */
 export const BookingRequestSchema = z.object({
   classroomUuid: z.string(),
-  attendeeCount: z.number().int().positive('El número de asistentes debe ser positivo').min(2),
+  // Mirrors the backend's @Positive on BookingRequestDTO.attendeeCount (min 1, not 2) —
+  // see docs/plan note on schema alignment. The UI itself offers 1..capacity.
+  attendeeCount: z.number().int().positive('El número de asistentes debe ser positivo'),
   timeSlotIds: z.array(z.number().int()).min(1, 'Selecciona al menos un bloque de tiempo'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha: YYYY-MM-DD'),
   title: z.preprocess(

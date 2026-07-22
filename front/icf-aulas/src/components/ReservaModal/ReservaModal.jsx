@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { X, Info, Users, Clock, ChevronDown, Plus, ArrowLeft, Calendar, Repeat, Upload, Trash2 } from 'lucide-react';
+import { X, Info, Users, Clock, ChevronDown, Plus, ArrowLeft, Calendar, Repeat, Upload, Trash2, TriangleAlert } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import UserCombobox from '../UserCombobox/UserCombobox';
 import { typeLabel } from '../../schemas/classroom';
@@ -133,14 +133,13 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
     setRepeatUntil,
     selectedDays,
     file,
-    fileError,
     handleFileChange,
     availableRooms,
     room,
     startSlots,
     endSlots,
     slotsLoading,
-    canSubmit,
+    isReadyToSubmit,
     maxAttendees,
     semesterEnd,
     formatDate,
@@ -156,6 +155,9 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
     selectedUser,
     setSelectedUser,
     handleReserveForOtherToggle,
+    isPlannedTimeUnavailable,
+    errors,
+    handleBlur,
   } = useReservaModal({ open, onClose, initialStart, initialEnd });
 
   // Hidden native input; the styled button forwards clicks to it. A ref (not an id)
@@ -219,13 +221,17 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
 
             {/* Room selector */}
             <div className="reserva-modal__field">
-              <label className="reserva-modal__label">Seleccionar Sala*</label>
-              <div className="reserva-modal__select-wrap">
+              <label className="reserva-modal__label">
+                Seleccionar Sala
+                {/* Cosmético — Zod es la única fuente de verdad */}
+                <span className="reserva-modal__required" aria-hidden="true">*</span>
+              </label>
+              <div className={`reserva-modal__select-wrap${errors.roomId ? ' reserva-modal__select-wrap--error' : ''}`}>
                 <select
                   className="reserva-modal__select"
                   value={roomId}
                   onChange={e => handleRoomChange(e.target.value)}
-                  required
+                  onBlur={() => handleBlur('roomId')}
                 >
                   <option value="" />
                   {availableRooms.map(r => (
@@ -234,6 +240,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                 </select>
                 <ChevronDown size={18} className="reserva-modal__chevron" />
               </div>
+              {errors.roomId && <span className="reserva-modal__error">{errors.roomId}</span>}
             </div>
 
             {/* Room info card */}
@@ -252,29 +259,44 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
 
             {/* Class name */}
             <div className="reserva-modal__field">
-              <label className="reserva-modal__label">Nombre de la clase*</label>
+              <label className="reserva-modal__label">
+                Nombre de la clase
+                {/* Cosmético — Zod es la única fuente de verdad */}
+                <span className="reserva-modal__required" aria-hidden="true">*</span>
+              </label>
               <input
                 type="text"
-                className="reserva-modal__input"
+                className={`reserva-modal__input${errors.className ? ' reserva-modal__input--error' : ''}`}
                 placeholder="Ej. Introducción a Mecánica de Fluidos"
                 value={className}
                 onChange={e => setClassName(e.target.value)}
+                onBlur={() => handleBlur('className')}
                 maxLength={150}
-                required
               />
+              {errors.className && <span className="reserva-modal__error">{errors.className}</span>}
             </div>
 
             {/* Start / End time */}
+            {isPlannedTimeUnavailable && (
+              <div className="reserva-modal__time-warning">
+                <TriangleAlert size={14} />
+                <span>El horario reservado no está disponible</span>
+              </div>
+            )}
             <div className="reserva-modal__row">
               <div className="reserva-modal__field">
-                <label className="reserva-modal__label">Hora de Inicio*</label>
-                <div className="reserva-modal__select-wrap reserva-modal__select-wrap--time">
+                <label className="reserva-modal__label">
+                  Hora de Inicio
+                  {/* Cosmético — Zod es la única fuente de verdad */}
+                  <span className="reserva-modal__required" aria-hidden="true">*</span>
+                </label>
+                <div className={`reserva-modal__select-wrap reserva-modal__select-wrap--time${errors.startLabel ? ' reserva-modal__select-wrap--error' : ''}`}>
                   <Clock size={16} className="reserva-modal__time-icon" />
                   <select
                     className="reserva-modal__select reserva-modal__select--time"
                     value={startLabel}
                     onChange={e => handleStartChange(e.target.value)}
-                    required
+                    onBlur={() => handleBlur('startLabel')}
                     disabled={!roomId || slotsLoading || startSlots.length === 0}
                   >
                     {startSlots.length === 0 && (
@@ -290,17 +312,22 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                   </select>
                   <ChevronDown size={18} className="reserva-modal__chevron" />
                 </div>
+                {errors.startLabel && <span className="reserva-modal__error">{errors.startLabel}</span>}
               </div>
 
               <div className="reserva-modal__field">
-                <label className="reserva-modal__label">Hora de Fin*</label>
-                <div className="reserva-modal__select-wrap reserva-modal__select-wrap--time">
+                <label className="reserva-modal__label">
+                  Hora de Fin
+                  {/* Cosmético — Zod es la única fuente de verdad */}
+                  <span className="reserva-modal__required" aria-hidden="true">*</span>
+                </label>
+                <div className={`reserva-modal__select-wrap reserva-modal__select-wrap--time${errors.endLabel ? ' reserva-modal__select-wrap--error' : ''}`}>
                   <Clock size={16} className="reserva-modal__time-icon" />
                   <select
                     className="reserva-modal__select reserva-modal__select--time"
                     value={endLabel}
                     onChange={e => setEndLabel(e.target.value)}
-                    required
+                    onBlur={() => handleBlur('endLabel')}
                     disabled={!startLabel || endSlots.length === 0}
                   >
                     {endSlots.map(s => (
@@ -309,18 +336,23 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                   </select>
                   <ChevronDown size={18} className="reserva-modal__chevron" />
                 </div>
+                {errors.endLabel && <span className="reserva-modal__error">{errors.endLabel}</span>}
               </div>
             </div>
 
             {/* Attendee count */}
             <div className="reserva-modal__field">
-              <label className="reserva-modal__label">Número de alumnos*</label>
-              <div className="reserva-modal__select-wrap">
+              <label className="reserva-modal__label">
+                Número de alumnos
+                {/* Cosmético — Zod es la única fuente de verdad */}
+                <span className="reserva-modal__required" aria-hidden="true">*</span>
+              </label>
+              <div className={`reserva-modal__select-wrap${errors.attendees ? ' reserva-modal__select-wrap--error' : ''}`}>
                 <select
                   className="reserva-modal__select"
                   value={attendees}
                   onChange={e => setAttendees(e.target.value)}
-                  required
+                  onBlur={() => handleBlur('attendees')}
                   disabled={!room}
                 >
                   <option value="">
@@ -332,20 +364,28 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                 </select>
                 <ChevronDown size={18} className="reserva-modal__chevron" />
               </div>
+              {errors.attendees && <span className="reserva-modal__error">{errors.attendees}</span>}
             </div>
 
-            {/* Student roster (.xlsx) — mandatory; content is validated server-side only */}
+            {/* Student roster (.xlsx) — mandatory; content is validated server-side only.
+                errors.file is the ONLY source of error here (required/size/format all live
+                in ReservaFormSchema — see reservaForm.js and useReservaModal's handleFileChange). */}
             <div className="reserva-modal__field">
-              <label className="reserva-modal__label">Lista de alumnos (.xlsx)*</label>
+              <label className="reserva-modal__label">
+                Lista de alumnos (.xlsx)
+                {/* Cosmético — Zod es la única fuente de verdad */}
+                <span className="reserva-modal__required" aria-hidden="true">*</span>
+              </label>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".xlsx"
                 onChange={onFileInputChange}
+                onBlur={() => handleBlur('file')}
                 hidden
               />
               {file ? (
-                <div className="reserva-modal__file-chip">
+                <div className={`reserva-modal__file-chip${errors.file ? ' reserva-modal__file-chip--error' : ''}`}>
                   <span className="reserva-modal__file-name" title={file.name}>{file.name}</span>
                   <button
                     type="button"
@@ -359,7 +399,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               ) : (
                 <button
                   type="button"
-                  className="reserva-modal__file-btn"
+                  className={`reserva-modal__file-btn${errors.file ? ' reserva-modal__file-btn--error' : ''}`}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload size={16} />
@@ -369,7 +409,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               <span className="reserva-modal__file-hint">
                 Columnas: Nombre(s), Apellido(s), Correo. Las filas deben coincidir con el número de alumnos.
               </span>
-              {fileError && <span className="reserva-modal__file-error">{fileError}</span>}
+              {errors.file && <span className="reserva-modal__file-error">{errors.file}</span>}
             </div>
 
             {/* Reservar para otro usuario (admin-only) */}
@@ -396,8 +436,13 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
 
             {isAdmin && reserveForOther && (
               <div className="reserva-modal__field">
-                <label className="reserva-modal__label">Usuario*</label>
+                <label className="reserva-modal__label">
+                  Usuario
+                  {/* Cosmético — Zod es la única fuente de verdad */}
+                  <span className="reserva-modal__required" aria-hidden="true">*</span>
+                </label>
                 <UserCombobox value={selectedUser} onChange={setSelectedUser} />
+                {errors.selectedUser && <span className="reserva-modal__error">{errors.selectedUser}</span>}
               </div>
             )}
 
@@ -426,7 +471,11 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               <>
                 {/* Weekday checkboxes */}
                 <div className="reserva-modal__field">
-                  <label className="reserva-modal__label">Repetir los días*</label>
+                  <label className="reserva-modal__label">
+                    Repetir los días
+                    {/* Cosmético — Zod es la única fuente de verdad */}
+                    <span className="reserva-modal__required" aria-hidden="true">*</span>
+                  </label>
                   <div className="reserva-modal__weekdays">
                     {WEEKDAY_OPTIONS.map(wd => (
                       <button
@@ -439,6 +488,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                       </button>
                     ))}
                   </div>
+                  {errors.selectedDays && <span className="reserva-modal__error">{errors.selectedDays}</span>}
                 </div>
               </>
             )}
@@ -455,7 +505,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
               <button
                 type="submit"
                 className="reserva-modal__btn reserva-modal__btn--submit"
-                disabled={!canSubmit}
+                disabled={!isReadyToSubmit}
               >
                 <Plus size={20} />
                 {createBookingMutation.isPending ? 'Reservando…' : 'Reservar Aula'}

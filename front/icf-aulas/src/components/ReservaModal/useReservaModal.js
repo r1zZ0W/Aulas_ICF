@@ -6,6 +6,28 @@ import { ROLES } from '../../utils/roles';
 import { getAvailableTimeSlots } from '../../api/timeslots';
 import { getActiveSemester } from '../../api/semesters';
 import { labelsToTimeSlotIds, toDateString } from '../../utils/reservations';
+import { useZodForm } from '../../hooks/useZodForm';
+import { ReservaFormSchema } from '../../schemas/reservation/reservaForm.js';
+
+/**
+ * Empty/default state for the Zod-backed form fields (user-authored inputs only).
+ * Non-input state (`step`, `pickedDate`, query/derived state) lives in separate
+ * `useState`s below — see the file header note in useZodForm.js for why only
+ * authored fields belong in the Zod form.
+ */
+const EMPTY_RESERVA = {
+  roomId: '',
+  className: '',
+  startLabel: '',
+  endLabel: '',
+  attendees: '',
+  file: null,
+  recurring: false,
+  repeatUntil: '',
+  selectedDays: [],
+  reserveForOther: false,
+  selectedUser: null,
+};
 
 /** Day-of-week names as the backend enum expects them. */
 export const WEEKDAY_OPTIONS = [
@@ -110,6 +132,98 @@ function snapToHalfHourHms(date) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
 }
 
+function isRangeAvailable(availableSlots, startLabel, endLabel) {
+  if (!startLabel || !endLabel || availableSlots.length === 0) return false;
+  const toMinutes = (str) => {
+    const [h, m] = str.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const startMins = toMinutes(startLabel);
+  const endMins = toMinutes(endLabel);
+  if (startMins >= endMins) return false;
+
+  const availableStarts = new Set(
+    availableSlots.map(s => toMinutes(s.startTime))
+  );
+
+  for (let mins = startMins; mins < endMins; mins += 30) {
+    if (!availableStarts.has(mins)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function findClosestAvailableRange(availableSlots, startSlots, plannedStart, plannedEnd) {
+  if (!plannedStart || !plannedEnd || startSlots.length === 0) return null;
+
+  const toMinutes = (str) => {
+    const [h, m] = str.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const plannedStartMins = toMinutes(plannedStart);
+  const plannedEndMins = toMinutes(plannedEnd);
+  const plannedDuration = plannedEndMins - plannedStartMins;
+
+  let bestCandidate = null;
+
+  for (const slot of startSlots) {
+    const S_mins = toMinutes(slot.startTime);
+    
+    // Find all contiguous slots starting from this one
+    const startIdx = availableSlots.findIndex(s => s.startTime === slot.startTime);
+    if (startIdx === -1) continue;
+
+    let contiguousCount = 1;
+    let i = startIdx;
+    while (i < availableSlots.length - 1) {
+      const cur = availableSlots[i];
+      const next = availableSlots[i + 1];
+      if (cur.endTime !== next.startTime) break;
+      contiguousCount++;
+      i++;
+    }
+
+    const targetNumSlots = Math.round(plannedDuration / 30);
+    const actualNumSlots = Math.min(contiguousCount, targetNumSlots);
+    
+    const actualEnd = availableSlots[startIdx + actualNumSlots - 1].endTime;
+    const actualEndMins = toMinutes(actualEnd);
+    const actualDuration = actualEndMins - S_mins;
+
+    const startDiff = Math.abs(S_mins - plannedStartMins);
+    const durationDiff = Math.abs(actualDuration - plannedDuration);
+
+    const candidate = {
+      start: slot.startTime,
+      end: actualEnd,
+      startDiff,
+      durationDiff,
+      startMins: S_mins
+    };
+
+    if (!bestCandidate) {
+      bestCandidate = candidate;
+    } else {
+      if (candidate.startDiff < bestCandidate.startDiff) {
+        bestCandidate = candidate;
+      } else if (candidate.startDiff === bestCandidate.startDiff) {
+        if (candidate.durationDiff < bestCandidate.durationDiff) {
+          bestCandidate = candidate;
+        } else if (candidate.durationDiff === bestCandidate.durationDiff) {
+          if (candidate.startMins < bestCandidate.startMins) {
+            bestCandidate = candidate;
+          }
+        }
+      }
+    }
+  }
+
+  return bestCandidate;
+}
+
+
 export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
   const { rooms, visibleRooms, createBookingMutation } = useReservation();
   const availableRooms = rooms.filter(r => visibleRooms.has(r.uuid));
@@ -126,22 +240,19 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
   // Form state
   const [step, setStep] = useState(1);
   const [pickedDate, setPickedDate] = useState(null);
-  const [roomId, setRoomId] = useState('');
-  const [className, setClassName] = useState('');
-  const [startLabel, setStartLabel] = useState('');
-  const [endLabel, setEndLabel] = useState('');
-  const [attendees, setAttendees] = useState('');
-  const [recurring, setRecurring] = useState(false);
-  const [repeatUntil, setRepeatUntil] = useState('');
-  const [selectedDays, setSelectedDays] = useState([]);
-  // Admin-only: book on behalf of another user instead of the caller (see
-  // ReservaModal.jsx — this toggle/picker never renders unless isAdmin).
-  const [reserveForOther, setReserveForOther] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  // Mandatory student roster (.xlsx). React only holds the File object — the content is
-  // never parsed client-side; the backend validates format, duplicates, and row count.
-  const [file, setFile] = useState(null);
-  const [fileError, setFileError] = useState('');
+
+  // Zod-backed form instance — single source of truth for every user-authored field.
+  // File required/size/format rules live in the schema too (see reservaForm.js), so
+  // there is no separate fileError state: errors.file is the only source of file errors.
+  const zod = useZodForm(EMPTY_RESERVA, ReservaFormSchema);
+  const {
+    roomId, className, startLabel, endLabel, attendees, file,
+    recurring, repeatUntil, selectedDays, reserveForOther, selectedUser,
+  } = zod.formData;
+
+  const [plannedStart, setPlannedStart] = useState('');
+  const [plannedEnd, setPlannedEnd] = useState('');
+  const [lastAutoSelected, setLastAutoSelected] = useState(null); // { roomId, dateStr }
 
   const forDate = pickedDate ?? new Date();
   const dateStr = pickedDate ? toDateString(pickedDate) : null;
@@ -159,24 +270,16 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
   // Reset room selection when the room gets hidden from the sidebar
   useEffect(() => {
     if (roomId && !visibleRooms.has(roomId)) {
-      setRoomId('');
-      setAttendees('');
+      zod.handleChange('roomId', '');
+      zod.handleChange('attendees', '');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleRooms, roomId]);
 
   useEffect(() => {
     if (!open) return;
 
-    setRoomId('');
-    setClassName('');
-    setAttendees('');
-    setRecurring(false);
-    setRepeatUntil('');
-    setSelectedDays([]);
-    setFile(null);
-    setFileError('');
-    setReserveForOther(false);
-    setSelectedUser(null);
+    setLastAutoSelected(null);
 
     if (initialStart) {
       // Display-only hint (see snapToHalfHourHms) — no room is known yet at this point,
@@ -184,15 +287,19 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
       // as soon as a room is picked.
       const d = new Date(initialStart);
       const defaultEnd = initialEnd ?? new Date(d.getTime() + 30 * 60 * 1000);
+      const startHms = snapToHalfHourHms(d);
+      const endHms = snapToHalfHourHms(defaultEnd);
+      zod.reset({ ...EMPTY_RESERVA, startLabel: startHms, endLabel: endHms });
       setPickedDate(d);
       setStep(2);
-      setStartLabel(snapToHalfHourHms(d));
-      setEndLabel(snapToHalfHourHms(defaultEnd));
+      setPlannedStart(startHms);
+      setPlannedEnd(endHms);
     } else {
+      zod.reset(EMPTY_RESERVA);
       setStep(1);
       setPickedDate(null);
-      setStartLabel('');
-      setEndLabel('');
+      setPlannedStart('');
+      setPlannedEnd('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -211,16 +318,14 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
 
   // When recurring is toggled ON, pre-check the picked date's weekday
   const handleRecurringToggle = () => {
-    setRecurring(r => {
-      if (!r && pickedDate) {
-        const day = jsWeekdayToEnum(pickedDate);
-        setSelectedDays([day]);
-      } else if (r) {
-        setSelectedDays([]);
-        setRepeatUntil('');
-      }
-      return !r;
-    });
+    const next = !recurring;
+    zod.handleChange('recurring', next);
+    if (next && pickedDate) {
+      zod.handleChange('selectedDays', [jsWeekdayToEnum(pickedDate)]);
+    } else {
+      zod.handleChange('selectedDays', []);
+      zod.handleChange('repeatUntil', '');
+    }
   };
 
   /**
@@ -229,10 +334,9 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
    * dependent state above.
    */
   const handleReserveForOtherToggle = () => {
-    setReserveForOther(r => {
-      if (r) setSelectedUser(null);
-      return !r;
-    });
+    const next = !reserveForOther;
+    zod.handleChange('reserveForOther', next);
+    if (!next) zod.handleChange('selectedUser', null);
   };
 
   /**
@@ -240,9 +344,10 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
    * @param {string} val - The day of the week to toggle (e.g., 'MON').
    */
   const toggleDay = (val) => {
-    setSelectedDays(prev =>
-      prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val]
-    );
+    const next = selectedDays.includes(val)
+      ? selectedDays.filter(d => d !== val)
+      : [...selectedDays, val];
+    zod.handleChange('selectedDays', next);
   };
 
   const room = rooms.find(r => r.uuid === roomId) ?? null;
@@ -285,90 +390,107 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
   }, [startLabel, availableSlots]);
 
   const handleRoomChange = (val) => {
-    setRoomId(val);
-    setAttendees('');
-    // A different room has a wholly different availability picture — discard any prior time
-    // choice (including the initialStart display hint) and let the reset effects below repopulate
-    // once this room's real availability loads.
-    setStartLabel('');
-    setEndLabel('');
+    zod.handleChange('roomId', val);
+    zod.handleChange('attendees', '');
   };
 
   const handleStartChange = (value) => {
-    setStartLabel(value);
+    zod.handleChange('startLabel', value);
     const slot = availableSlots.find(s => s.startTime === value);
     // Default to the shortest valid block (the chosen start slot's own end) — always a legal
     // option since it's guaranteed to be `endSlots[0]` for this same start.
-    setEndLabel(slot?.endTime ?? '');
+    zod.handleChange('endLabel', slot?.endTime ?? '');
   };
 
   /**
-   * Validates only what the browser can know without reading the file — extension and
-   * size (the backend's 1 MB multipart limit). Content validation (OOXML magic number,
-   * duplicates, row count vs attendees) is exclusively the backend's job.
+   * Sets (or clears) the selected roster file. Extension/size validation and the
+   * required check all live in ReservaFormSchema's `file` field (see reservaForm.js) —
+   * errors.file is the single source of truth for file errors, no local fileError state.
+   * Content validation (OOXML magic number, duplicates, row count vs attendees) is
+   * exclusively the backend's job.
    *
    * @param {File|null} selected - The file chosen in the input, or null to clear it.
    */
   const handleFileChange = (selected) => {
-    if (!selected) {
-      setFile(null);
-      setFileError('');
-      return;
-    }
-    if (!selected.name.toLowerCase().endsWith('.xlsx')) {
-      setFile(null);
-      setFileError('El archivo debe ser un Excel (.xlsx).');
-      return;
-    }
-    if (selected.size > 1024 * 1024) {
-      setFile(null);
-      setFileError('El archivo no debe exceder 1 MB.');
-      return;
-    }
-    setFile(selected);
-    setFileError('');
+    zod.handleChange('file', selected);
   };
 
-  // ── Reset/default effects ─────────────────────────────────────────────────
-  // Both effects gate on `queryEnabled` (no room/date picked yet → nothing to validate against,
-  // don't touch the current value) AND `!slotsLoading` (fetch in flight → don't clobber the
-  // current selection with a stale/empty read before the real result lands; this matters when
-  // the date changes while a room is already selected — see handleDatePick).
-  //
-  // IMPORTANT: an empty `startSlots`/`endSlots` result AFTER loading has finished is a legitimate
-  // outcome (the room is fully booked that day) and must still clear an invalid stale label —
-  // the guard is intentionally `slotsLoading`, not `availableSlots.length === 0`.
+  // ── Reset/default and auto-selection effects ──────────────────────────────
+  const isPlannedTimeUnavailable = useMemo(() => {
+    if (!plannedStart || !plannedEnd || !roomId || slotsLoading) return false;
+    return !isRangeAvailable(availableSlots, plannedStart, plannedEnd);
+  }, [plannedStart, plannedEnd, roomId, slotsLoading, availableSlots]);
+
+  // Auto-selection and closest range search when room/date changes
   useEffect(() => {
-    if (!queryEnabled || slotsLoading) return;
-    const stillValid = startSlots.some(s => s.startTime === startLabel);
-    if (!stillValid) {
-      const next = startSlots[0]?.startTime ?? '';
-      setStartLabel(next);
-      setEndLabel(next ? (availableSlots.find(s => s.startTime === next)?.endTime ?? '') : '');
+    if (!roomId || !dateStr || slotsLoading) return;
+
+    if (
+      lastAutoSelected &&
+      lastAutoSelected.roomId === roomId &&
+      lastAutoSelected.dateStr === dateStr
+    ) {
+      return;
     }
-  }, [queryEnabled, slotsLoading, startSlots, startLabel, availableSlots]);
 
+    setLastAutoSelected({ roomId, dateStr });
+
+    if (plannedStart && plannedEnd) {
+      if (isRangeAvailable(availableSlots, plannedStart, plannedEnd)) {
+        zod.handleChange('startLabel', plannedStart);
+        zod.handleChange('endLabel', plannedEnd);
+      } else {
+        const closest = findClosestAvailableRange(availableSlots, startSlots, plannedStart, plannedEnd);
+        if (closest) {
+          zod.handleChange('startLabel', closest.start);
+          zod.handleChange('endLabel', closest.end);
+        } else {
+          zod.handleChange('startLabel', '');
+          zod.handleChange('endLabel', '');
+        }
+      }
+    } else {
+      const next = startSlots[0]?.startTime ?? '';
+      zod.handleChange('startLabel', next);
+      zod.handleChange('endLabel', next ? (availableSlots.find(s => s.startTime === next)?.endTime ?? '') : '');
+    }
+  }, [roomId, dateStr, slotsLoading, availableSlots, startSlots, plannedStart, plannedEnd, lastAutoSelected]);
+
+  // Validation fallback for user manual edits
   useEffect(() => {
     if (!queryEnabled || slotsLoading) return;
-    if (!endLabel) return;
-    const stillValid = endSlots.some(s => s.value === endLabel);
-    if (!stillValid) setEndLabel(endSlots[0]?.value ?? '');
-  }, [queryEnabled, slotsLoading, endSlots, endLabel]);
 
-  const canSubmit =
-    Boolean(roomId) &&
-    className.trim().length > 0 &&
-    Boolean(startLabel) &&
-    Boolean(endLabel) &&
-    Number(attendees) >= 1 &&
-    Boolean(file) &&
-    (!recurring || selectedDays.length > 0) &&
-    (!reserveForOther || Boolean(selectedUser)) &&
-    !createBookingMutation.isPending;
+    if (startLabel) {
+      const startValid = startSlots.some(s => s.startTime === startLabel);
+      if (!startValid) {
+        const next = startSlots[0]?.startTime ?? '';
+        zod.handleChange('startLabel', next);
+        zod.handleChange('endLabel', next ? (availableSlots.find(s => s.startTime === next)?.endTime ?? '') : '');
+        return;
+      }
+    }
+
+    if (endLabel) {
+      const endValid = endSlots.some(s => s.value === endLabel);
+      if (!endValid) {
+        zod.handleChange('endLabel', endSlots[0]?.value ?? '');
+      }
+    }
+  }, [queryEnabled, slotsLoading, startSlots, endSlots, startLabel, endLabel, availableSlots]);
+
+  // Readiness of ASYNC infrastructure only (never input validity — that's validateAll()'s job
+  // inside handleSubmit). While slots are still loading or the mutation is in flight, a
+  // "valid" form must still not submit: timeSlotIds could resolve empty/stale otherwise.
+  const isReadyToSubmit = !slotsLoading && !createBookingMutation.isPending;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!canSubmit) return;
+
+    // validateAll() marks every field as touched and returns false if Zod fails — this
+    // illuminates all required-field errors even on a direct "Reservar Aula" click with
+    // no prior field interaction.
+    const isValid = zod.validateAll();
+    if (!isValid) return;
 
     const timeSlotIds = labelsToTimeSlotIds(availableSlots, startLabel, endLabel);
     if (timeSlotIds.length === 0) {
@@ -406,25 +528,24 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     pickedDate,
     roomId,
     className,
-    setClassName,
+    setClassName: (v) => zod.handleChange('className', v),
     startLabel,
     endLabel,
-    setEndLabel,
+    setEndLabel: (v) => zod.handleChange('endLabel', v),
     attendees,
-    setAttendees,
+    setAttendees: (v) => zod.handleChange('attendees', v),
     recurring,
     repeatUntil,
-    setRepeatUntil,
+    setRepeatUntil: (v) => zod.handleChange('repeatUntil', v),
     selectedDays,
     file,
-    fileError,
     handleFileChange,
     availableRooms,
     room,
     startSlots,
     endSlots,
     slotsLoading,
-    canSubmit,
+    isReadyToSubmit,
     maxAttendees,
     semesterEnd,
     formatDate,
@@ -439,7 +560,12 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     isAdmin,
     reserveForOther,
     selectedUser,
-    setSelectedUser,
+    setSelectedUser: (v) => zod.handleChange('selectedUser', v),
     handleReserveForOtherToggle,
+    isPlannedTimeUnavailable,
+    plannedStart,
+    // Zod-backed validation surface — errors only visible for touched fields (see useZodForm.js)
+    errors: zod.errors,
+    handleBlur: zod.handleBlur,
   };
 }

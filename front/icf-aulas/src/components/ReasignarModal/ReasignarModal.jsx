@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { X, Info, Users, Clock, ChevronDown, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Modal from '../Modal/Modal';
@@ -6,9 +6,13 @@ import { useReservation } from '../../context/ReservationContext';
 import { typeLabel } from '../../schemas/classroom';
 import { getTimeSlots } from '../../api/timeslots';
 import { labelsToTimeSlotIds } from '../../utils/reservations';
+import { useZodForm } from '../../hooks/useZodForm';
+import { ReasignFormSchema } from '../../schemas/reservation/reasignForm.js';
 import '../ReservaModal/ReservaModal.css';
 import './ReasignarModal.css';
 import { TriangleAlert } from 'lucide-react';
+
+const EMPTY_REASIGN = { roomId: '', startLabel: '', endLabel: '' };
 
 /** @param {number} h @param {number} m @returns {number} */
 const toMins = (h, m) => h * 60 + m;
@@ -78,41 +82,45 @@ export default function ReasignarModal({ open, onClose, reservation }) {
     staleTime: Infinity,
   });
 
-  const [roomId, setRoomId] = useState('');
-  const [startLabel, setStartLabel] = useState('');
-  const [endLabel, setEndLabel] = useState('');
+  // Zod-backed form instance — single source of truth for roomId/startLabel/endLabel.
+  const zod = useZodForm(EMPTY_REASIGN, ReasignFormSchema);
+  const { roomId, startLabel, endLabel } = zod.formData;
 
   useEffect(() => {
     if (!open || !reservation) return;
     // Pre-fill with current reservation values
-    setRoomId(reservation.classroomUuid ?? '');
-    // Derive labels from the first and last time slot in the ordered list
     const slots = reservation.timeSlots ?? [];
-    setStartLabel(slots.length > 0 ? timeToLabel(slots[0].startTime) : '');
-    setEndLabel(slots.length > 0 ? timeToLabel(slots[slots.length - 1].endTime) : '');
+    zod.reset({
+      roomId: reservation.classroomUuid ?? '',
+      startLabel: slots.length > 0 ? timeToLabel(slots[0].startTime) : '',
+      endLabel: slots.length > 0 ? timeToLabel(slots[slots.length - 1].endTime) : '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reservation]);
 
   const startSlot = START_SLOTS.find(s => s.label === startLabel) ?? null;
   const endSlots = startSlot ? getEndSlots(startSlot.h, startSlot.m) : [];
   const room = rooms.find(r => r.uuid === roomId) ?? null;
 
+  const handleRoomChange = val => zod.handleChange('roomId', val);
+
   const handleStartChange = val => {
-    setStartLabel(val);
+    zod.handleChange('startLabel', val);
     const slot = START_SLOTS.find(s => s.label === val);
     if (!slot) return;
     const eSlots = getEndSlots(slot.h, slot.m);
-    if (!eSlots.find(s => s.label === endLabel)) setEndLabel(eSlots[0]?.label ?? '');
+    if (!eSlots.find(s => s.label === endLabel)) zod.handleChange('endLabel', eSlots[0]?.label ?? '');
   };
 
-  const canSubmit =
-    Boolean(roomId) &&
-    Boolean(startLabel) &&
-    Boolean(endLabel) &&
-    !reassignMutation.isPending;
+  // Readiness of async infrastructure only — input validity is validateAll()'s job below.
+  const isReadyToSubmit = !reassignMutation.isPending;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!canSubmit || !reservation) return;
+    if (!reservation) return;
+
+    const isValid = zod.validateAll();
+    if (!isValid) return;
 
     const newTimeSlotIds = labelsToTimeSlotIds(timeslotCatalog, startLabel, endLabel);
 
@@ -161,13 +169,17 @@ export default function ReasignarModal({ open, onClose, reservation }) {
 
           {/* Room selector */}
           <div className="reserva-modal__field">
-            <label className="reserva-modal__label">Seleccionar Sala*</label>
-            <div className="reserva-modal__select-wrap">
+            <label className="reserva-modal__label">
+              Seleccionar Sala
+              {/* Cosmético — Zod es la única fuente de verdad */}
+              <span className="reserva-modal__required" aria-hidden="true">*</span>
+            </label>
+            <div className={`reserva-modal__select-wrap${zod.errors.roomId ? ' reserva-modal__select-wrap--error' : ''}`}>
               <select
                 className="reserva-modal__select"
                 value={roomId}
-                onChange={e => setRoomId(e.target.value)}
-                required
+                onChange={e => handleRoomChange(e.target.value)}
+                onBlur={() => zod.handleBlur('roomId')}
               >
                 <option value="" />
                 {availableRooms.map(r => (
@@ -176,6 +188,7 @@ export default function ReasignarModal({ open, onClose, reservation }) {
               </select>
               <ChevronDown size={18} className="reserva-modal__chevron" />
             </div>
+            {zod.errors.roomId && <span className="reserva-modal__error">{zod.errors.roomId}</span>}
           </div>
 
           {/* Room info card */}
@@ -209,14 +222,18 @@ export default function ReasignarModal({ open, onClose, reservation }) {
           {/* Time selectors */}
           <div className="reserva-modal__row">
             <div className="reserva-modal__field">
-              <label className="reserva-modal__label">Hora de Inicio*</label>
-              <div className="reserva-modal__select-wrap reserva-modal__select-wrap--time">
+              <label className="reserva-modal__label">
+                Hora de Inicio
+                {/* Cosmético — Zod es la única fuente de verdad */}
+                <span className="reserva-modal__required" aria-hidden="true">*</span>
+              </label>
+              <div className={`reserva-modal__select-wrap reserva-modal__select-wrap--time${zod.errors.startLabel ? ' reserva-modal__select-wrap--error' : ''}`}>
                 <Clock size={16} className="reserva-modal__time-icon" />
                 <select
                   className="reserva-modal__select reserva-modal__select--time"
                   value={startLabel}
                   onChange={e => handleStartChange(e.target.value)}
-                  required
+                  onBlur={() => zod.handleBlur('startLabel')}
                 >
                   {START_SLOTS.map(s => (
                     <option key={s.label} value={s.label}>{s.label}</option>
@@ -224,17 +241,22 @@ export default function ReasignarModal({ open, onClose, reservation }) {
                 </select>
                 <ChevronDown size={18} className="reserva-modal__chevron" />
               </div>
+              {zod.errors.startLabel && <span className="reserva-modal__error">{zod.errors.startLabel}</span>}
             </div>
 
             <div className="reserva-modal__field">
-              <label className="reserva-modal__label">Hora de Fin*</label>
-              <div className="reserva-modal__select-wrap reserva-modal__select-wrap--time">
+              <label className="reserva-modal__label">
+                Hora de Fin
+                {/* Cosmético — Zod es la única fuente de verdad */}
+                <span className="reserva-modal__required" aria-hidden="true">*</span>
+              </label>
+              <div className={`reserva-modal__select-wrap reserva-modal__select-wrap--time${zod.errors.endLabel ? ' reserva-modal__select-wrap--error' : ''}`}>
                 <Clock size={16} className="reserva-modal__time-icon" />
                 <select
                   className="reserva-modal__select reserva-modal__select--time"
                   value={endLabel}
-                  onChange={e => setEndLabel(e.target.value)}
-                  required
+                  onChange={e => zod.handleChange('endLabel', e.target.value)}
+                  onBlur={() => zod.handleBlur('endLabel')}
                   disabled={!startLabel || endSlots.length === 0}
                 >
                   {endSlots.map(s => (
@@ -243,6 +265,7 @@ export default function ReasignarModal({ open, onClose, reservation }) {
                 </select>
                 <ChevronDown size={18} className="reserva-modal__chevron" />
               </div>
+              {zod.errors.endLabel && <span className="reserva-modal__error">{zod.errors.endLabel}</span>}
             </div>
           </div>
 
@@ -257,7 +280,7 @@ export default function ReasignarModal({ open, onClose, reservation }) {
             <button
               type="submit"
               className="reserva-modal__btn reserva-modal__btn--submit"
-              disabled={!canSubmit}
+              disabled={!isReadyToSubmit}
             >
               <Plus size={20} />
               {reassignMutation.isPending ? 'Reasignando…' : 'Reasignar Aula'}

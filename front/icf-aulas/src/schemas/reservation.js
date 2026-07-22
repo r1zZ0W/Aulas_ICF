@@ -7,6 +7,8 @@ export { ReservationGroupResponseSchema } from './reservation/reservationGroupRe
 export { ReservInstanceRequestSchema } from './reservation/reservInstanceRequest.js';
 export { ReservInstanceResponseSchema } from './reservation/reservInstanceResponse.js';
 export { BookingRequestSchema } from './reservation/bookingRequest.js';
+export { ReservaFormSchema } from './reservation/reservaForm.js';
+export { ReasignFormSchema } from './reservation/reasignForm.js';
 export { ReassignRequestSchema } from './reservation/reassignRequest.js';
 export { ReservSlotRequestSchema } from './reservation/reservSlotRequest.js';
 export { ReservSlotResponseSchema } from './reservation/reservSlotResponse.js';

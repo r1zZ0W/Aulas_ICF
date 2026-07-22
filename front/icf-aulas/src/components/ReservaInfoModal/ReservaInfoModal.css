@@ -33,3 +33,27 @@
   pointer-events: none;
   color: var(--moon-bulma);
 }
+
+.reserva-info-modal__students-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.reserva-info-modal__inline-btn {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.reserva-info-modal__inline-btn:hover {
+  text-decoration: underline;
+}
