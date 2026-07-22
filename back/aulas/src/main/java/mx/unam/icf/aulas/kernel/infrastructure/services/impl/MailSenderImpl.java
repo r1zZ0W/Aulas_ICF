@@ -54,7 +54,7 @@ public class MailSenderImpl implements MailSender {
     /**
      * Processes the email sending logic, including handling BCC recipients and UTF-8 encoding.
      * @param to the super admin.
-     * @param subject if it is a
+     * @param subject the matter of the email.
      * @param content the HTML content of the email.
      * @param bccRecipients the list of admins that receives the email in BCC.
      */
