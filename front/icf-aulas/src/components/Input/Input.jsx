@@ -8,6 +8,7 @@ export default function Input({
   error,
   className = "",
   id,
+  required,
   ...props
 }) {
   const inputId = id || (label ? `input-${label.replace(/\s/g, "-").toLowerCase()}` : undefined);
@@ -20,6 +21,8 @@ export default function Input({
       {label && (
         <label htmlFor={inputId} className={`input-wrap__label ${labelClassName || ""}`.trim()}>
           {label}
+          {/* Cosmético — la validación real la maneja Zod, no este atributo */}
+          {required && <span className="input-wrap__required" aria-hidden="true">*</span>}
         </label>
       )}
       <div className="input-wrap__field position-relative d-flex align-items-center w-100">

@@ -12,6 +12,11 @@
   color: #595d62;
 }
 
+.input-wrap__required {
+  color: #e53e3e;
+  margin-left: 2px;
+}
+
 
 .input-wrap__input {
   width: 100%;

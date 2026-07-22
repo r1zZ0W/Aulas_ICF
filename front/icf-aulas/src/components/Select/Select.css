@@ -16,6 +16,10 @@
   color: var(--moon-content-text-secondary);
 }
 
+.select-wrap__required {
+  color: #e53e3e;
+}
+
 .select-wrap__trigger {
   position: relative;
   display: flex;

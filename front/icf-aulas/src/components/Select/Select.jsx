@@ -23,6 +23,7 @@ import "./Select.css";
 export default function Select({
   value,
   onChange,
+  onBlur,
   options = [],
   placeholder = "Seleccionar...",
   label,
@@ -133,7 +134,8 @@ export default function Select({
       {label && (
         <label className={`select-wrap__label ${labelClassName || ""}`.trim()}>
           {label}
-          {required && <span aria-hidden> *</span>}
+          {/* Cosmético — la validación real la maneja Zod, no este atributo */}
+          {required && <span className="select-wrap__required" aria-hidden> *</span>}
         </label>
       )}
       <button
@@ -141,6 +143,7 @@ export default function Select({
         type="button"
         className={`select-wrap__trigger ${open ? "select-wrap__trigger--open" : ""} ${!selectedOption ? "select-wrap__trigger--placeholder" : ""}`}
         onClick={() => !disabled && setOpen((o) => !o)}
+        onBlur={onBlur}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
