@@ -56,7 +56,7 @@ public class ClassroomResourceService {
      * POST /api/v1/classrooms/{uuid}/resources
      *
      * @param classroomUuid public UUID of the classroom
-     * @param dto           allocation payload with resourceId and quantity
+     * @param dto           allocation payload with resourceUuid and quantity
      * @throws ResourceNotFoundException when the classroom or equipment resource does not exist
      * @throws DomainException           when the quantity is not positive
      */
@@ -65,8 +65,8 @@ public class ClassroomResourceService {
         Classroom classroom = classroomRepository.findByUuid(classroomUuid)
             .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + classroomUuid));
 
-        Resource resource = resourceRepository.findById(dto.resourceId())
-            .orElseThrow(() -> new ResourceNotFoundException("Equipment resource not found: " + dto.resourceId()));
+        Resource resource = resourceRepository.findByUuid(dto.resourceUuid())
+            .orElseThrow(() -> new ResourceNotFoundException("Equipment resource not found: " + dto.resourceUuid()));
 
         if (dto.quantity() == null || dto.quantity() < 1)
             throw new DomainException("Quantity must be at least 1");
@@ -81,20 +81,23 @@ public class ClassroomResourceService {
 
     /**
      * Removes an equipment allocation from a classroom.
-     * DELETE /api/v1/classrooms/{classroomUuid}/resources/{resourceId}
+     * DELETE /api/v1/classrooms/{classroomUuid}/resources/{resourceUuid}
      *
      * @param classroomUuid public UUID of the classroom
-     * @param resourceId    internal identifier of the equipment resource to remove
-     * @throws ResourceNotFoundException when the classroom or allocation does not exist
+     * @param resourceUuid  public UUID of the equipment resource to remove
+     * @throws ResourceNotFoundException when the classroom, resource, or allocation does not exist
      */
     @Transactional(rollbackFor = Exception.class)
-    public void delete(UUID classroomUuid, Integer resourceId) {
+    public void delete(UUID classroomUuid, UUID resourceUuid) {
         Classroom classroom = classroomRepository.findByUuid(classroomUuid)
             .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + classroomUuid));
 
-        ClassroomResourceId id = new ClassroomResourceId(classroom.getId(), resourceId);
+        Resource resource = resourceRepository.findByUuid(resourceUuid)
+            .orElseThrow(() -> new ResourceNotFoundException("Equipment resource not found: " + resourceUuid));
+
+        ClassroomResourceId id = new ClassroomResourceId(classroom.getId(), resource.getId());
         ClassroomResource allocation = allocationRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Equipment allocation not found for classroom " + classroomUuid + " and resource " + resourceId));
+            .orElseThrow(() -> new ResourceNotFoundException("Equipment allocation not found for classroom " + classroomUuid + " and resource " + resourceUuid));
 
         allocationRepository.delete(allocation);
     }

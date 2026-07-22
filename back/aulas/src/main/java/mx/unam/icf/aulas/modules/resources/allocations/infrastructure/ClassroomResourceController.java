@@ -57,14 +57,14 @@ public class ClassroomResourceController implements ResponseHandler {
 
     /**
      * Removes an equipment allocation from a classroom. Requires ADMIN role.
-     * DELETE /api/v1/classrooms/{classroomUuid}/resources/{resourceId}
+     * DELETE /api/v1/classrooms/{classroomUuid}/resources/{resourceUuid}
      */
-    @DeleteMapping("/{resourceId}")
+    @DeleteMapping("/{resourceUuid}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable UUID classroomUuid,
-            @PathVariable Integer resourceId) {
-        service.delete(classroomUuid, resourceId);
+            @PathVariable UUID resourceUuid) {
+        service.delete(classroomUuid, resourceUuid);
         return ok("Equipment allocation removed successfully");
     }
 }

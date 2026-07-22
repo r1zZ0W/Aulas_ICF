@@ -14,14 +14,14 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
  * MapStruct mapper for converting between {@link ClassroomResource} entities and DTOs.
  *
  * @author Ithera
- * @version 1.0
+ * @version 2.0
  */
 @Mapper(componentModel = "spring")
 public interface ClassroomResourceMapper extends BaseMapper<ClassroomResource, ClassroomResourceRequestDTO, ClassroomResourceResponseDTO> {
 
     @Override
     @Mapping(target = "classroomUuid", source = "classroom.uuid")
-    @Mapping(target = "resourceId", source = "resource.id")
+    @Mapping(target = "resourceUuid", source = "resource.uuid")
     @Mapping(target = "resourceName", source = "resource.name")
     ClassroomResourceResponseDTO toDto(ClassroomResource entity);
 

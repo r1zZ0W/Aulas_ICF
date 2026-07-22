@@ -15,10 +15,12 @@ import lombok.Setter;
 import mx.unam.icf.aulas.modules.resources.classrooms.domain.Classroom;
 import mx.unam.icf.aulas.modules.resources.equipment.domain.Resource;
 
+import java.util.UUID;
+
 /**
  * Entity representing the many-to-many association between classrooms and equipment,
  * enriched with the {@code quantity} attribute.
- *
+ * <p></p>
  * Uses {@link ClassroomResourceId} as a composite primary key via {@code @EmbeddedId},
  * with {@code @MapsId} linking each FK field to its corresponding entity relationship.
  *

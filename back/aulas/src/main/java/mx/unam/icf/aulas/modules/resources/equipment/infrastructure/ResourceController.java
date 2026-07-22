@@ -1,5 +1,6 @@
 package mx.unam.icf.aulas.modules.resources.equipment.infrastructure;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
@@ -7,7 +8,9 @@ import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteria;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.SortWhitelist;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import mx.unam.icf.aulas.modules.resources.equipment.app.ResourceService;
-import mx.unam.icf.aulas.modules.resources.equipment.app.dtos.ResourceDTO;
+import mx.unam.icf.aulas.modules.resources.equipment.app.dtos.ResourceRequestDTO;
+import mx.unam.icf.aulas.modules.resources.equipment.app.dtos.ResourceResponseDTO;
+import mx.unam.icf.aulas.modules.resources.equipment.app.dtos.ResourceStatsDTO;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,14 +21,18 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 /**
- * REST controller for managing the equipment resource catalog.
+ * REST controller for managing the global equipment resource catalog.
  *
  * <p>Read operations are available to any authenticated user.
  * Write and delete operations require the {@code ADMIN} role.
- * All endpoints are exposed under {@code /api/v1/resources}.</p>
+ * All endpoints are exposed under {@code /api/v1/resources} and are keyed by
+ * the resource's public UUID — never its internal numeric id.</p>
  */
 @RestController
 @RequestMapping(value = "/api/v1/resources", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -35,30 +42,45 @@ public class ResourceController implements ResponseHandler {
     private final ResourceService service;
 
     /**
-     * Retrieves all equipment resources in the catalog, paginated.
-     * GET /api/v1/resources[?page=0&size=20&sort=name&direction=asc]
+     * Returns aggregated resource statistics for the admin dashboard.
+     * GET /api/v1/resources/stats
      *
-     * <p>Allowed sort fields: {@code createdAt}, {@code name}.</p>
+     * <p>Spring MVC matches the literal path {@code /stats} before the template
+     * {@code /{uuid}}, so there is no route conflict.</p>
      */
-    @GetMapping
-    public ResponseEntity<ApiResponse<PagedResultDTO<ResourceDTO>>> findAll(
-            @SortWhitelist(
-                    value = {"createdAt", "name"},
-                    defaultSort = "name",
-                    defaultDirection = "asc")
-            PageCriteria criteria) {
-        return ok(service.findAll(criteria.toPageable()));
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponse<ResourceStatsDTO>> stats() {
+        return ok(service.getStats());
     }
 
     /**
-     * Retrieves a single equipment resource by its internal ID.
-     * GET /api/v1/resources/{id}
+     * Retrieves all equipment resources in the catalog, paginated.
+     * GET /api/v1/resources[?search=text&page=0&size=20&sort=name&direction=asc]
+     *
+     * <p>When {@code search} is provided, a case-insensitive {@code LIKE} filter is
+     * applied over {@code name} and {@code description}. Allowed sort fields:
+     * {@code name}, {@code quantity}.</p>
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<PagedResultDTO<ResourceResponseDTO>>> findAll(
+            @RequestParam(value = "search", required = false) String search,
+            @SortWhitelist(
+                    value = {"name", "quantity"},
+                    defaultSort = "name",
+                    defaultDirection = "asc")
+            PageCriteria criteria) {
+        return ok(service.findAll(search, criteria.toPageable()));
+    }
+
+    /**
+     * Retrieves a single equipment resource by its public UUID.
+     * GET /api/v1/resources/{uuid}
      *
      * @throws mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException when the resource is not found
      */
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ResourceDTO>> findById(@PathVariable Integer id) {
-        return ok(service.findById(id));
+    @GetMapping("/{uuid}")
+    public ResponseEntity<ApiResponse<ResourceResponseDTO>> findByUuid(@PathVariable UUID uuid) {
+        return ok(service.findByUuid(uuid));
     }
 
     /**
@@ -67,28 +89,34 @@ public class ResourceController implements ResponseHandler {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ResourceDTO>> save(@RequestBody ResourceDTO dto) {
+    public ResponseEntity<ApiResponse<ResourceResponseDTO>> save(@Valid @RequestBody ResourceRequestDTO dto) {
         return created(service.save(dto));
     }
 
     /**
      * Updates an existing equipment resource. Requires ADMIN role.
-     * PUT /api/v1/resources/{id}
+     * PUT /api/v1/resources/{uuid}
      */
-    @PutMapping("/{id}")
+    @PutMapping("/{uuid}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ResourceDTO>> update(@PathVariable Integer id, @RequestBody ResourceDTO dto) {
-        return ok(service.update(id, dto));
+    public ResponseEntity<ApiResponse<ResourceResponseDTO>> update(
+            @PathVariable UUID uuid,
+            @Valid @RequestBody ResourceRequestDTO dto) {
+        return ok(service.update(uuid, dto));
     }
 
     /**
      * Deletes an equipment resource from the catalog. Requires ADMIN role.
-     * DELETE /api/v1/resources/{id}
+     *
+     * <p>Any classroom allocations referencing this resource are removed by the
+     * database's {@code ON DELETE CASCADE} constraint (see {@link ResourceService#delete}).</p>
+     *
+     * DELETE /api/v1/resources/{uuid}
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{uuid}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Integer id) {
-        service.delete(id);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID uuid) {
+        service.delete(uuid);
         return ok("Equipment resource deleted successfully");
     }
 }

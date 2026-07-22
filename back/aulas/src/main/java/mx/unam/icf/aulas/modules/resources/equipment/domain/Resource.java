@@ -11,15 +11,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.UUID;
+
 /**
  * Entity class representing a physical or logical resource available in classrooms
  * (e.g., projector, computer, air conditioning unit).
  *
- * This is a pre-seeded catalog entity. It does not extend {@code BaseEntity}
- * because it carries no UUID or audit timestamps.
+ * This is a catalog entity. It does not extend {@code BaseEntity} (no audit
+ * timestamps), but — like {@code Classroom} — exposes a public {@link #uuid}
+ * so the API never leaks the internal {@link #id} to clients.
  *
  * @author Ithera
- * @version 1.0
+ * @version 2.0
  */
 @Entity
 @Table(name = "resources")
@@ -27,16 +30,24 @@ import lombok.Setter;
 @NoArgsConstructor @AllArgsConstructor
 public class Resource {
 
-    /** Auto-generated internal identifier. */
+    /** Auto-generated internal identifier. Never exposed through the API. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    /** Unique resource name (e.g., PROYECTOR, COMPUTADORA, AIRE_ACONDICIONADO). */
+    /** Public identifier used by every API request/response involving this resource. */
+    @Column(name = "uuid", nullable = false, unique = true, columnDefinition = "BINARY(16)")
+    private UUID uuid = UUID.randomUUID();
+
+    /** Unique resource name (e.g., Proyector Epson, Laptop Dell Latitude). */
     @Column(name = "name", nullable = false, unique = true, length = 50)
     private String name;
 
     /** Optional human-readable description of the resource. */
     @Column(name = "description", length = 255)
     private String description;
+
+    /** Total number of units of this equipment type in the global catalog. */
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity;
 }
