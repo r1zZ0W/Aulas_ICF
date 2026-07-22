@@ -40,7 +40,7 @@ const SESSION_MODAL_CONTENT = {
  * when they explicitly clicked "Cerrar Sesión" (authReason === 'logout').
  */
 export default function Login() {
-  const { form, errors, loading, handleChange, handleSubmit } = useLogin();
+  const { form, errors, loading, handleChange, handleBlur, handleSubmit } = useLogin();
 
   const location = useLocation();
   const successMessage = location.state?.success;
@@ -140,6 +140,7 @@ export default function Login() {
                       fullWidth
                       value={form.username}
                       onChange={handleChange("username")}
+                      onBlur={handleBlur("username")}
                       error={errors.username}
                     />
 
@@ -150,6 +151,7 @@ export default function Login() {
                       fullWidth
                       value={form.password}
                       onChange={handleChange("password")}
+                      onBlur={handleBlur("password")}
                       error={errors.password}
                     />
 
