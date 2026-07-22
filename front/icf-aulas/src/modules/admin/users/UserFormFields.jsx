@@ -13,10 +13,11 @@ const STATUS_OPTIONS = [
  * @param {'create'|'edit'} props.mode
  * @param {object}   props.form        - Current form state.
  * @param {function} props.onField     - (field, value) => void
- * @param {object}   props.errors      - Zod-derived field error map.
+ * @param {function} props.onBlurField - (field) => void  — triggers real-time validation.
+ * @param {object}   props.errors      - Zod-derived field error map (only touched fields).
  * @param {Array<{value: string, label: string}>} props.roleOptions
  */
-export default function UserFormFields({ mode, form, onField, errors, roleOptions }) {
+export default function UserFormFields({ mode, form, onField, onBlurField, errors, roleOptions }) {
   const isCreate = mode === 'create';
 
   return (
@@ -25,6 +26,7 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
         label="Nombre(s)"
         value={form.firstName}
         onChange={(e) => onField('firstName', e.target.value)}
+        onBlur={() => onBlurField?.('firstName')}
         placeholder={isCreate ? 'Ej. María' : undefined}
         error={errors.firstName}
         required
@@ -33,6 +35,7 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
         label="Apellidos"
         value={form.lastNames}
         onChange={(e) => onField('lastNames', e.target.value)}
+        onBlur={() => onBlurField?.('lastNames')}
         placeholder={isCreate ? 'Ej. García López' : undefined}
         error={errors.lastNames}
         required
@@ -41,6 +44,7 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
         label="Nombre de usuario"
         value={form.username}
         onChange={(e) => onField('username', e.target.value)}
+        onBlur={() => onBlurField?.('username')}
         placeholder={isCreate ? 'Ej. mgarcia' : undefined}
         error={errors.username}
         required
@@ -50,6 +54,7 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
         type="email"
         value={form.email}
         onChange={(e) => onField('email', e.target.value)}
+        onBlur={() => onBlurField?.('email')}
         placeholder={isCreate ? 'usuario@icf.unam.mx' : undefined}
         error={errors.email}
         required
@@ -61,6 +66,7 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
           type="password"
           value={form.password}
           onChange={(e) => onField('password', e.target.value)}
+          onBlur={() => onBlurField?.('password')}
           placeholder="Mín. 8 caracteres"
           error={errors.password}
           required
@@ -71,6 +77,7 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
           type="password"
           value={form.password}
           onChange={(e) => onField('password', e.target.value)}
+          onBlur={() => onBlurField?.('password')}
           placeholder="Dejar en blanco para no cambiar"
           error={errors.password}
         />
@@ -91,6 +98,7 @@ export default function UserFormFields({ mode, form, onField, errors, roleOption
           label="Rol"
           value={String(form.roleId)}
           onChange={(v) => onField('roleId', v)}
+          onBlur={() => onBlurField?.('roleId')}
           options={roleOptions}
           placeholder="Seleccionar rol..."
           error={errors.roleId}

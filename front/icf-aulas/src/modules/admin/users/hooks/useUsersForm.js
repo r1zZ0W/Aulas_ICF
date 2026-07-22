@@ -1,10 +1,17 @@
 /**
  * @fileoverview Custom hook that manages all local form state for creating and
- * editing users in the admin panel.  Includes Zod validation, field-change
- * handlers, and submit orchestration.
+ * editing users in the admin panel.  Includes Zod validation via useZodForm,
+ * field-change handlers, and submit orchestration.
+ *
+ * Validation strategy (powered by useZodForm):
+ *   - onBlur per field  → makes that field's error visible immediately.
+ *   - onChange on a touched field → clears the error in real time as the user types.
+ *   - handleCreateSubmit / handleEditSubmit → call validateAll() first, so clicking
+ *     "Guardar" without touching any field still illuminates every required field.
  */
 import { useState } from 'react';
 import { UserCreateSchema, UserUpdateSchema } from '../../../../schemas/index.js';
+import { useZodForm } from '../../../../hooks/useZodForm.js';
 
 // ── Empty form state ──────────────────────────────────────────────────────────
 
@@ -15,20 +22,26 @@ export const EMPTY_CREATE = {
 
 export const EMPTY_UPDATE = {
   firstName: '', lastNames: '', username: '', email: '',
-  roleId: '', password: ''
+  roleId: '', password: '', isActive: 'true', departamento: ''
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Preprocessors ─────────────────────────────────────────────────────────────
+// These convert raw form strings to the typed values that UserCreateSchema /
+// UserUpdateSchema expect, mirroring what the submit handlers do before parsing.
 
-/** Flattens a ZodError into a { field: firstMessage } map. */
-function parseZodErrors(zodError) {
-  const out = {};
-  for (const issue of zodError.issues ?? []) {
-    const key = issue.path[0];
-    if (key && !out[key]) out[key] = issue.message;
-  }
-  return out;
-}
+const createPreprocess = (data) => ({
+  ...data,
+  roleId: data.roleId ? Number(data.roleId) : undefined,
+  departamento: data.departamento || undefined,
+});
+
+const updatePreprocess = (data) => ({
+  ...data,
+  roleId: Number(data.roleId),
+  isActive: data.isActive === 'true' || data.isActive === true,
+  departamento: data.departamento || undefined,
+  password: data.password ? data.password : undefined,
+});
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -40,22 +53,25 @@ function parseZodErrors(zodError) {
  *   roles:              Array<{id: number, name: string}>,
  *   createMutation:     import('@tanstack/react-query').UseMutationResult,
  *   updateMutation:     import('@tanstack/react-query').UseMutationResult,
- * }} deps - Mutations and roles list from useUsers().
+ * }} deps
  *
  * @returns {{
  *   createOpen:         boolean,
  *   editUser:           object | null,
  *   deleteTarget:       object | null,
+ *   setDeleteTarget:    (user: object | null) => void,
  *   createForm:         typeof EMPTY_CREATE,
  *   editForm:           typeof EMPTY_UPDATE,
- *   formErrors:         Record<string, string | undefined>,
+ *   createErrors:       Record<string, string | undefined>,
+ *   editErrors:         Record<string, string | undefined>,
  *   openCreate:         () => void,
  *   closeCreate:        () => void,
  *   openEdit:           (user: object) => void,
  *   closeEdit:          () => void,
- *   setDeleteTarget:    (user: object | null) => void,
  *   handleCreateField:  (field: string, value: any) => void,
  *   handleEditField:    (field: string, value: any) => void,
+ *   handleCreateBlur:   (field: string) => void,
+ *   handleEditBlur:     (field: string) => void,
  *   handleCreateSubmit: () => void,
  *   handleEditSubmit:   () => void,
  * }}
@@ -66,77 +82,71 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
   const [editUser, setEditUser] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // ── Form data & validation errors ──────────────────────────────────────────
-  const [createForm, setCreateForm] = useState(EMPTY_CREATE);
-  const [editForm, setEditForm] = useState(EMPTY_UPDATE);
-  const [formErrors, setFormErrors] = useState({});
+  // ── Zod-backed form instances ───────────────────────────────────────────────
+  const createZod = useZodForm(EMPTY_CREATE, UserCreateSchema, { preprocess: createPreprocess });
+  const editZod   = useZodForm(EMPTY_UPDATE, UserUpdateSchema, { preprocess: updatePreprocess });
 
   // ── Modal helpers ──────────────────────────────────────────────────────────
   function openCreate() {
-    setCreateForm(EMPTY_CREATE);
-    setFormErrors({});
+    createZod.reset(EMPTY_CREATE);
     setCreateOpen(true);
   }
 
   function closeCreate() {
     setCreateOpen(false);
-    setFormErrors({});
+    createZod.reset(EMPTY_CREATE);
   }
 
   /**
-   * Opens the modal of the edit user form.
+   * Opens the edit modal pre-populated with the selected user's data.
    * @param {object} user - The user to edit.
    */
   function openEdit(user) {
     setEditUser(user);
-    setEditForm({
-      firstName: user.firstName,
-      lastNames: user.lastNames,
-      username: user.username ?? '',
-      email: user.email,
+    editZod.reset({
+      firstName:    user.firstName,
+      lastNames:    user.lastNames,
+      username:     user.username ?? '',
+      email:        user.email,
       departamento: user.departamento ?? '',
-      roleId: String(
+      roleId:       String(
         roles.find((r) => r.name.toUpperCase() === user.roleName?.toUpperCase())?.id ?? ''
       ),
-      isActive: user.isActive,
+      isActive: String(user.isActive ?? 'true'),
       password: '',
     });
-    setFormErrors({});
   }
 
-  /**
-   * Closes the modal of the edit user form.
-   */
+  /** Closes the edit modal and resets its form. */
   function closeEdit() {
     setEditUser(null);
-    setFormErrors({});
+    editZod.reset(EMPTY_UPDATE);
   }
 
   // ── Field handlers ─────────────────────────────────────────────────────────
-  function handleCreateField(field, value) {
-    setCreateForm((f) => ({ ...f, [field]: value }));
-    setFormErrors((e) => ({ ...e, [field]: undefined }));
-  }
+  // These are thin wrappers that keep the public API surface identical to what
+  // UsersPage / UserFormFields already call.
+  const handleCreateField = (field, value) => createZod.handleChange(field, value);
+  const handleEditField   = (field, value) => editZod.handleChange(field, value);
 
-  function handleEditField(field, value) {
-    setEditForm((f) => ({ ...f, [field]: value }));
-    setFormErrors((e) => ({ ...e, [field]: undefined }));
-  }
+  const handleCreateBlur = (field) => createZod.handleBlur(field);
+  const handleEditBlur   = (field) => editZod.handleBlur(field);
 
   // ── Submit handlers ────────────────────────────────────────────────────────
   async function handleCreateSubmit() {
+    // validateAll() marks every field as touched and returns false if Zod fails.
+    // This illuminates all required-field errors even when the user never touched
+    // a single input (direct "Guardar" click on a blank form).
+    const isValid = createZod.validateAll();
+    if (!isValid) return;
+
     const payload = {
-      ...createForm,
-      roleId: createForm.roleId ? Number(createForm.roleId) : undefined,
-      departamento: createForm.departamento || undefined,
+      ...createZod.formData,
+      roleId: createZod.formData.roleId ? Number(createZod.formData.roleId) : undefined,
+      departamento: createZod.formData.departamento || undefined,
     };
-    const result = UserCreateSchema.safeParse(payload);
-    if (!result.success) {
-      setFormErrors(parseZodErrors(result.error));
-      return;
-    }
     try {
-      await createMutation.mutateAsync(result.data);
+      await createMutation.mutateAsync(payload);
       closeCreate();
     } catch {
       // error already handled by useUsers onError (toast)
@@ -144,20 +154,18 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
   }
 
   async function handleEditSubmit() {
+    const isValid = editZod.validateAll();
+    if (!isValid) return;
+
     const payload = {
-      ...editForm,
-      roleId: Number(editForm.roleId),
-      isActive: editForm.isActive === 'true' || editForm.isActive === true,
-      departamento: editForm.departamento || undefined,
-      password: editForm.password ? editForm.password : undefined,
+      ...editZod.formData,
+      roleId: Number(editZod.formData.roleId),
+      isActive: editZod.formData.isActive === 'true' || editZod.formData.isActive === true,
+      departamento: editZod.formData.departamento || undefined,
+      password: editZod.formData.password ? editZod.formData.password : undefined,
     };
-    const result = UserUpdateSchema.safeParse(payload);
-    if (!result.success) {
-      setFormErrors(parseZodErrors(result.error));
-      return;
-    }
     try {
-      await updateMutation.mutateAsync({ uuid: editUser.uuid, payload: result.data });
+      await updateMutation.mutateAsync({ uuid: editUser.uuid, payload });
       closeEdit();
     } catch {
       // error already handled by useUsers onError (toast)
@@ -171,9 +179,10 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
     deleteTarget,
     setDeleteTarget,
     // form data
-    createForm,
-    editForm,
-    formErrors,
+    createForm:  createZod.formData,
+    editForm:    editZod.formData,
+    createErrors: createZod.errors,
+    editErrors:   editZod.errors,
     // actions
     openCreate,
     closeCreate,
@@ -181,6 +190,8 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
     closeEdit,
     handleCreateField,
     handleEditField,
+    handleCreateBlur,
+    handleEditBlur,
     handleCreateSubmit,
     handleEditSubmit,
   };

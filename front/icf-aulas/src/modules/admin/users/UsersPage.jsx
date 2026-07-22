@@ -53,13 +53,16 @@ export default function UsersPage() {
     setDeleteTarget,
     createForm,
     editForm,
-    formErrors,
+    createErrors,
+    editErrors,
     openCreate,
     closeCreate,
     openEdit,
     closeEdit,
     handleCreateField,
     handleEditField,
+    handleCreateBlur,
+    handleEditBlur,
     handleCreateSubmit,
     handleEditSubmit,
   } = useUsersForm({ roles, createMutation, updateMutation });
@@ -225,7 +228,8 @@ export default function UsersPage() {
           mode="create"
           form={createForm}
           onField={handleCreateField}
-          errors={formErrors}
+          onBlurField={handleCreateBlur}
+          errors={createErrors}
           roleOptions={roleOptions}
         />
       </FormModal>
@@ -244,7 +248,8 @@ export default function UsersPage() {
           mode="edit"
           form={editForm}
           onField={handleEditField}
-          errors={formErrors}
+          onBlurField={handleEditBlur}
+          errors={editErrors}
           roleOptions={roleOptions}
         />
       </FormModal>
