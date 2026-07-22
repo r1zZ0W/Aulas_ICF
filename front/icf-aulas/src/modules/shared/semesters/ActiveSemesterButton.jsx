@@ -38,7 +38,7 @@ export default function ActiveSemesterButton({ isAdmin }) {
   // ── Form / modal state ────────────────────────────────────────────────────────
   const {
     open, mode, form, formErrors, editTarget,
-    openCreate, openEdit, close, onField, handleSubmit,
+    openCreate, openEdit, close, onField, onFieldBlur, handleSubmit,
   } = useSemestersForm({ createMutation, updateMutation });
 
   // ── Close dropdown on outside click ──────────────────────────────────────────
@@ -169,7 +169,12 @@ export default function ActiveSemesterButton({ isAdmin }) {
           loading={createMutation.isPending || updateMutation.isPending}
           onSubmit={handleSubmit}
         >
-          <SemesterFormFields form={form} onField={onField} errors={formErrors} />
+          <SemesterFormFields
+            form={form}
+            onField={onField}
+            onBlurField={onFieldBlur}
+            errors={formErrors}
+          />
         </FormModal>
       )}
     </>
