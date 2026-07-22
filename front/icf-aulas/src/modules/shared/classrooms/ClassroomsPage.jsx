@@ -88,12 +88,14 @@ export default function ClassroomsPage() {
   const {
     createOpen, editTarget, viewTarget, deleteTarget,
     form,
+    errors,
     openCreate, closeCreate,
     openEdit, openDelete,
     closeEdit,
     openView, closeView,
     setDeleteTarget,
     onField,
+    onFieldBlur,
     handleCreateSubmit,
     handleEditSubmit,
   } = useClassroomsForm({
@@ -389,6 +391,8 @@ export default function ClassroomsPage() {
               mode="create"
               form={form}
               onField={onField}
+              onBlurField={onFieldBlur}
+              errors={errors}
               parentOptions={parentOptions}
             />
           </FormModal>
@@ -407,6 +411,8 @@ export default function ClassroomsPage() {
               mode="edit"
               form={form}
               onField={onField}
+              onBlurField={onFieldBlur}
+              errors={errors}
               parentOptions={parentOptions}
               childOptions={childOptions}
             />

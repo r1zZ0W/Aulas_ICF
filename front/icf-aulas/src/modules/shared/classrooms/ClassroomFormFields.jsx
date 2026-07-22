@@ -15,6 +15,8 @@ const STATUS_OPTIONS = [
  * @param {'create'|'edit'} props.mode
  * @param {object}   props.form           - Current form state (incl. `childUuids` in edit mode).
  * @param {function} props.onField        - (field: string, value: any) => void
+ * @param {function} [props.onBlurField]  - (field: string) => void — triggers real-time validation.
+ * @param {object}   [props.errors]       - Zod-derived field error map (only touched fields).
  * @param {Array<{value: string, label: string}>} [props.parentOptions=[]]
  *   Options for the "Aula padre" selector, already filtered to exclude cycles.
  * @param {Array<{uuid: string, name: string, linkedRoomUuid?: string|null}>} [props.childOptions=[]]
@@ -25,6 +27,8 @@ export default function ClassroomFormFields({
   mode,
   form,
   onField,
+  onBlurField,
+  errors = {},
   parentOptions = [],
   childOptions  = [],
 }) {
@@ -43,7 +47,9 @@ export default function ClassroomFormFields({
         label="Nombre"
         value={form.name}
         onChange={(e) => onField('name', e.target.value)}
+        onBlur={() => onBlurField?.('name')}
         placeholder="Ej. Aula Magna A"
+        error={errors.name}
         required
       />
 
@@ -54,6 +60,8 @@ export default function ClassroomFormFields({
         max={500}
         value={form.capacity}
         onChange={(e) => onField('capacity', Number(e.target.value))}
+        onBlur={() => onBlurField?.('capacity')}
+        error={errors.capacity}
         required
       />
 
@@ -62,7 +70,9 @@ export default function ClassroomFormFields({
           label="Tipo"
           value={form.type}
           onChange={(v) => onField('type', v)}
+          onBlur={() => onBlurField?.('type')}
           options={CLASSROOM_TYPES}
+          error={errors.type}
           required
         />
       </div>
@@ -72,8 +82,25 @@ export default function ClassroomFormFields({
           label="Descripción"
           value={form.description ?? ''}
           onChange={(e) => onField('description', e.target.value)}
+          onBlur={() => onBlurField?.('description')}
           placeholder="Descripción opcional del aula (máx. 500 caracteres)"
+          error={errors.description}
         />
+      </div>
+
+      <div className="classrooms-page__form-grid--full">
+        <Input
+          label="Link de imagen (URL)"
+          value={form.roomImageUrl ?? ''}
+          onChange={(e) => onField('roomImageUrl', e.target.value)}
+          onBlur={() => onBlurField?.('roomImageUrl')}
+          placeholder="https://ejemplo.com/imagenes/aula-magna-a.jpg"
+          error={errors.roomImageUrl}
+        />
+        <span className="classrooms-page__form-help">
+          URL de una imagen representativa del aula, alojada en un servicio externo. No se
+          suben archivos: solo se guarda el enlace.
+        </span>
       </div>
 
       {/* Aula padre — a qué aula pertenece o está contenida esta */}
@@ -83,7 +110,9 @@ export default function ClassroomFormFields({
             label="Aula padre (a la que pertenece esta aula)"
             value={form.linkedRoomUuid ?? ''}
             onChange={(v) => onField('linkedRoomUuid', v || null)}
+            onBlur={() => onBlurField?.('linkedRoomUuid')}
             options={parentOptions}
+            error={errors.linkedRoomUuid}
           />
           <span className="classrooms-page__form-help">
             Selecciona si esta aula está físicamente dentro de otra (ej. un laboratorio dentro

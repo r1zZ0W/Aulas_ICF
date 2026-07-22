@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import Modal from '../../../components/Modal/Modal';
@@ -30,6 +30,18 @@ export default function ClassroomInfoModal({ open, onClose, classroom, allClassr
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
+
+  // Tracks whether the external roomImageUrl failed to load (broken link, CORS, 404…), so the
+  // image block is hidden instead of showing a broken-image icon. Reset whenever a different
+  // classroom is shown, so a previous failure doesn't stick to the next classroom's (valid) URL.
+  // Adjusted during render (not in an effect) — the React-recommended pattern for resetting
+  // state when a prop changes, see https://react.dev/learn/you-might-not-need-an-effect.
+  const [imgFailState, setImgFailState] = useState({ uuid: null, failed: false });
+  const currentUuid = classroom?.uuid ?? null;
+  if (currentUuid !== imgFailState.uuid) {
+    setImgFailState({ uuid: currentUuid, failed: false });
+  }
+  const imgFailed = imgFailState.failed;
 
   // Read-only equipment list — visible to all roles (admin edits it via
   // ClassroomResourcesModal). Gated by `open` so it doesn't fetch on every table render.
@@ -79,6 +91,18 @@ export default function ClassroomInfoModal({ open, onClose, classroom, allClassr
 
         {/* Body */}
         <div className="classroom-info-modal__body">
+          {/* Representative image — external URL only, never uploaded/stored by this system. */}
+          {classroom.roomImageUrl && !imgFailed && (
+            <div className="classroom-info-modal__image-wrap">
+              <img
+                src={classroom.roomImageUrl}
+                alt={`Imagen de ${classroom.name}`}
+                className="classroom-info-modal__image"
+                onError={() => setImgFailState((prev) => ({ ...prev, failed: true }))}
+              />
+            </div>
+          )}
+
           <dl className="classroom-info-modal__grid">
             <div className="classroom-info-modal__field">
               <dt className="classroom-info-modal__label">Nombre</dt>

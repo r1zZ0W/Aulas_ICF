@@ -2,18 +2,16 @@
  * @fileoverview Validation schema for the classroom-resource mutation the frontend actually
  * sends (assign/update an equipment allocation for a classroom).
  *
- * Deliberately distinct from `ClassroomResourceRequestSchema` (classroomResourceRequest.js),
- * which faithfully mirrors the backend's `ClassroomResourceRequestDTO { classroomId, resourceId,
- * quantity }`. The frontend only ever knows a classroom's public UUID (sent in the URL path),
- * never its internal numeric `classroomId` — and `ClassroomResourceService.save` on the backend
- * ignores `classroomId` in the body anyway (it derives the classroom from the path UUID). Rather
- * than loosen the DTO-mirroring schema — which would misrepresent the real backend contract —
- * this is a dedicated schema for exactly what the client sends: `{ resourceId, quantity }`.
+ * Mirrors the backend's `ClassroomResourceRequestDTO { resourceUuid, quantity }`. The classroom
+ * itself is identified by the path UUID of the enclosing endpoint
+ * (`/api/v1/classrooms/{classroomUuid}/resources`), never by a field in this body — and the
+ * equipment resource is identified by its public `resourceUuid`, consistent with UUID-only
+ * identification across the whole API (the backend never exposes the internal numeric id).
  */
 import { z } from 'zod';
 
 export const ClassroomResourceMutationSchema = z.object({
-  resourceId: z.number().int().positive('ID de recurso no válido'),
+  resourceUuid: z.string().uuid('UUID de recurso no válido'),
   quantity: z
     .number()
     .int()

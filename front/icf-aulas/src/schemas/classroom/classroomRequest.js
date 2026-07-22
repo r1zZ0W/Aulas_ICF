@@ -20,9 +20,12 @@ export const ClassroomRequestSchema = z.object({
     .min(1, 'La capacidad debe ser al menos 1')
     .max(500, 'La capacidad máxima admitida es de 500 personas'),
 
+  // NOTE: this project's zod v4.4.3 silently ignores the old `errorMap` option (no error, no
+  // warning — the message just never applies, falling back to Zod's generic English message
+  // "Invalid option: expected one of ..."). Use the v4 `error` option instead.
   type: z.enum(
     Object.keys(CLASSROOM_TYPES_MAP),
-    { errorMap: () => ({ message: 'Selecciona un tipo de aula válido' }) }
+    { error: 'Selecciona un tipo de aula válido' }
   ),
 
   description: z
@@ -36,6 +39,24 @@ export const ClassroomRequestSchema = z.object({
   linkedRoomUuid: z.string().nullable().optional(),
 
   isActive: z.boolean().default(true),
+
+  // Mirrors the `description` field's empty-string-to-null normalization, plus format/length
+  // checks applied via `.refine` (after the transform) so an empty value skips them instead of
+  // failing `.url()` outright. 512, not 150: signed URLs (S3/Firebase/Cloudinary) routinely
+  // exceed 150 chars once access tokens and hashed paths are included — matches the backend's
+  // @Size(max = 512) on ClassroomRequestDTO.roomImageUrl and the VARCHAR(512) column.
+  roomImageUrl: z
+    .string()
+    .trim()
+    .transform((v) => (v === '' ? null : v))
+    .nullable()
+    .optional()
+    .refine((v) => !v || v.length <= 512, {
+      message: 'El URL de la imagen debe tener menos de 512 caracteres',
+    })
+    .refine((v) => !v || z.string().safeParse(v).success, {
+      message: 'Ingresa un URL de imagen válido (debe iniciar con http:// o https://)',
+    }),
 });
 
 export default ClassroomRequestSchema;

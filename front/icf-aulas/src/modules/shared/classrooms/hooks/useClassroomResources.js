@@ -49,15 +49,15 @@ export function useClassroomResources(classroomUuid) {
 
   // ── Mutations ──────────────────────────────────────────────────────────────────
   const assignMutation = useApiMutation({
-    mutationFn: ({ classroomUuid: uuid, resourceId, quantity }) =>
-      assignClassroomResource(uuid, { resourceId, quantity }),
+    mutationFn: ({ classroomUuid: uuid, resourceUuid, quantity }) =>
+      assignClassroomResource(uuid, { resourceUuid, quantity }),
     invalidateKey: ['classrooms', classroomUuid, 'resources'],
     successMessage: 'Recurso del aula actualizado correctamente.',
   });
 
   const removeMutation = useApiMutation({
-    mutationFn: ({ classroomUuid: uuid, resourceId }) =>
-      removeClassroomResource(uuid, resourceId),
+    mutationFn: ({ classroomUuid: uuid, resourceUuid }) =>
+      removeClassroomResource(uuid, resourceUuid),
     invalidateKey: ['classrooms', classroomUuid, 'resources'],
     successMessage: 'Recurso eliminado del aula.',
   });

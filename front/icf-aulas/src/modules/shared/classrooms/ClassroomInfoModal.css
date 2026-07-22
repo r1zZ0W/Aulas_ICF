@@ -53,6 +53,23 @@
   padding: 24px 32px;
 }
 
+/* Representative image */
+.classroom-info-modal__image-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--moon-gohan, #efefef);
+  margin-bottom: 20px;
+}
+
+.classroom-info-modal__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .classroom-info-modal__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

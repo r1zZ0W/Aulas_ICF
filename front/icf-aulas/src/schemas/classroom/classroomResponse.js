@@ -15,6 +15,7 @@ export const ClassroomResponseSchema = z.object({
   description: z.string().nullable().optional(),
   linkedRoomUuid: z.string().nullable().optional(),
   isActive: z.boolean(),
+  roomImageUrl: z.string().nullable().optional(),
 });
 
 export default ClassroomResponseSchema;

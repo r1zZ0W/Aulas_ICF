@@ -14,6 +14,9 @@ import './ClassroomResourcesModal.css';
  * classroom. Persistence is immediate per row (the backend exposes upsert/delete per single
  * resource, not a bulk endpoint) — there is no separate "Guardar" step.
  *
+ * All rows are keyed by the resource's public UUID (`resourceUuid`), never its internal
+ * numeric id — consistent with UUID-only identification across the whole API.
+ *
  * Concurrency / data-integrity guarantees (see plan for the reasoning):
  *  - Each row's quantity edit lives in local `editingQuantities` state, decoupled from the
  *    server-fetched `resources` list, so a background refetch triggered by ANY row's mutation
@@ -22,7 +25,7 @@ import './ClassroomResourcesModal.css';
  *    — no hand-rolled numeric checks). On success, error, AND invalid input the local edit is
  *    cleared in a `finally`, so the input always reverts to server truth — never a lingering,
  *    unpersisted value ("UI lie").
- *  - `busyIds` is a map keyed by resourceId (not a single primitive): each row's own mutation
+ *  - `busyIds` is a map keyed by resourceUuid (not a single primitive): each row's own mutation
  *    disables only that row, so a fast user editing two rows in a row can't have row B
  *    prematurely re-enabled by row A's unrelated mutation finishing.
  *  - The modal cannot be closed (✕ button or Escape) while any mutation is in flight, so a
@@ -45,11 +48,11 @@ export default function ClassroomResourcesModal({ open, onClose, classroom }) {
   } = useClassroomResources(classroomUuid);
 
   // ── Per-row local state (decoupled from server state — see file header) ──────
-  const [editingQuantities, setEditingQuantities] = useState({}); // { [resourceId]: raw string }
-  const [busyIds, setBusyIds] = useState({});                     // { [resourceId]: true }
+  const [editingQuantities, setEditingQuantities] = useState({}); // { [resourceUuid]: raw string }
+  const [busyIds, setBusyIds] = useState({});                     // { [resourceUuid]: true }
 
   // ── "Agregar recurso" row state ───────────────────────────────────────────────
-  const [addResourceId, setAddResourceId] = useState('');
+  const [addResourceUuid, setAddResourceUuid] = useState('');
   const [addQuantity, setAddQuantity] = useState('1');
   const [addError, setAddError] = useState('');
 
@@ -77,7 +80,7 @@ export default function ClassroomResourcesModal({ open, onClose, classroom }) {
     if (hasInFlight) return;
     setEditingQuantities({});
     setBusyIds({});
-    setAddResourceId('');
+    setAddResourceUuid('');
     setAddQuantity('1');
     setAddError('');
     onClose();
@@ -96,27 +99,27 @@ export default function ClassroomResourcesModal({ open, onClose, classroom }) {
 
   // ── Row: commit a pending quantity edit (onBlur / Enter) ─────────────────────
   async function commitQuantity(item) {
-    const raw = editingQuantities[item.resourceId];
+    const raw = editingQuantities[item.resourceUuid];
     if (raw === undefined) return; // no edit pending
 
     const next = Number(raw);
     // Dirty-check — the only hand-written comparison; everything else is delegated to Zod.
-    if (next === item.quantity) { clearQty(item.resourceId); return; }
+    if (next === item.quantity) { clearQty(item.resourceUuid); return; }
 
     const parsed = ClassroomResourceMutationSchema.safeParse({
-      resourceId: item.resourceId,
+      resourceUuid: item.resourceUuid,
       quantity: next,
     });
-    if (!parsed.success) { clearQty(item.resourceId); return; } // invalid → revert to server truth
+    if (!parsed.success) { clearQty(item.resourceUuid); return; } // invalid → revert to server truth
 
-    setBusy(item.resourceId);
+    setBusy(item.resourceUuid);
     try {
       await assignMutation.mutateAsync({ classroomUuid, ...parsed.data });
     } catch {
       // toast already emitted by useApiMutation.onError
     } finally {
-      clearQty(item.resourceId);  // success, error, or invalid → input reflects server truth
-      clearBusy(item.resourceId); // release only this row, never a shared/global flag
+      clearQty(item.resourceUuid);  // success, error, or invalid → input reflects server truth
+      clearBusy(item.resourceUuid); // release only this row, never a shared/global flag
     }
   }
 
@@ -126,22 +129,22 @@ export default function ClassroomResourcesModal({ open, onClose, classroom }) {
 
   // ── Row: remove an allocation ─────────────────────────────────────────────────
   async function handleRemove(item) {
-    if (busyIds[item.resourceId]) return;
-    setBusy(item.resourceId);
+    if (busyIds[item.resourceUuid]) return;
+    setBusy(item.resourceUuid);
     try {
-      await removeMutation.mutateAsync({ classroomUuid, resourceId: item.resourceId });
+      await removeMutation.mutateAsync({ classroomUuid, resourceUuid: item.resourceUuid });
     } catch {
       // toast already emitted by useApiMutation.onError
     } finally {
-      clearBusy(item.resourceId);
-      clearQty(item.resourceId); // discard any pending edit on the now-removed row
+      clearBusy(item.resourceUuid);
+      clearQty(item.resourceUuid); // discard any pending edit on the now-removed row
     }
   }
 
   // ── "Agregar recurso" row ─────────────────────────────────────────────────────
-  const assignedIds = new Set(resources.map((r) => r.resourceId));
-  const availableCatalog = catalog.filter((c) => !assignedIds.has(c.id));
-  const catalogOptions = availableCatalog.map((c) => ({ value: String(c.id), label: c.name }));
+  const assignedUuids = new Set(resources.map((r) => r.resourceUuid));
+  const availableCatalog = catalog.filter((c) => !assignedUuids.has(c.uuid));
+  const catalogOptions = availableCatalog.map((c) => ({ value: c.uuid, label: c.name }));
 
   const catalogSelectPlaceholder = catalogLoading
     ? 'Cargando recursos…'
@@ -152,27 +155,27 @@ export default function ClassroomResourcesModal({ open, onClose, classroom }) {
         : 'Selecciona un recurso…';
 
   const addDisabled =
-    !addResourceId || catalogLoading || catalogError || availableCatalog.length === 0 || hasInFlight;
+    !addResourceUuid || catalogLoading || catalogError || availableCatalog.length === 0 || hasInFlight;
 
   async function handleAdd() {
     setAddError('');
     const parsed = ClassroomResourceMutationSchema.safeParse({
-      resourceId: Number(addResourceId),
+      resourceUuid: addResourceUuid,
       quantity: Number(addQuantity),
     });
     if (!parsed.success) {
       setAddError(parsed.error.issues[0]?.message ?? 'Datos inválidos.');
       return;
     }
-    setBusy(parsed.data.resourceId);
+    setBusy(parsed.data.resourceUuid);
     try {
       await assignMutation.mutateAsync({ classroomUuid, ...parsed.data });
-      setAddResourceId('');
+      setAddResourceUuid('');
       setAddQuantity('1');
     } catch {
       // toast already emitted by useApiMutation.onError
     } finally {
-      clearBusy(parsed.data.resourceId);
+      clearBusy(parsed.data.resourceUuid);
     }
   }
 
@@ -216,16 +219,16 @@ export default function ClassroomResourcesModal({ open, onClose, classroom }) {
           ) : (
             <ul className="classroom-resources-modal__list">
               {resources.map((item) => {
-                const rowBusy = !!busyIds[item.resourceId];
-                const displayValue = editingQuantities[item.resourceId] ?? String(item.quantity);
+                const rowBusy = !!busyIds[item.resourceUuid];
+                const displayValue = editingQuantities[item.resourceUuid] ?? String(item.quantity);
                 return (
-                  <li key={item.resourceId} className="classroom-resources-modal__row">
+                  <li key={item.resourceUuid} className="classroom-resources-modal__row">
                     <span className="classroom-resources-modal__row-name">{item.resourceName}</span>
                     <Input
                       type="number"
                       min={1}
                       value={displayValue}
-                      onChange={(e) => setQty(item.resourceId, e.target.value)}
+                      onChange={(e) => setQty(item.resourceUuid, e.target.value)}
                       onBlur={() => commitQuantity(item)}
                       onKeyDown={handleQuantityKeyDown}
                       disabled={rowBusy}
@@ -252,8 +255,8 @@ export default function ClassroomResourcesModal({ open, onClose, classroom }) {
           <div className="classroom-resources-modal__add">
             <div className="classroom-resources-modal__add-fields">
               <Select
-                value={addResourceId}
-                onChange={(v) => { setAddResourceId(v); setAddError(''); }}
+                value={addResourceUuid}
+                onChange={(v) => { setAddResourceUuid(v); setAddError(''); }}
                 options={catalogOptions}
                 placeholder={catalogSelectPlaceholder}
                 disabled={catalogLoading || catalogError || hasInFlight}

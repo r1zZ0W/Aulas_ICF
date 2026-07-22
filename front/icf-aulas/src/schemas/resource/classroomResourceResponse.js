@@ -9,7 +9,7 @@ import { z } from 'zod';
  */
 export const ClassroomResourceResponseSchema = z.object({
   classroomUuid: z.string().uuid(),
-  resourceId: z.number().int(),
+  resourceUuid: z.string().uuid(),
   resourceName: z.string(),
   quantity: z.number().int()
 });
