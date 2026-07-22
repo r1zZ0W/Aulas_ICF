@@ -45,6 +45,8 @@ export {
   ReservInstanceRequestSchema,
   ReservInstanceResponseSchema,
   BookingRequestSchema,
+  ReservaFormSchema,
+  ReasignFormSchema,
   ReassignRequestSchema,
   ReservSlotRequestSchema,
   ReservSlotResponseSchema,
@@ -52,8 +54,9 @@ export {
 
 // Resource schemas
 export {
-  default as ResourceSchema,
-  ClassroomResourceRequestSchema,
+  ResourceRequestSchema,
+  ResourceResponseSchema,
+  ResourceStatsSchema,
   ClassroomResourceResponseSchema,
   ClassroomResourceMutationSchema,
   ResourceCatalogItemSchema,

@@ -36,6 +36,11 @@ export const PRIVATE_ROUTES_META = [
     sidebar: { label: 'Usuarios', show: true },
   },
   {
+    path: '/resources',
+    allowedRoles: [ROLES.ADMIN],
+    sidebar: { label: 'Gestión de Recursos', show: true },
+  },
+  {
     path: '/reports',
     allowedRoles: [ROLES.ADMIN],
     sidebar: { label: 'Estadísticas', show: true },

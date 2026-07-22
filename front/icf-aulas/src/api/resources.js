@@ -1,11 +1,15 @@
 import { z } from 'zod';
 import { createApiClient, HttpError } from './base.js';
 import {
+  ResourceRequestSchema,
+  ResourceResponseSchema,
+  ResourceStatsSchema,
   ResourceCatalogItemSchema,
   ClassroomResourceResponseSchema,
   ClassroomResourceMutationSchema,
 } from '../schemas/resource.js';
 import { PagedResultSchema } from '../schemas/pagedResult.js';
+import { buildPageParams } from '../utils/queryUtils.js';
 
 const api = createApiClient({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
@@ -21,10 +25,123 @@ function resolveErrorMessage(error, overrides = {}) {
     401: 'No autorizado.',
     403: 'No tienes permisos para realizar esta acción.',
     404: 'El recurso solicitado no existe.',
+    409: 'Ya existe un recurso con ese nombre.',
     500: 'Error interno del servidor. Intenta de nuevo más tarde.',
   };
   return defaults[error.status] || serverMessage || `Error inesperado (${error.status}).`;
 }
+
+// ── Global resource catalog (admin CRUD) ────────────────────────────────────────
+
+/**
+ * Fetches a paginated, optionally-filtered page of the global equipment catalog. ADMIN reads
+ * are unrestricted (any authenticated user may GET); writes are ADMIN only (enforced server-side).
+ *
+ * @param {object} [params={}]
+ * @param {string}       [params.search]    - Free-text filter over name/description.
+ * @param {number}       [params.page]      - Zero-based page index.
+ * @param {number}       [params.size]      - Page size.
+ * @param {string}       [params.sort]      - Sort field. Allowed: name, quantity.
+ * @param {'asc'|'desc'} [params.direction] - Sort direction.
+ * @returns {Promise<{items: object[], totalElements: number, totalPages: number}>}
+ */
+export async function getResources({ search, page, size, sort, direction } = {}) {
+  try {
+    const qs = buildPageParams({ search, page, size, sort, direction });
+    const { data } = await api.get(`/api/v1/resources${qs}`);
+    return PagedResultSchema(ResourceResponseSchema).parse(data.data);
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
+}
+
+/**
+ * Fetches aggregated resource statistics (total types, total units) for the admin dashboard.
+ * GET /api/v1/resources/stats
+ *
+ * @returns {Promise<{ totalTypes: number, totalUnits: number }>}
+ */
+export async function getResourceStats() {
+  try {
+    const { data } = await api.get('/api/v1/resources/stats');
+    return ResourceStatsSchema.parse(data.data);
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
+}
+
+/**
+ * Fetches a single equipment resource by its public UUID.
+ * GET /api/v1/resources/{uuid}
+ */
+export async function getResource(uuid) {
+  try {
+    const { data } = await api.get(`/api/v1/resources/${uuid}`);
+    return ResourceResponseSchema.parse(data.data ?? data);
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
+}
+
+/**
+ * Creates a new equipment resource in the global catalog. ADMIN only.
+ * POST /api/v1/resources
+ */
+export async function createResource(payload) {
+  try {
+    const body = ResourceRequestSchema.parse(payload);
+    const { data } = await api.post('/api/v1/resources', body);
+    return ResourceResponseSchema.parse(data.data ?? data);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw new Error(resolveErrorMessage(error, {
+        409: 'Ya existe un recurso con ese nombre.',
+      }));
+    }
+    throw error;
+  }
+}
+
+/**
+ * Updates an existing equipment resource in the global catalog. ADMIN only.
+ * PUT /api/v1/resources/{uuid}
+ */
+export async function updateResource(uuid, payload) {
+  try {
+    const body = ResourceRequestSchema.parse(payload);
+    const { data } = await api.put(`/api/v1/resources/${uuid}`, body);
+    return ResourceResponseSchema.parse(data.data ?? data);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw new Error(resolveErrorMessage(error, {
+        409: 'Ya existe un recurso con ese nombre.',
+      }));
+    }
+    throw error;
+  }
+}
+
+/**
+ * Deletes an equipment resource from the global catalog. ADMIN only.
+ *
+ * Any classroom allocations referencing this resource are removed by the backend's
+ * `ON DELETE CASCADE` — no orphaned `classroom_resources` rows are left behind.
+ *
+ * DELETE /api/v1/resources/{uuid}
+ */
+export async function deleteResource(uuid) {
+  try {
+    await api.delete(`/api/v1/resources/${uuid}`);
+  } catch (error) {
+    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
+    throw error;
+  }
+}
+
+// ── Classroom ⇄ equipment allocation ────────────────────────────────────────────
 
 /** Page size used while walking the equipment catalog — see getResourceCatalog(). */
 const CATALOG_PAGE_SIZE = 100;
@@ -44,7 +161,7 @@ const CATALOG_PAGE_SIZE = 100;
  * fetch, instead of silently returning a half-loaded catalog. Cost is O(pages), linear — accepted
  * as the equipment catalog is expected to stay small.
  *
- * @returns {Promise<Array<{id:number, name:string, description?:string|null}>>}
+ * @returns {Promise<Array<{uuid:string, name:string, description?:string|null, quantity?:number}>>}
  */
 export async function getResourceCatalog() {
   try {
@@ -85,12 +202,10 @@ export async function getClassroomResources(classroomUuid) {
  * Assigns or updates the quantity of an equipment resource for a classroom (upsert). ADMIN only.
  * POST /api/v1/classrooms/{classroomUuid}/resources
  *
- * Sends only `{ resourceId, quantity }` — the backend derives the classroom from the path UUID
- * and ignores `classroomId` in the request body (see ClassroomResourceService.save), so there is
- * no numeric classroom id to send from the frontend, which only ever holds the UUID.
+ * Sends only `{ resourceUuid, quantity }` — the backend derives the classroom from the path UUID.
  *
  * @param {string} classroomUuid
- * @param {{ resourceId: number, quantity: number }} payload
+ * @param {{ resourceUuid: string, quantity: number }} payload
  */
 export async function assignClassroomResource(classroomUuid, payload) {
   try {
@@ -105,11 +220,11 @@ export async function assignClassroomResource(classroomUuid, payload) {
 
 /**
  * Removes an equipment allocation from a classroom. ADMIN only.
- * DELETE /api/v1/classrooms/{classroomUuid}/resources/{resourceId}
+ * DELETE /api/v1/classrooms/{classroomUuid}/resources/{resourceUuid}
  */
-export async function removeClassroomResource(classroomUuid, resourceId) {
+export async function removeClassroomResource(classroomUuid, resourceUuid) {
   try {
-    await api.delete(`/api/v1/classrooms/${classroomUuid}/resources/${resourceId}`);
+    await api.delete(`/api/v1/classrooms/${classroomUuid}/resources/${resourceUuid}`);
   } catch (error) {
     if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
     throw error;
