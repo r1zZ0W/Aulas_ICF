@@ -43,7 +43,7 @@ public class Classroom extends BaseEntity {
     @Column(name = "is_active")
     private Boolean isActive;
 
-    @Column(name = "room_image_url", length = 150)
+    @Column(name = "room_image_url", length = 512)
     private String roomImageUrl;
     
 }

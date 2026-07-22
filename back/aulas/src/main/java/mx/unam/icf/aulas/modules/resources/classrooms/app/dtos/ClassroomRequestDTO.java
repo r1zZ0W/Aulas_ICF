@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import mx.unam.icf.aulas.modules.resources.classrooms.domain.ClassroomType;
+import org.hibernate.validator.constraints.URL;
 
 import java.util.UUID;
 
@@ -30,5 +31,9 @@ public record ClassroomRequestDTO(
         String description,
 
         UUID linkedRoomUuid,
-        Boolean isActive
+        Boolean isActive,
+
+        @Size(max = 512, message = "Image URL must be at most 512 characters")
+        @URL(message = "Image URL must be a valid http(s) URL")
+        String roomImageUrl
 ) {}
