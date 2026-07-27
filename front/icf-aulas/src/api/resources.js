@@ -11,10 +11,7 @@ import {
 import { PagedResultSchema } from '../schemas/pagedResult.js';
 import { buildPageParams } from '../utils/queryUtils.js';
 
-const api = createApiClient({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
-  headers: { Accept: 'application/json' },
-});
+const api = createApiClient();
 
 function resolveErrorMessage(error, overrides = {}) {
   if (overrides[error.status]) return overrides[error.status];

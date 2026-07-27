@@ -26,10 +26,7 @@ import { LoginRequestSchema, LoginResponseSchema } from '../schemas/index.js';
 
 const BASE_PATH = '/api/v1/auth';
 
-const api = createApiClient({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
-  headers: { Accept: 'application/json' },
-});
+const api = createApiClient();
 
 /**
  * Maps an {@link HttpError} to a human-readable Spanish message using the HTTP

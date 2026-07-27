@@ -10,10 +10,7 @@ import { z } from 'zod';
 import { createApiClient, HttpError } from './base.js';
 import { SemesterRequestSchema, SemesterResponseSchema } from '../schemas/semester.js';
 
-const api = createApiClient({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
-  headers: { Accept: 'application/json' },
-});
+const api = createApiClient();
 
 function resolveErrorMessage(error, overrides = {}) {
   if (overrides[error.status]) return overrides[error.status];

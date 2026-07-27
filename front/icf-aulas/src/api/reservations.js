@@ -22,10 +22,7 @@ import {
 } from '../schemas/reservation.js';
 import { buildPageParams } from '../utils/queryUtils.js';
 
-const api = createApiClient({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
-  headers: { Accept: 'application/json' },
-});
+const api = createApiClient();
 
 /**
  * Resolves an error message based on the HTTP status code.

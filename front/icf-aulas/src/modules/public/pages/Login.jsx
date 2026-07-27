@@ -11,6 +11,7 @@ import { useLogin } from "../../../hooks/useLogin";
 
 import "../styles/public.css";
 import { AtomIcon } from "lucide-react";
+import logoIcfPng from "../../../assets/logo_icf.png";
 
 /** Maps an auth reason to a human-readable modal content. */
 const SESSION_MODAL_CONTENT = {
@@ -96,7 +97,7 @@ export default function Login() {
             <div className="col-sm-7 open-box d-md-flex align-items-center justify-content-center transition-all side-panel">
               <div className="text-center w-100">
                 <img
-                  src="/src/assets/logo_icf.png"
+                  src={logoIcfPng}
                   alt="Logo ICF"
                   className="img-fluid illustration-img"
                 />

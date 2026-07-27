@@ -28,7 +28,10 @@ export class HttpError extends Error {
  * @param {Record<string, string>} [config.headers={}] - Global headers to include in every request.
  * @returns {Object} An object containing HTTP client helper methods (get, delete, post, put, patch).
  */
-export function createApiClient({ baseURL = '', headers: globalHeaders = {} } = {}) {
+export function createApiClient({
+  baseURL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
+  headers: globalHeaders = { Accept: 'application/json' },
+} = {}) {
 
   // ── Core request ────────────────────────────────────────────────────────────
 

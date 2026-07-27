@@ -28,6 +28,7 @@
 - [Flujo principal](#flujo-principal)
 - [Estructura sugerida del proyecto](#estructura-sugerida-del-proyecto)
 - [Instalación y ejecución](#instalación-y-ejecución)
+- [Despliegue en producción](#despliegue-en-producción)
 - [Roles de usuario](#roles-de-usuario)
 - [Reglas de negocio relevantes](#reglas-de-negocio-relevantes)
 - [Pantallas consideradas](#pantallas-consideradas)
@@ -173,42 +174,190 @@ Aulas-ICF/
 
 ## Instalación y ejecución
 
+Toda la configuración sensible o dependiente del entorno (credenciales de base de datos,
+secreto JWT, CORS, correo, etc.) vive fuera del código fuente, en variables de entorno.
+**Nunca edites `application.properties` para poner credenciales reales** — usa un archivo
+`.env` local (gitignoreado) o variables de entorno del sistema operativo.
+
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/aulas-icf.git
-cd aulas-icf
+git clone <url-del-repositorio>
+cd Aulas_ICF
 ```
 
-### 2. Configurar el frontend
+### 2. Configurar el backend
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd back/aulas
+cp .env.example .env
+# Edita .env: como mínimo, DB_USERNAME/DB_PASSWORD y JWT_SECRET.
 ```
 
-### 3. Configurar el backend
+Spring Boot carga `back/aulas/.env` automáticamente (vía `spring.config.import` en
+`application.properties`) cuando el proceso se ejecuta con ese directorio como working
+directory. Ver todas las variables disponibles, con su propósito, en
+[`back/aulas/.env.example`](back/aulas/.env.example).
 
 ```bash
-cd backend
 ./mvnw spring-boot:run
 ```
 
-### 4. Configurar la base de datos
+Por defecto corre con el perfil `dev` (`spring.profiles.active=${SPRING_PROFILES_ACTIVE:dev}`),
+que activa un JWT secret de desarrollo y un admin sembrado (`Admin@12345!`,
+`admin@icf.unam.mx`) contra una base de datos con `ddl-auto=update` (Hibernate crea/altera
+las tablas automáticamente). **Esto es solo para desarrollo local** — ver
+[Despliegue en producción](#despliegue-en-producción) para el flujo de producción.
 
-- Crear una base de datos en MySQL.
-- Importar el script SQL inicial.
-- Configurar las credenciales en `application.properties`.
+### 3. Configurar el frontend
 
-Ejemplo:
-
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/aulas_icf
-spring.datasource.username=root
-spring.datasource.password=tu_password
-spring.jpa.hibernate.ddl-auto=update
+```bash
+cd front/icf-aulas
+cp .env.example .env.development
+pnpm install
+pnpm dev
 ```
+
+> El proyecto usa **pnpm**, no npm — `pnpm-lock.yaml` está versionado para builds
+> reproducibles. Ver [`front/icf-aulas/.env.example`](front/icf-aulas/.env.example) para las
+> variables disponibles (`VITE_API_URL`, la URL base del backend).
+
+### 4. Base de datos (desarrollo)
+
+En desarrollo, con el perfil `dev` y `ddl-auto=update`, Hibernate crea el esquema
+automáticamente contra una base de datos MySQL vacía — solo necesitas crearla y apuntar
+`DB_URL`/`DB_USERNAME`/`DB_PASSWORD` en tu `.env`:
+
+```sql
+CREATE DATABASE test_aulas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+***
+
+## Despliegue en producción
+
+Producción usa el perfil `prod` (`SPRING_PROFILES_ACTIVE=prod`), que difiere de `dev` en
+varios puntos deliberados: `ddl-auto=validate` (Hibernate nunca altera el esquema en
+producción), Swagger/OpenAPI deshabilitado, sin admin sembrado por defecto (debe
+provisionarse explícitamente), y sin lazy-initialization (falla rápido en el arranque si hay
+un error de wiring, en vez de ocultarlo hasta la primera petición).
+
+### 1. Base de datos: aplicar el esquema base
+
+Con `ddl-auto=validate`, la aplicación **no crea el esquema** — debe existir de antemano.
+Sobre una base de datos vacía, aplica una sola vez:
+
+```bash
+mysql -u <usuario> -p <base_de_datos> < back/aulas/docs/migration_v1.0__baseline.sql
+```
+
+Este script crea todas las tablas, el catálogo de roles (`ADMIN`, `MAESTRO`) y el catálogo de
+horarios (`time_slots`, 1–24). No ejecutes las migraciones incrementales `v1.1`–`v1.6` ni
+`reservations-refactor.sql` después — sus cambios ya están incorporados en el baseline.
+
+### 2. Variables de entorno
+
+Copia [`back/aulas/.env.example`](back/aulas/.env.example) como punto de partida y define,
+como mínimo: `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`, un `JWT_SECRET` fuerte y único (nunca
+reutilices el de desarrollo), `APP_CORS_ALLOWED_ORIGINS` (el origen público real del
+frontend — solo scheme+host+puerto, sin ruta), `APP_FRONTEND_URL`, y
+`APP_SEED_ADMIN_PASSWORD`/`APP_SEED_ADMIN_EMAIL` para el primer arranque (ver punto 4).
+
+**El arranque en servidor no debe depender de dónde vive el `.env`**: `spring.config.import`
+resuelve esa ruta relativa al directorio de trabajo del proceso. En un servidor, usa en su
+lugar una de estas vías (cualquiera funciona; las variables de entorno del sistema operativo
+tienen prioridad sobre el archivo):
+
+- **systemd** (recomendado): `EnvironmentFile=/ruta/a/.env` en la unidad `.service`. Ver el
+  ejemplo completo más abajo.
+- **Script/CLI**: `set -a; . ./.env; set +a; java -jar aulas.jar` ejecutado desde el
+  directorio donde vive el `.env`.
+- **Variables de entorno del SO**: exportar `DB_URL`, `JWT_SECRET`, etc. directamente.
+
+Ejemplo de unidad systemd (ajusta rutas, usuario y tamaño de heap al servidor real):
+
+```ini
+[Unit]
+Description=Aulas ICF Backend Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=aulasuser
+WorkingDirectory=/opt/aulas
+ExecStart=/usr/bin/java -Xms256m -Xmx1g -jar /opt/aulas/aulas-backend.jar
+EnvironmentFile=/opt/aulas/.env
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`-Xmx1g` (no menos): Apache POI carga el árbol DOM completo de cada `.xlsx` de lista de
+alumnos en memoria al parsearlo; con subidas concurrentes, un heap más chico arriesga
+`OutOfMemoryError`. `RestartSec=5s` evita que systemd agote sus reintentos si el primer
+arranque falla por una config incorrecta. `After=network-online.target` (no `mysql.service`):
+si MySQL corre en otra máquina, esa unidad no existe localmente.
+
+El directorio de `STORAGE_BASE_DIR` (rosters de alumnos) debe existir con permisos de
+escritura para el usuario del servicio — la aplicación crea las subcarpetas internas
+automáticamente, solo el directorio raíz necesita existir con los permisos correctos:
+
+```bash
+sudo mkdir -p /var/lib/aulas-icf/uploads
+sudo chown -R aulasuser:aulasuser /var/lib/aulas-icf
+sudo chmod 750 /var/lib/aulas-icf
+```
+
+### 3. Frontend: build de producción
+
+```bash
+cd front/icf-aulas
+# Confirma VITE_API_URL en .env.production antes de compilar — se hornea en el bundle.
+pnpm install
+pnpm build
+```
+
+Sirve el contenido de `dist/` con tu servidor web (Nginx, Apache, etc.). Si la aplicación se
+publica bajo un subpath (p. ej. `/salasicf/`) en vez de la raíz del dominio, además necesitas:
+`base: '/salasicf/'` en `vite.config.js` y `<BrowserRouter basename={import.meta.env.BASE_URL}>`
+en `src/main.jsx` — sin esto, los assets se piden fuera del proxy y la SPA muestra 404/pantalla
+en blanco al refrescar subrutas.
+
+Ejemplo de bloque Nginx para un despliegue bajo subpath, con proxy al backend y paridad de
+tamaño de subida con `spring.servlet.multipart.max-request-size` (10 MB):
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name www.fis.unam.mx;
+    client_max_body_size 12M;
+
+    # SPA estática. Usar `root`, no `alias` — alias combinado con try_files tiene un bug
+    # histórico de Nginx (rutas duplicadas / internal redirect cycle 500).
+    location /salasicf/ {
+        root /var/www;
+        try_files $uri $uri/ /salasicf/index.html;
+    }
+
+    location /salasicf/api/ {
+        proxy_pass http://127.0.0.1:8080/api/;  # la barra final strippea /salasicf
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 4. Primer arranque: usuario administrador
+
+Con la base de datos ya provisionada (paso 1) y `APP_SEED_ADMIN_PASSWORD`/
+`APP_SEED_ADMIN_EMAIL` definidas, `AdminSeeder` crea el primer usuario `ADMIN` automáticamente
+al arrancar la aplicación (una sola vez; es idempotente). **Tras iniciar sesión exitosamente,
+borra esas dos variables del `.env` de producción** — dejarlas significa que un futuro arranque
+contra una tabla `users` vacía (p. ej. por error) recrearía ese mismo admin con esa contraseña.
 
 ***
 

@@ -85,15 +85,18 @@ public class MailSenderImpl implements MailSender {
 
             // This is needed for retrieving the messages, while testing this is disabled.
             // Instead, we mock it through logs.
-            // javaMailSender.send(message);
+            javaMailSender.send(message);
 
-            log.info("==================================================");
-            log.info("[SIMULACIÓN DE CORREO] Correo NO enviado a SMTP real.");
-            log.info("De: {}", from);
-            log.info("Para: {}", to);
-            log.info("Asunto: {}", subject);
-            log.info("BCC: {}", bccRecipients);
-            log.info("==================================================");
+            /*
+             * log.info("==================================================");
+             * log.info("[SIMULACIÓN DE CORREO] Correo NO enviado a SMTP real.");
+             * log.info("De: {}", from);
+             * log.info("Para: {}", to);
+             * log.info("Asunto: {}", subject);
+             * log.info("BCC: {}", bccRecipients);
+             * log.info("==================================================");
+             */
+
 
         } catch (MessagingException e) {
             throw new MailSendingException("Failed to send email message.", e);

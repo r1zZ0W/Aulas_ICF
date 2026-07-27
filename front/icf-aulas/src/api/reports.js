@@ -13,10 +13,7 @@ import { ReservationStatisticsSchema, AvailableMonthsSchema } from '../schemas/r
 
 // ─── HTTP client ──────────────────────────────────────────────────────────────
 
-const api = createApiClient({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
-  headers: { Accept: 'application/json' },
-});
+const api = createApiClient();
 
 // ─── Error helpers ────────────────────────────────────────────────────────────
 

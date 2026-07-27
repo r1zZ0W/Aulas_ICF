@@ -1,3 +1,5 @@
+import aulasHeaderPng from "../../../assets/aulas_header.png";
+
 /**
  * Header component for the login form.
  * Shows the logo of the application.
@@ -8,7 +10,7 @@ export default function LogoHeader({ containerClassName = "text-end mb-4" }) {
     <div className={containerClassName}>
       <div className="d-flex align-items-center justify-content-center">
         <img
-          src="/src/assets/aulas_header.png"
+          src={aulasHeaderPng}
           alt="Logo Ithera"
           className="img-fluid"
         />

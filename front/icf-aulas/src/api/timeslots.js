@@ -7,10 +7,7 @@ import { z } from 'zod';
 import { createApiClient, HttpError } from './base.js';
 import { TimeSlotSchema } from '../schemas/timeSlot.js';
 
-const api = createApiClient({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080',
-  headers: { Accept: 'application/json' },
-});
+const api = createApiClient();
 
 /**
  * Retrieves the full time-slot catalog.
