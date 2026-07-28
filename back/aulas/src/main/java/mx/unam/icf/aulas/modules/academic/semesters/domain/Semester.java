@@ -34,7 +34,7 @@ public class Semester extends BaseEntity {
      * Public UUID exposed through external APIs.
      * Not the primary key; never updated after creation.
      */
-    @Column(name = "uuid", nullable = false, unique = true, updatable = false)
+    @Column(name = "uuid", nullable = false, unique = true, updatable = false, columnDefinition = "BINARY(16)")
     private UUID uuid = UUID.randomUUID();
 
     /**

@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.academic.semesters.app;
 
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.modules.academic.semesters.app.dtos.SemesterRequestDTO;
 import mx.unam.icf.aulas.modules.academic.semesters.app.dtos.SemesterResponseDTO;
@@ -73,7 +74,7 @@ public class SemesterService {
     public SemesterResponseDTO findActive() {
         LocalDate today = LocalDate.now();
         Semester current = repository.findCurrent(today)
-                .orElseThrow(() -> new ResourceNotFoundException(
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.SEMESTER_NO_ACTIVE,
                         "No active semester for the current date: " + today));
         return mapper.toDto(current, today);
     }
@@ -95,7 +96,7 @@ public class SemesterService {
         LocalDate today = LocalDate.now();
 
         if (repository.findByName(dto.name()).isPresent())
-            throw new DomainException("A semester with that name already exists: " + dto.name());
+            throw new DomainException(ErrorCode.SEMESTER_NAME_TAKEN, "A semester with that name already exists: " + dto.name());
 
         validateDates(dto.startDate(), dto.endDate(), true, null, today);
 
@@ -122,10 +123,10 @@ public class SemesterService {
         LocalDate today = LocalDate.now();
 
         Semester semester = repository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Semester not found: " + uuid));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.SEMESTER_NOT_FOUND, "Semester not found: " + uuid));
 
         if (!semester.getName().equals(dto.name()) && repository.findByName(dto.name()).isPresent())
-            throw new DomainException("A semester with that name already exists: " + dto.name());
+            throw new DomainException(ErrorCode.SEMESTER_NAME_TAKEN, "A semester with that name already exists: " + dto.name());
 
         validateDates(dto.startDate(), dto.endDate(), false, semester.getEndDate(), today);
 
@@ -174,17 +175,17 @@ public class SemesterService {
     private void validateDates(LocalDate start, LocalDate end,
                                boolean isCreate, LocalDate currentEnd, LocalDate today) {
         if (!end.isAfter(start))
-            throw new DomainException("End date must be strictly after start date");
+            throw new DomainException(ErrorCode.SEMESTER_END_BEFORE_START, "End date must be strictly after start date");
 
         if (end.isAfter(start.plusMonths(MAX_SEMESTER_MONTHS)))
-            throw new DomainException(
+            throw new DomainException(ErrorCode.SEMESTER_DURATION_TOO_LONG,
                     "Semester duration cannot exceed " + MAX_SEMESTER_MONTHS + " months");
 
         if (isCreate) {
             if (start.isBefore(today))
-                throw new DomainException("Start date cannot be in the past");
+                throw new DomainException(ErrorCode.SEMESTER_START_IN_PAST, "Start date cannot be in the past");
             if (end.isBefore(today))
-                throw new DomainException("End date cannot be in the past");
+                throw new DomainException(ErrorCode.SEMESTER_END_IN_PAST, "End date cannot be in the past");
             return;
         }
 
@@ -192,6 +193,6 @@ public class SemesterService {
         // still ongoing or future. Already-concluded semesters may be freely edited.
         boolean alreadyConcluded = currentEnd != null && currentEnd.isBefore(today);
         if (!alreadyConcluded && end.isBefore(today))
-            throw new DomainException("End date cannot be set to a past date for an ongoing or future semester");
+            throw new DomainException(ErrorCode.SEMESTER_END_IN_PAST, "End date cannot be set to a past date for an ongoing or future semester");
     }
 }

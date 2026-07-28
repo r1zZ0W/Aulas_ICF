@@ -80,3 +80,20 @@ export const ReservaFormSchema = z
   });
 
 export default ReservaFormSchema;
+
+/**
+ * Translates `BookingRequestDTO` (backend) field names to `ReservaFormSchema` (this file's)
+ * field names, for `useZodForm`'s `dtoMap` option — see useReservaModal.js.
+ *
+ * The relation is one of *shape*, not names: `timeSlotIds` is a single DTO array built from
+ * two form controls (`startLabel` + `endLabel`), so a server error on it highlights both.
+ * `startDate` has no control of its own in this form (it comes from the calendar's picked
+ * date, outside the modal) — `null` routes it to the toast instead of losing it silently.
+ */
+export const BOOKING_DTO_MAP = {
+  classroomUuid: 'roomId',
+  attendeeCount: 'attendees',
+  title: 'className',
+  timeSlotIds: ['startLabel', 'endLabel'],
+  startDate: null,
+};

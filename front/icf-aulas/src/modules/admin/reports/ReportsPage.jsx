@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   BarChart3, Info, Download,
   BookOpen, Building2, UserCheck, RefreshCw,
@@ -13,10 +13,14 @@ import {
 
 import { useReportStatistics } from './hooks/useReportStatistics';
 import { useAvailableMonths } from './hooks/useAvailableMonths';
-import { downloadReservationReportPdf } from '../../../api/reports';
+// Dynamically imported inside handleExportPdf, not statically here: html2canvas-pro +
+// jsPDF add ~200KB to whatever chunk imports them, and most visits to this page never
+// click "Exportar PDF" — loading them eagerly would tax every admin who just wants to
+// look at the charts.
 import { toast } from '../../../utils/toast';
 import Select from '../../../components/Select/Select';
 import EmptyState from '../../../components/EmptyState/EmptyState';
+import ErrorBanner from '../../../components/ErrorBanner/ErrorBanner';
 import { useSemesters } from '../../shared/semesters/hooks/useSemesters';
 
 import './ReportsPage.css';
@@ -106,10 +110,14 @@ function StatCard({ icon: Icon, label, value, sub, delta }) {
 
 /**
  * Card wrapper for charts: title + subtitle + body slot.
+ *
+ * `data-pdf-block` marks the whole card as one atomic unit for the PDF export
+ * (see `exportStatisticsPdf.js`): a chart is captured as a single image and is
+ * never split across two PDF pages.
  */
 function ChartCard({ title, subtitle, loading, children }) {
   return (
-    <div className="reports-page__chart-card chart-card">
+    <div className="reports-page__chart-card chart-card" data-pdf-block>
       <h3 className="reports-page__chart-title">{title}</h3>
       <p className="reports-page__chart-subtitle">{subtitle}</p>
       <div className="reports-page__chart-body">
@@ -118,6 +126,37 @@ function ChartCard({ title, subtitle, loading, children }) {
           : children
         }
       </div>
+    </div>
+  );
+}
+
+/**
+ * PDF-only cover block: identifies which period the export captures.
+ *
+ * Hidden on screen by default (`.reports-page__pdf-cover { display: none }`); made
+ * visible only while `.reports-page--exporting` is toggled on the export root during
+ * capture (see `handleExportPdf`). `html2canvas` skips `display:none` elements, so the
+ * cover must actually be visible at capture time — it is never rendered conditionally
+ * via React state, only via an imperative class toggle timed around the capture call.
+ */
+function ReportPdfCover({ scope, periodLabel, totalReservations }) {
+  const generatedAt = new Date().toLocaleString('es-MX', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  });
+
+  return (
+    <div className="reports-page__pdf-cover" data-pdf-block>
+      <h2 className="reports-page__pdf-cover-title">Reportes y Estadísticas</h2>
+      <p className="reports-page__pdf-cover-period">
+        {scope === 'MONTHLY' ? 'Mensual' : 'Semestral'} — {periodLabel}
+      </p>
+      <p className="reports-page__pdf-cover-meta">
+        Total de reservaciones en el periodo: {totalReservations.toLocaleString('es-MX')}
+      </p>
+      <p className="reports-page__pdf-cover-meta">
+        Generado el {generatedAt}
+      </p>
     </div>
   );
 }
@@ -197,35 +236,64 @@ export default function ReportsPage() {
 
   const anchorOptions = scope === 'MONTHLY' ? monthOptions : semesterOptions;
 
+  // ── PDF export metadata ──────────────────────────────────────────────────────
+  // Human-readable label for the PDF cover vs. a raw slug value for the filename —
+  // kept separate because `formatMonthLabel`'s output ("Julio 2026") isn't
+  // filesystem-friendly, and a semester UUID is meaningless in a filename. Both are
+  // derived from the same resolved `anchor` so they always describe the same period.
+  const periodLabel = scope === 'MONTHLY'
+    ? (anchor ? formatMonthLabel(anchor) : '')
+    : (semesterOptions.find(o => o.value === anchor)?.label ?? '');
+
+  const periodSlugValue = scope === 'MONTHLY'
+    ? anchor
+    : (semestersList.find(s => s.uuid === anchor)?.name ?? anchor);
+
   // ── Data ───────────────────────────────────────────────────────────────────
-  const { stats, loading } = useReportStatistics({ scope, anchor: anchor || defaultAnchor });
+  const { stats, loading, isFetching, isError, refetch } = useReportStatistics({ scope, anchor: anchor || defaultAnchor });
 
   // ── Exportar PDF ───────────────────────────────────────────────────────────
+  const exportRootRef = useRef(null);
   const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(null); // { current, total } | null while capturing
+
+  // `isFetching` (not just `loading`) matters here: `useReportStatistics` uses
+  // `keepPreviousData`, so right after switching scope/anchor `loading` is already
+  // false but the charts are still showing the *previous* period's numbers while the
+  // new ones load in the background. Exporting during that window would produce a PDF
+  // whose cover names the new period while the captured charts show the old one — the
+  // exact defect this refactor removes, reintroduced through a side door.
+  const exportDisabled = exporting || loading || isFetching || !stats || stats.totalReservations === 0;
 
   async function handleExportPdf() {
-    if (exporting) return;
-    setExporting(true);
-    try {
-      const { blob, filename } = await downloadReservationReportPdf({ period: 'CURRENT_MONTH' });
+    if (exportDisabled || !exportRootRef.current) return;
 
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      // Deferred cleanup: revoking synchronously after click() can invalidate the
-      // objectURL before the browser's download subsystem opens the Blob stream
-      // (intermittent 0-byte downloads in Chromium under load).
-      setTimeout(() => {
-        link.remove();
-        URL.revokeObjectURL(url);
-      }, 100);
+    const root = exportRootRef.current;
+    setExporting(true);
+    root.classList.add('reports-page--exporting');
+    try {
+      // Let the now-visible cover block paint before html2canvas walks the DOM —
+      // `display:none` elements are skipped by html2canvas, so it must actually be
+      // rendered by the time capture starts.
+      await new Promise(resolve => requestAnimationFrame(resolve));
+
+      const { exportBlocksToPdf, buildReportFilename } = await import('./exportStatisticsPdf.js');
+      const blocks = Array.from(root.querySelectorAll('[data-pdf-block]'));
+      const filename = buildReportFilename(scope, periodSlugValue);
+
+      await exportBlocksToPdf({
+        blocks,
+        filename,
+        onProgress: (current, total) => setExportProgress({ current, total }),
+      });
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message || 'No se pudo generar el reporte en PDF.');
     } finally {
+      // Always restore visibility, even on failure — the cover must never linger
+      // visible on screen because the capture threw partway through.
+      root.classList.remove('reports-page--exporting');
       setExporting(false);
+      setExportProgress(null);
     }
   }
 
@@ -260,14 +328,23 @@ export default function ReportsPage() {
         <button
           type="button"
           onClick={handleExportPdf}
-          disabled={exporting}
+          disabled={exportDisabled}
           className="reports-page__export-btn"
-          title="Descargar reporte PDF del mes en curso"
+          title="Descargar el reporte del periodo seleccionado en PDF"
         >
           <Download size={15} />
-          {exporting ? 'Generando…' : 'Exportar PDF'}
+          {exporting
+            ? (exportProgress ? `Generando ${exportProgress.current}/${exportProgress.total}…` : 'Generando…')
+            : 'Exportar PDF'}
         </button>
       </div>
+
+      {isError && (
+        <ErrorBanner
+          message="No se pudieron cargar las estadísticas del periodo seleccionado."
+          onDismiss={() => refetch()}
+        />
+      )}
 
       {/* ── Info panel ───────────────────────────────────────────────────── */}
       <div className="reports-page__info-panel">
@@ -321,199 +398,209 @@ export default function ReportsPage() {
         />
       </div>
 
-      {/* ── KPI cards ─────────────────────────────────────────────────────── */}
-      {!loading && stats && stats.totalReservations === 0 ? (
-        <div style={{ marginTop: '24px', padding: '40px 0' }}>
-          <EmptyState message="No hay datos de reservaciones para el periodo seleccionado." />
-        </div>
-      ) : (
-        <>
-          <div className="reports-page__kpi-grid">
-            <StatCard
-              icon={BookOpen}
-              label="Total Reservaciones"
-              value={stats ? stats.totalReservations.toLocaleString('es-MX') : undefined}
-              delta={stats?.totalReservationsDeltaPct}
-            />
-            <StatCard
-              icon={Building2}
-              label="Aula Más Ocupada"
-              value={stats ? (stats.mostOccupiedClassroom?.name ?? '—') : undefined}
-              sub={stats?.mostOccupiedClassroom ? `${stats.mostOccupiedClassroom.hours} horas ocupadas` : undefined}
-            />
-            <StatCard
-              icon={UserCheck}
-              label="Mayor Usuario"
-              value={stats ? (stats.topUser?.name ?? '—') : undefined}
-              sub={stats?.topUser ? `${stats.topUser.reservations} reservaciones` : undefined}
-            />
-            <StatCard
-              icon={RefreshCw}
-              label="Tasa de Recurrencia"
-              value={stats ? `${formatPct(stats.recurrenceRatePct)}%` : undefined}
-              sub="de las reservas son recurrentes"
-            />
+      {/* ── Exportable region: cover (PDF-only) + KPI cards + charts ────────── */}
+      <div ref={exportRootRef} className="reports-page__export-root">
+        {stats && (
+          <ReportPdfCover
+            scope={scope}
+            periodLabel={periodLabel}
+            totalReservations={stats.totalReservations}
+          />
+        )}
+
+        {!loading && stats && stats.totalReservations === 0 ? (
+          <div style={{ marginTop: '24px', padding: '40px 0' }}>
+            <EmptyState message="No hay datos de reservaciones para el periodo seleccionado." />
           </div>
+        ) : (
+          <>
+            <div className="reports-page__kpi-grid" data-pdf-block>
+              <StatCard
+                icon={BookOpen}
+                label="Total Reservaciones"
+                value={stats ? stats.totalReservations.toLocaleString('es-MX') : undefined}
+                delta={stats?.totalReservationsDeltaPct}
+              />
+              <StatCard
+                icon={Building2}
+                label="Aula Más Ocupada"
+                value={stats ? (stats.mostOccupiedClassroom?.name ?? '—') : undefined}
+                sub={stats?.mostOccupiedClassroom ? `${stats.mostOccupiedClassroom.hours} horas ocupadas` : undefined}
+              />
+              <StatCard
+                icon={UserCheck}
+                label="Mayor Usuario"
+                value={stats ? (stats.topUser?.name ?? '—') : undefined}
+                sub={stats?.topUser ? `${stats.topUser.reservations} reservaciones` : undefined}
+              />
+              <StatCard
+                icon={RefreshCw}
+                label="Tasa de Recurrencia"
+                value={stats ? `${formatPct(stats.recurrenceRatePct)}%` : undefined}
+                sub="de las reservas son recurrentes"
+              />
+            </div>
 
-          {/* ── Charts grid ───────────────────────────────────────────────────── */}
-          <div className="reports-page__charts-grid">
+            {/* ── Charts grid ───────────────────────────────────────────────────── */}
+            <div className="reports-page__charts-grid">
 
-            {/* Aulas Más Ocupadas — BarChart vertical */}
-            <ChartCard
-              title="Aulas Más Ocupadas"
-              subtitle="Horas totales de reservación por aula"
-              loading={loading}
-            >
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={stats?.mostOccupiedClassrooms ?? []} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit=" h" />} />
-                  <Bar dataKey="hours" radius={[4, 4, 0, 0]} maxBarSize={50}>
-                    {(stats?.mostOccupiedClassrooms ?? []).map((_, i) => (
-                      <Cell key={i} fill={COLOR_BARS[i % COLOR_BARS.length]} />
-                    ))
-                    }
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            {/* Usuarios con Más Reservas — BarChart horizontal */}
-            <ChartCard
-              title="Usuarios con Más Reservas"
-              subtitle="Top organizadores o departamentos"
-              loading={loading}
-            >
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart
-                  layout="vertical"
-                  data={stats?.topUsers ?? []}
-                  margin={{ top: 8, right: 24, left: 8, bottom: 0 }}
+                {/* Aulas Más Ocupadas — BarChart vertical */}
+                <ChartCard
+                  title="Aulas Más Ocupadas"
+                  subtitle="Horas totales de reservación por aula"
+                  loading={loading}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit="" />} />
-                  <Bar dataKey="reservations" radius={[0, 4, 4, 0]} maxBarSize={22}>
-                    {(stats?.topUsers ?? []).map((_, i) => (
-                      <Cell key={i} fill={i === 0 ? COLOR_PRIMARY : COLOR_LIGHT} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={stats?.mostOccupiedClassrooms ?? []} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit=" h" />} />
+                      <Bar dataKey="hours" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                        {(stats?.mostOccupiedClassrooms ?? []).map((_, i) => (
+                          <Cell key={i} fill={COLOR_BARS[i % COLOR_BARS.length]} />
+                        ))
+                        }
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
 
-            {/* Recurrencia de Reservas — PieChart (donut) */}
-            <ChartCard
-              title="Recurrencia de Reservas"
-              subtitle="Proporción de eventos recurrentes vs eventuales"
-              loading={loading}
-            >
-              <div style={{ position: 'relative', width: '100%', height: 250 }}>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={donutData}
-                      cx="50%"
-                      cy="46%"
-                      innerRadius={65}
-                      outerRadius={95}
-                      dataKey="value"
-                      startAngle={90}
-                      endAngle={-270}
-                      paddingAngle={paddingAngle}
+                {/* Usuarios con Más Reservas — BarChart horizontal */}
+                <ChartCard
+                  title="Usuarios con Más Reservas"
+                  subtitle="Top organizadores o departamentos"
+                  loading={loading}
+                >
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart
+                      layout="vertical"
+                      data={stats?.topUsers ?? []}
+                      margin={{ top: 8, right: 24, left: 8, bottom: 0 }}
                     >
-                      <Cell fill={COLOR_REC} />
-                      <Cell fill={COLOR_EVE} />
-                    </Pie>
-                    <Legend
-                      iconType="circle"
-                      iconSize={11}
-                      wrapperStyle={{ fontSize: 12, color: '#6b7280', paddingTop: 4 }}
-                    />
-                    <Tooltip content={<SimpleTooltip unit=" reservas" />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                {/* Central label — rendered over the chart */}
-                {stats && (
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, right: 0,
-                    height: 'calc(100% - 40px)',   // subtract legend height
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center',
-                    pointerEvents: 'none',
-                  }}>
-                    <span style={{ fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1 }}>
-                      {ratePct > 50 ? `${formatPct(ratePct)}%` : `${formatPct(100 - ratePct)}%`}
-                    </span>
-                    <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                      {ratePct > 50 ? 'Recurrentes' : 'Eventuales'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </ChartCard>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit="" />} />
+                      <Bar dataKey="reservations" radius={[0, 4, 4, 0]} maxBarSize={22}>
+                        {(stats?.topUsers ?? []).map((_, i) => (
+                          <Cell key={i} fill={i === 0 ? COLOR_PRIMARY : COLOR_LIGHT} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
 
-            {/* Tendencia de Reservaciones — AreaChart */}
-            <ChartCard
-              title="Tendencia de Reservaciones"
-              subtitle="Volumen de reservas a lo largo del tiempo"
-              loading={loading}
-            >
-              <ResponsiveContainer width="100%" height={250}>
-                <AreaChart
-                  data={stats?.trend ?? []}
-                  margin={{
-                    top: 8, right: 8,
-                    // SEMESTER rotates its labels -30° with textAnchor="end", which shifts
-                    // the first tick left and every tick's descenders down — extra left/bottom
-                    // margin keeps them from clipping against the chart edges.
-                    left: scope === 'SEMESTER' ? 20 : -10,
-                    bottom: scope === 'SEMESTER' ? 12 : 0,
-                  }}
+                {/* Recurrencia de Reservas — PieChart (donut) */}
+                <ChartCard
+                  title="Recurrencia de Reservas"
+                  subtitle="Proporción de eventos recurrentes vs eventuales"
+                  loading={loading}
                 >
-                  <defs>
-                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLOR_AREA} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={COLOR_AREA} stopOpacity={0.03} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
-                    axisLine={false}
-                    tickLine={false}
-                    // MONTHLY has 28-31 day labels — thin them out to start/end only.
-                    // SEMESTER has ~6 month labels; interval={0} forces recharts to render
-                    // every one instead of its collision heuristic skipping/duplicating ticks
-                    // (the reported bug). Rotating them keeps them legible on narrower screens
-                    // now that the collision-avoidance algorithm is disabled.
-                    interval={scope === 'MONTHLY' ? 'preserveStartEnd' : 0}
-                    angle={scope === 'SEMESTER' ? -30 : 0}
-                    textAnchor={scope === 'SEMESTER' ? 'end' : 'middle'}
-                    height={scope === 'SEMESTER' ? 42 : 30}
-                  />
-                  <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<SimpleTooltip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="reservations"
-                    stroke={COLOR_AREA}
-                    strokeWidth={2}
-                    fill="url(#areaGrad)"
-                    dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0, fill: COLOR_AREA }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartCard>
+                  <div style={{ position: 'relative', width: '100%', height: 250 }}>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={donutData}
+                          cx="50%"
+                          cy="46%"
+                          innerRadius={65}
+                          outerRadius={95}
+                          dataKey="value"
+                          startAngle={90}
+                          endAngle={-270}
+                          paddingAngle={paddingAngle}
+                        >
+                          <Cell fill={COLOR_REC} />
+                          <Cell fill={COLOR_EVE} />
+                        </Pie>
+                        <Legend
+                          iconType="circle"
+                          iconSize={11}
+                          wrapperStyle={{ fontSize: 12, color: '#6b7280', paddingTop: 4 }}
+                        />
+                        <Tooltip content={<SimpleTooltip unit=" reservas" />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Central label — rendered over the chart */}
+                    {stats && (
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0,
+                        height: 'calc(100% - 40px)',   // subtract legend height
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        pointerEvents: 'none',
+                      }}>
+                        <span style={{ fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1 }}>
+                          {ratePct > 50 ? `${formatPct(ratePct)}%` : `${formatPct(100 - ratePct)}%`}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                          {ratePct > 50 ? 'Recurrentes' : 'Eventuales'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </ChartCard>
 
-          </div>
-        </>
-      )}
+                {/* Tendencia de Reservaciones — AreaChart */}
+                <ChartCard
+                  title="Tendencia de Reservaciones"
+                  subtitle="Volumen de reservas a lo largo del tiempo"
+                  loading={loading}
+                >
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart
+                      data={stats?.trend ?? []}
+                      margin={{
+                        top: 8, right: 8,
+                        // SEMESTER rotates its labels -30° with textAnchor="end", which shifts
+                        // the first tick left and every tick's descenders down — extra left/bottom
+                        // margin keeps them from clipping against the chart edges.
+                        left: scope === 'SEMESTER' ? 20 : -10,
+                        bottom: scope === 'SEMESTER' ? 12 : 0,
+                      }}
+                    >
+                      <defs>
+                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={COLOR_AREA} stopOpacity={0.3} />
+                          <stop offset="95%" stopColor={COLOR_AREA} stopOpacity={0.03} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 11, fill: '#6b7280' }}
+                        axisLine={false}
+                        tickLine={false}
+                        // MONTHLY has 28-31 day labels — thin them out to start/end only.
+                        // SEMESTER has ~6 month labels; interval={0} forces recharts to render
+                        // every one instead of its collision heuristic skipping/duplicating ticks
+                        // (the reported bug). Rotating them keeps them legible on narrower screens
+                        // now that the collision-avoidance algorithm is disabled.
+                        interval={scope === 'MONTHLY' ? 'preserveStartEnd' : 0}
+                        angle={scope === 'SEMESTER' ? -30 : 0}
+                        textAnchor={scope === 'SEMESTER' ? 'end' : 'middle'}
+                        height={scope === 'SEMESTER' ? 42 : 30}
+                      />
+                      <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<SimpleTooltip />} />
+                      <Area
+                        type="monotone"
+                        dataKey="reservations"
+                        stroke={COLOR_AREA}
+                        strokeWidth={2}
+                        fill="url(#areaGrad)"
+                        dot={false}
+                        activeDot={{ r: 4, strokeWidth: 0, fill: COLOR_AREA }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

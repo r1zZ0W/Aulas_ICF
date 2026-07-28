@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Eye, Pencil, Trash2, Building2, CheckCircle2, XCircle, ToggleLeft, ToggleRight, Boxes } from 'lucide-react';
 
 import { useAuth } from '../../../context/AuthContext';
@@ -17,6 +17,7 @@ import Select from '../../../components/Select/Select';
 import DataTable from '../../../components/DataTable/DataTable';
 import Badge from '../../../components/Badge/Badge';
 import EmptyState from '../../../components/EmptyState/EmptyState';
+import ErrorBanner from '../../../components/ErrorBanner/ErrorBanner';
 import Pagination from '../../../components/Pagination/Pagination';
 import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
@@ -59,6 +60,8 @@ export default function ClassroomsPage() {
     totalPages,
     stats,
     loading,
+    classroomsError,
+    refetchClassrooms,
     createMutation,
     updateMutation,
     deleteMutation,
@@ -74,6 +77,15 @@ export default function ClassroomsPage() {
 
   // ── Full catalog (for parent/child selectors + InfoModal children list) ────────
   const { allClassrooms } = useAllClassrooms();
+
+  // ── Keep the URL page in range after the total shrinks (e.g. deleting the last
+  // row of the last page) — otherwise the query keeps requesting a page that no
+  // longer exists and the pagination footer shows a broken count.
+  useEffect(() => {
+    if (!loading && page > 0 && page >= totalPages) {
+      setPage(Math.max(0, totalPages - 1));
+    }
+  }, [loading, page, totalPages, setPage]);
 
   // ── Apply client-side status filter ──────────────────────────────────────────
   // Only meaningful for admins (teachers already receive active-only from server).
@@ -306,6 +318,13 @@ export default function ClassroomsPage() {
 
       {/* Table card */}
       <div className="classrooms-page__table-card">
+        {classroomsError && (
+          <ErrorBanner
+            message="No se pudo cargar la lista de aulas."
+            onDismiss={() => refetchClassrooms()}
+          />
+        )}
+
         {/* Toolbar */}
         <div className="classrooms-page__table-toolbar">
           <Buscador
@@ -350,7 +369,7 @@ export default function ClassroomsPage() {
             page={page}
             totalPages={totalPages}
             onPageChange={setPage}
-            pageSize={classrooms.length}
+            pageSize={DEFAULT_PAGE_SIZE}
             total={totalElements}
             noun="aula"
             searchActive={!!search}

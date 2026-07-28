@@ -25,7 +25,7 @@ public class RoleService {
     /**
      * Returns all roles in the system as DTOs (id + name).
      *
-     * @return list of {@link RoleDTO} ordered by insertion order (ADMIN first, then MAESTRO)
+     * @return list of {@link RoleDTO} ordered by insertion order (ADMIN first, then TEACHER)
      */
     public List<RoleDTO> findAll() {
         return roleMapper.toDtoList(roleRepository.findAll());

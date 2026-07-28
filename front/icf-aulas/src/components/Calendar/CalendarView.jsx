@@ -10,6 +10,7 @@ import { useReservation } from '../../context/ReservationContext';
 import { getAvailability } from '../../api/reservations';
 import { instanceToEvent } from '../../utils/reservations';
 import DayEventsModal from './DayEventsModal';
+import ErrorBanner from '../ErrorBanner/ErrorBanner';
 
 import './CalendarView.css';
 
@@ -72,7 +73,7 @@ export default function CalendarView() {
   } = useCalendar({ onRangeChange: handleRangeChange });
 
   // ── Availability query ────────────────────────────────────────────────────
-  const { data: instances = [] } = useQuery({
+  const { data: instances = [], isError: instancesError, refetch: refetchInstances } = useQuery({
     queryKey: ['reservations', 'availability', calendarRange.from, calendarRange.to],
     queryFn: () => getAvailability({ from: calendarRange.from, to: calendarRange.to }),
     enabled: Boolean(calendarRange.from && calendarRange.to),
@@ -114,6 +115,13 @@ export default function CalendarView() {
 
   return (
     <div className="calendar-wrapper">
+      {instancesError && (
+        <ErrorBanner
+          message="No se pudieron cargar las reservas del calendario."
+          onDismiss={() => refetchInstances()}
+        />
+      )}
+
       {/* Custom toolbar */}
       <div className="cal-toolbar">
         <div className="cal-toolbar__left">

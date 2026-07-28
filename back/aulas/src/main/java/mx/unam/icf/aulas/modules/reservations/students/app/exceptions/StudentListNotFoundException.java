@@ -1,5 +1,6 @@
 package mx.unam.icf.aulas.modules.reservations.students.app.exceptions;
 
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 
 /**
@@ -14,7 +15,7 @@ import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundExcept
  */
 public class StudentListNotFoundException extends ResourceNotFoundException {
 
-    public StudentListNotFoundException(String message) {
-        super(message);
+    public StudentListNotFoundException(ErrorCode code, String message) {
+        super(code, message);
     }
 }

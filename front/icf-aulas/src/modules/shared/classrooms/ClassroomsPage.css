@@ -69,7 +69,13 @@
 .classrooms-page__stat-icon--green { background: #f0fdf4; color: #16a34a; }
 .classrooms-page__stat-icon--red   { background: #fff1f2; color: #e11d48; }
 
-/* Table card */
+/* Table card
+ * Flex column bounded to the remaining viewport height (via `.classrooms-page`'s
+ * own flex:1/min-height:0 chain up to `.private-layout` at 100vh). Only the table
+ * rows (`.data-table-wrap`, flexed below) scroll internally — the toolbar and the
+ * pagination footer stay pinned and always visible, no page-level scroll needed
+ * to reach the "Mostrando X al Y de Z aulas" footer.
+ */
 .classrooms-page__table-card {
   margin-top: 28px;
   background: #fff;
@@ -77,6 +83,10 @@
   border-radius: 16px;
   box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .classrooms-page__table-toolbar {
@@ -86,6 +96,20 @@
   padding: 14px 16px;
   border-bottom: 1px solid #e5e7eb;
   flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* Override DataTable's default max-height: 60vh — here the wrap fills exactly
+ * the space table-card has left after the toolbar and pagination, so it can be
+ * taller or shorter than 60vh depending on the viewport. */
+.classrooms-page__table-card .data-table-wrap {
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.classrooms-page__table-card .pagination {
+  flex-shrink: 0;
 }
 
 /* Action buttons */

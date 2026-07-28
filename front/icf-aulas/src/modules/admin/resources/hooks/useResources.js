@@ -48,6 +48,8 @@ export function useResources({ search, page = 0, size = 20, sort, direction } = 
   const {
     data: pageData,
     isLoading: resourcesLoading,
+    isError: resourcesError,
+    refetch: refetchResources,
   } = useQuery({
     queryKey: ['resources', 'list', { search, page, size, sort, direction }],
     queryFn: () => getResources({ search, page, size, sort, direction }),
@@ -89,6 +91,8 @@ export function useResources({ search, page = 0, size = 20, sort, direction } = 
     totalPages,
     stats,
     resourcesLoading,
+    resourcesError,
+    refetchResources,
     createMutation,
     updateMutation,
     deleteMutation,

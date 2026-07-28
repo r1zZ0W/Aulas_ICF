@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.web.FilterResponseWriter;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -141,6 +142,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         filterResponseWriter.writeError(
                 response,
                 HttpStatus.TOO_MANY_REQUESTS,
+                ErrorCode.RATE_LIMITED,
                 "Too many requests. Please try again in " + windowMinutes + " minute(s)."
         );
     }

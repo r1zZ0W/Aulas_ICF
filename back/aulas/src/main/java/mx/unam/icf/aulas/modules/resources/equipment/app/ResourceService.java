@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.app.dtos.PagedResultDTO;
 import mx.unam.icf.aulas.kernel.app.mappers.PageMapper;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.modules.resources.equipment.app.dtos.ResourceRequestDTO;
 import mx.unam.icf.aulas.modules.resources.equipment.app.dtos.ResourceResponseDTO;
@@ -82,7 +83,7 @@ public class ResourceService {
     public ResourceResponseDTO findByUuid(UUID uuid) {
         return mapper.toDto(
             repository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Equipment resource not found: " + uuid))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESOURCE_NOT_FOUND, "Equipment resource not found: " + uuid))
         );
     }
 
@@ -95,7 +96,7 @@ public class ResourceService {
     @Transactional(rollbackFor = Exception.class)
     public ResourceResponseDTO save(ResourceRequestDTO dto) {
         if (repository.findByName(dto.name()).isPresent())
-            throw new DomainException("An equipment resource with that name already exists: " + dto.name());
+            throw new DomainException(ErrorCode.RESOURCE_NAME_TAKEN, "An equipment resource with that name already exists: " + dto.name());
 
         return mapper.toDto(repository.save(mapper.toEntity(dto)));
     }
@@ -111,10 +112,10 @@ public class ResourceService {
     @Transactional(rollbackFor = Exception.class)
     public ResourceResponseDTO update(UUID uuid, ResourceRequestDTO dto) {
         Resource resource = repository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Equipment resource not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESOURCE_NOT_FOUND, "Equipment resource not found: " + uuid));
 
         if (!resource.getName().equals(dto.name()) && repository.findByName(dto.name()).isPresent())
-            throw new DomainException("An equipment resource with that name already exists: " + dto.name());
+            throw new DomainException(ErrorCode.RESOURCE_NAME_TAKEN, "An equipment resource with that name already exists: " + dto.name());
 
         mapper.updateEntityFromDto(dto, resource);
         return mapper.toDto(repository.save(resource));
@@ -132,7 +133,7 @@ public class ResourceService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(UUID uuid) {
         Resource resource = repository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Equipment resource not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESOURCE_NOT_FOUND, "Equipment resource not found: " + uuid));
         repository.delete(resource);
     }
 }

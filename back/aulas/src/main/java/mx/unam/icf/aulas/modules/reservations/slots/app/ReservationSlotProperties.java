@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 @Getter
 @Setter
 @Component
-@ConfigurationProperties(prefix = "app.reservations.slot-duration-minutes")
+@ConfigurationProperties(prefix = "app.reservations")
 public class ReservationSlotProperties {
 
     /**

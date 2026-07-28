@@ -2,7 +2,6 @@ package mx.unam.icf.aulas.modules.reports.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.GlobalExceptionHandler;
-import mx.unam.icf.aulas.modules.reports.app.ReservationReportService;
 import mx.unam.icf.aulas.modules.reports.app.ReservationStatisticsService;
 import mx.unam.icf.aulas.modules.reports.app.dtos.ReservationStatisticsDTO;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +31,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class ReportControllerTest {
 
-    @Mock private ReservationReportService     reportService;
     @Mock private ReservationStatisticsService statisticsService;
     @Mock private Environment                  env;
 
@@ -41,7 +39,7 @@ class ReportControllerTest {
 
     @BeforeEach
     void setUp() {
-        ReportController controller = new ReportController(reportService, statisticsService);
+        ReportController controller = new ReportController(statisticsService);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(env))
@@ -101,7 +99,7 @@ class ReportControllerTest {
         when(statisticsService.getStatistics(eq("WEEKLY"), any()))
                 .thenThrow(new IllegalArgumentException("scope must be MONTHLY or SEMESTER"));
         // Simulate dev profile so the real message is forwarded
-        when(env.getActiveProfiles()).thenReturn(new String[]{"dev"});
+        when(env.acceptsProfiles(any(org.springframework.core.env.Profiles.class))).thenReturn(true);
 
         mockMvc.perform(get("/api/v1/reports/statistics").param("scope", "WEEKLY"))
                 .andExpect(status().isBadRequest())
@@ -112,7 +110,7 @@ class ReportControllerTest {
     void statistics_invalidAnchor_returns400() throws Exception {
         when(statisticsService.getStatistics(any(), eq("bad-anchor")))
                 .thenThrow(new IllegalArgumentException("Invalid anchor for scope MONTHLY"));
-        when(env.getActiveProfiles()).thenReturn(new String[]{"dev"});
+        when(env.acceptsProfiles(any(org.springframework.core.env.Profiles.class))).thenReturn(true);
 
         mockMvc.perform(get("/api/v1/reports/statistics")
                         .param("scope", "MONTHLY")
@@ -126,7 +124,7 @@ class ReportControllerTest {
         String fakeUuid = "00000000-0000-0000-0000-000000000000";
         when(statisticsService.getStatistics(eq("SEMESTER"), eq(fakeUuid)))
                 .thenThrow(new IllegalArgumentException("Semester not found: " + fakeUuid));
-        when(env.getActiveProfiles()).thenReturn(new String[]{"dev"});
+        when(env.acceptsProfiles(any(org.springframework.core.env.Profiles.class))).thenReturn(true);
 
         mockMvc.perform(get("/api/v1/reports/statistics")
                         .param("scope", "SEMESTER")

@@ -3,6 +3,7 @@ package mx.unam.icf.aulas.modules.resources.classrooms.app;
 import lombok.RequiredArgsConstructor;
 
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.modules.reservations.groups.infrastructure.ReservationGroupRepository;
 import mx.unam.icf.aulas.modules.reservations.instances.infrastructure.ReservInstanceRepository;
@@ -133,7 +134,7 @@ public class ClassroomService {
     public ClassroomResponseDTO findByUuid(UUID uuid) {
         return classroomMapper.toDto(
             classroomRepository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + uuid))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + uuid))
         );
     }
 
@@ -147,13 +148,13 @@ public class ClassroomService {
     @Transactional(rollbackFor = Exception.class)
     public ClassroomResponseDTO save(ClassroomRequestDTO dto) {
         if (classroomRepository.findByName(dto.name()).isPresent())
-            throw new DomainException("A classroom with that name already exists: " + dto.name());
+            throw new DomainException(ErrorCode.CLASSROOM_NAME_TAKEN, "A classroom with that name already exists: " + dto.name());
 
         Classroom classroom = classroomMapper.toEntity(dto);
 
         if (dto.linkedRoomUuid() != null) {
             Classroom linked = classroomRepository.findByUuid(dto.linkedRoomUuid())
-                .orElseThrow(() -> new ResourceNotFoundException("Linked classroom not found: " + dto.linkedRoomUuid()));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Linked classroom not found: " + dto.linkedRoomUuid()));
             assertNoCycle(classroom, linked);
             classroom.setLinkedRoom(linked);
         }
@@ -172,19 +173,19 @@ public class ClassroomService {
     @Transactional(rollbackFor = Exception.class)
     public ClassroomResponseDTO update(UUID uuid, ClassroomRequestDTO dto) {
         if (uuid == null)
-            throw new DomainException("Classroom UUID is required to perform an update");
+            throw new DomainException(ErrorCode.INVALID_PARAMETERS, "Classroom UUID is required to perform an update");
 
         Classroom classroom = classroomRepository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + uuid));
 
         if (!classroom.getName().equals(dto.name()) && classroomRepository.findByName(dto.name()).isPresent())
-            throw new DomainException("A classroom with that name already exists: " + dto.name());
+            throw new DomainException(ErrorCode.CLASSROOM_NAME_TAKEN, "A classroom with that name already exists: " + dto.name());
 
         classroomMapper.updateEntityFromDto(dto, classroom);
 
         if (dto.linkedRoomUuid() != null) {
             Classroom linked = classroomRepository.findByUuid(dto.linkedRoomUuid())
-                .orElseThrow(() -> new ResourceNotFoundException("Linked classroom not found: " + dto.linkedRoomUuid()));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Linked classroom not found: " + dto.linkedRoomUuid()));
             assertNoCycle(classroom, linked);
             classroom.setLinkedRoom(linked);
         }
@@ -222,10 +223,10 @@ public class ClassroomService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(UUID uuid) {
         if (uuid == null)
-            throw new DomainException("Classroom UUID is required to perform a deletion");
+            throw new DomainException(ErrorCode.INVALID_PARAMETERS, "Classroom UUID is required to perform a deletion");
 
         Classroom classroom = classroomRepository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + uuid));
         Long id = classroom.getId();
 
         // 1. Snapshot affected groups before we delete their instances.
@@ -279,10 +280,10 @@ public class ClassroomService {
     @Transactional(rollbackFor = Exception.class)
     public ClassroomResponseDTO toggleStatus(UUID uuid) {
         if (uuid == null)
-            throw new DomainException("Classroom UUID is required to toggle its status");
+            throw new DomainException(ErrorCode.INVALID_PARAMETERS, "Classroom UUID is required to toggle its status");
 
         Classroom classroom = classroomRepository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + uuid));
 
         classroom.setIsActive(!Boolean.TRUE.equals(classroom.getIsActive()));
         return classroomMapper.toDto(classroomRepository.save(classroom));
@@ -319,7 +320,7 @@ public class ClassroomService {
     @Transactional(rollbackFor = Exception.class)
     public void setChildren(UUID parentUuid, List<UUID> childUuids) {
         Classroom parent = classroomRepository.findByUuid(parentUuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + parentUuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + parentUuid));
 
         // Deduplicate the desired set silently.
         Set<UUID> distinct = new HashSet<>(childUuids);
@@ -327,7 +328,7 @@ public class ClassroomService {
         // Bulk-fetch desired children in one query (O(1) round-trips, not O(N)).
         List<Classroom> desired = classroomRepository.findAllByUuidIn(distinct);
         if (desired.size() != distinct.size())
-            throw new DomainException("One or more child UUIDs do not exist or were not found");
+            throw new DomainException(ErrorCode.CLASSROOM_CHILDREN_NOT_FOUND, "One or more child UUIDs do not exist or were not found");
 
         // Precompute ancestor-id set once; each per-child cycle check is then O(1).
         Set<Long> ancestorIds = collectAncestorIds(parent);
@@ -335,10 +336,10 @@ public class ClassroomService {
         // Validate each desired child in-memory (no additional DB round-trips).
         for (Classroom child : desired) {
             if (!Boolean.TRUE.equals(child.getIsActive()))
-                throw new DomainException(
+                throw new DomainException(ErrorCode.CLASSROOM_CHILD_INACTIVE,
                     "Child classroom is not active: " + child.getUuid());
             if (ancestorIds.contains(child.getId()))
-                throw new DomainException(
+                throw new DomainException(ErrorCode.CLASSROOM_CYCLE_DETECTED,
                     "Linking " + child.getName() + " to " + parent.getName()
                     + " would create a cycle in the parent chain");
             child.setLinkedRoom(parent);
@@ -376,7 +377,7 @@ public class ClassroomService {
         Classroom cursor = linked;
         while (cursor != null) {
             if (cursor.getId() != null && cursor.getId().equals(target.getId()))
-                throw new DomainException(
+                throw new DomainException(ErrorCode.CLASSROOM_CYCLE_DETECTED,
                     "Linked room creates a cycle in the parent chain: " + target.getName());
             cursor = cursor.getLinkedRoom();
         }

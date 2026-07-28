@@ -1,6 +1,7 @@
 package mx.unam.icf.aulas.kernel.infrastructure.exceptions;
 
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 
 /**
  * Exception thrown when the application fails to write or read a file through
@@ -16,19 +17,21 @@ public class FileStorageException extends DomainException {
     /**
      * Creates a new file storage exception with a message.
      *
-     * @param message the error message
+     * @param code the stable error identifier the client resolves to a user-facing message
+     * @param message the error message (logs/debugging only)
      */
-    public FileStorageException(String message) {
-        super(message);
+    public FileStorageException(ErrorCode code, String message) {
+        super(code, message);
     }
 
     /**
      * Creates a new file storage exception with a message and cause (typically an {@link java.io.IOException}).
      *
-     * @param message the error message
+     * @param code the stable error identifier the client resolves to a user-facing message
+     * @param message the error message (logs/debugging only)
      * @param cause   the original cause
      */
-    public FileStorageException(String message, Throwable cause) {
-        super(message, cause);
+    public FileStorageException(ErrorCode code, String message, Throwable cause) {
+        super(code, message, cause);
     }
 }

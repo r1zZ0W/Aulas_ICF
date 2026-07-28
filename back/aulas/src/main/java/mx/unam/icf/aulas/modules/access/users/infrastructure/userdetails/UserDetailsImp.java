@@ -16,7 +16,7 @@ import java.util.UUID;
  *
  * <p>The public {@link UUID} is used as the user identifier throughout the API surface;
  * the internal numeric ID is intentionally kept private and never exposed to clients.
- * The granted authority is derived from the role name (e.g. {@code ROLE_MAESTRO}),
+ * The granted authority is derived from the role name (e.g. {@code ROLE_TEACHER}),
  * not from the numeric role ID, to keep authorization rules readable.</p>
  */
 @Getter
@@ -40,7 +40,7 @@ public class UserDetailsImp implements UserDetails {
     /** Concatenation of firstName and lastNames, embedded in the JWT for display purposes. */
     private final String nombreCompleto;
 
-    /** Role name (e.g. "MAESTRO", "ADMIN") used to build the {@link GrantedAuthority}. */
+    /** Role name (e.g. "TEACHER", "ADMIN") used to build the {@link GrantedAuthority}. */
     private final String roleName;
 
     private final Collection<? extends GrantedAuthority> authorities;

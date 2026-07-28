@@ -23,7 +23,10 @@ export const UserUpdateSchema = z.object({
     .max(50, 'El usuario debe tener menos de 50 caracteres')
     .regex(USERNAME_REGEX, 'Solo letras, números, puntos, guiones y guiones bajos'),
   email: z.string().email('Correo electrónico no válido'),
-  roleId: z.number().int().positive('El rol es requerido'),
+  roleId: z
+    .number({ error: 'Selecciona un rol' })
+    .int('Selecciona un rol')
+    .positive('El rol es requerido'),
   password: z
     .string()
     .min(8, 'La contraseña debe tener al menos 8 caracteres')

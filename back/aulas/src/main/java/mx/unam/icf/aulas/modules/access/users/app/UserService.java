@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.access.users.app;
 
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.kernel.infrastructure.services.NotificationService;
 import mx.unam.icf.aulas.kernel.infrastructure.web.paging.PageCriteriaArgumentResolver;
@@ -38,7 +39,7 @@ import java.util.UUID;
  *
  * <p>On registration (DFR §3.1):</p>
  * <ul>
- *   <li>The role defaults to {@code MAESTRO} when {@code roleId} is omitted.</li>
+ *   <li>The role defaults to {@code TEACHER} when {@code roleId} is omitted.</li>
  *   <li>A unique {@code matricula} is auto-generated in the format {@code ICF<yyyy><5 digits>}.</li>
  *   <li>An HTML email with credentials is sent to the new user's institutional address (best-effort).</li>
  * </ul>
@@ -64,7 +65,7 @@ public class UserService {
     /**
      * Registers a new user account. Restricted to ADMIN role.
      *
-     * <p>When {@code roleId} is {@code null}, the system defaults the role to {@code MAESTRO} (DFR §3.1).
+     * <p>When {@code roleId} is {@code null}, the system defaults the role to {@code TEACHER} (DFR §3.1).
      * A unique matrícula is generated automatically. Credentials are sent by email after save.</p>
      *
      * @param request registration payload
@@ -74,19 +75,19 @@ public class UserService {
     @Transactional(rollbackFor = Exception.class)
     public void save(RegisterRequestDTO request) {
         if (userRepository.findByEmailIgnoreCase(request.email()).isPresent())
-            throw new DomainException("Email is already registered");
+            throw new DomainException(ErrorCode.USER_EMAIL_TAKEN, "Email is already registered");
 
         if (userRepository.findByUsernameIgnoreCase(request.username()).isPresent())
-            throw new DomainException("Username is already registered");
+            throw new DomainException(ErrorCode.USER_USERNAME_TAKEN, "Username is already registered");
 
         Role role;
         if (request.roleId() == null) {
-            // DFR §3.1: default role is MAESTRO
-            role = roleRepository.findByName("MAESTRO")
-                .orElseThrow(() -> new ResourceNotFoundException("Default role MAESTRO not found — ensure seed migration V4 has run"));
+            // DFR §3.1: default role is TEACHER
+            role = roleRepository.findByName("TEACHER")
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.ROLE_NOT_FOUND, "Default role TEACHER not found — ensure R__reference_data.sql has run"));
         } else {
             role = roleRepository.findById(request.roleId())
-                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + request.roleId()));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.ROLE_NOT_FOUND, "Role not found: " + request.roleId()));
         }
 
         User user = new User();
@@ -170,7 +171,7 @@ public class UserService {
     public UserResponseDTO findByUuid(UUID uuid) {
         return userMapper.toDto(
             userRepository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uuid))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + uuid))
         );
     }
 
@@ -192,18 +193,18 @@ public class UserService {
     @Transactional(rollbackFor = Exception.class)
     public UserResponseDTO update(UUID uuid, UserUpdateRequestDTO dto, UUID currentUserUuid) {
         if (uuid.equals(currentUserUuid))
-            throw new DomainException("Administrators cannot modify their own role or active status via this endpoint; use PUT /me for self-service edits");
+            throw new DomainException(ErrorCode.USER_SELF_ROLE_EDIT_FORBIDDEN, "Administrators cannot modify their own role or active status via this endpoint; use PUT /me for self-service edits");
 
         User user = userRepository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + uuid));
 
         if (!user.getEmail().equalsIgnoreCase(dto.email())
                 && userRepository.findByEmailIgnoreCase(dto.email()).isPresent())
-            throw new DomainException("Email is already registered: " + dto.email());
+            throw new DomainException(ErrorCode.USER_EMAIL_TAKEN, "Email is already registered: " + dto.email());
 
         if (!user.getUsername().equalsIgnoreCase(dto.username())
                 && userRepository.findByUsernameIgnoreCase(dto.username()).isPresent())
-            throw new DomainException("Username is already registered: " + dto.username());
+            throw new DomainException(ErrorCode.USER_USERNAME_TAKEN, "Username is already registered: " + dto.username());
 
 
         if (dto.firstName() != null)
@@ -222,7 +223,7 @@ public class UserService {
             user.setPasswordHash(passwordEncoder.encode(dto.password()));
 
         Role role = roleRepository.findById(dto.roleId())
-            .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + dto.roleId()));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.ROLE_NOT_FOUND, "Role not found: " + dto.roleId()));
 
         user.setRole(role);
 
@@ -253,10 +254,10 @@ public class UserService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(UUID uuid, UUID currentUserUuid) {
         if (uuid.equals(currentUserUuid))
-            throw new DomainException("You cannot delete your own account");
+            throw new DomainException(ErrorCode.USER_CANNOT_DELETE_SELF, "You cannot delete your own account");
 
         User user = userRepository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + uuid));
 
         // 1. Slots (references instance_id + denormalized user_id)
         reservSlotRepository.deleteAllByUserId(user.getId());
@@ -286,7 +287,7 @@ public class UserService {
     @Transactional(rollbackFor = Exception.class)
     public UserResponseDTO selfEdit(UUID uuid, UserSelfEditRequestDTO dto) {
         User user = userRepository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + uuid));
 
         if (dto.firstName() != null)
             user.setFirstName(dto.firstName());
@@ -297,14 +298,14 @@ public class UserService {
         if (dto.username() != null && !dto.username().isBlank()) {
             if (!user.getUsername().equalsIgnoreCase(dto.username())
                     && userRepository.findByUsernameIgnoreCase(dto.username()).isPresent())
-                throw new DomainException("Username is already registered: " + dto.username());
+                throw new DomainException(ErrorCode.USER_USERNAME_TAKEN, "Username is already registered: " + dto.username());
             user.setUsername(dto.username());
         }
 
         if (dto.email() != null && !dto.email().isBlank()) {
             if (!user.getEmail().equalsIgnoreCase(dto.email())
                     && userRepository.findByEmailIgnoreCase(dto.email()).isPresent())
-                throw new DomainException("Email is already registered: " + dto.email());
+                throw new DomainException(ErrorCode.USER_EMAIL_TAKEN, "Email is already registered: " + dto.email());
             user.setEmail(dto.email());
         }
 
@@ -313,7 +314,7 @@ public class UserService {
 
         if (dto.password() != null && !dto.password().isBlank()) {
             if (!"ADMIN".equalsIgnoreCase(user.getRole().getName())) {
-                throw new DomainException("Only administrators can change passwords from this profile");
+                throw new DomainException(ErrorCode.USER_PASSWORD_CHANGE_FORBIDDEN, "Only administrators can change passwords from this profile");
             }
             user.setPasswordHash(passwordEncoder.encode(dto.password()));
         }
@@ -332,7 +333,7 @@ public class UserService {
     @Transactional(rollbackFor = Exception.class)
     public void updatePassword(UUID uuid, String rawPassword) {
         User user = userRepository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + uuid));
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         userRepository.save(user);
     }
@@ -353,6 +354,6 @@ public class UserService {
             if (userRepository.findByInstitutionalId(candidate).isEmpty())
                 return candidate;
         }
-        throw new DomainException("Could not generate a unique matricula; please try again");
+        throw new DomainException(ErrorCode.USER_MATRICULA_GENERATION_FAILED, "Could not generate a unique matricula; please try again");
     }
 }

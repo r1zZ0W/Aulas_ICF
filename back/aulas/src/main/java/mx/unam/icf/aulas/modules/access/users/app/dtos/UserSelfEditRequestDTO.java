@@ -20,25 +20,25 @@ import jakarta.validation.constraints.Size;
  */
 public record UserSelfEditRequestDTO(
 
-        @jakarta.validation.constraints.NotBlank(message = "First name is required")
-        @Size(max = 100, message = "First name must be at most 100 characters")
+        @jakarta.validation.constraints.NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         String firstName,
 
-        @jakarta.validation.constraints.NotBlank(message = "Last names are required")
-        @Size(max = 100, message = "Last names must be at most 100 characters")
+        @jakarta.validation.constraints.NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         String lastNames,
 
-        @jakarta.validation.constraints.NotBlank(message = "Username is required")
-        @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
+        @jakarta.validation.constraints.NotBlank(message = "FIELD_REQUIRED")
+        @Size(min = 3, max = 50, message = "FIELD_OUT_OF_RANGE")
         String username,
 
-        @jakarta.validation.constraints.NotBlank(message = "Email is required")
-        @jakarta.validation.constraints.Email(message = "Invalid email format")
+        @jakarta.validation.constraints.NotBlank(message = "FIELD_REQUIRED")
+        @jakarta.validation.constraints.Email(message = "FIELD_INVALID_FORMAT")
         String email,
 
-        @Size(max = 20, message = "Extension must be at most 20 characters")
+        @Size(max = 20, message = "FIELD_OUT_OF_RANGE")
         String extension,
 
-        @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
+        @Size(min = 8, max = 128, message = "FIELD_OUT_OF_RANGE")
         String password
 ) {}

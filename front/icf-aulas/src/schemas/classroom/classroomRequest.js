@@ -15,8 +15,8 @@ export const ClassroomRequestSchema = z.object({
     .max(100, 'El nombre debe tener menos de 100 caracteres'),
 
   capacity: z
-    .number()
-    .int()
+    .number({ error: 'La capacidad debe ser un número' })
+    .int('La capacidad debe ser un número entero')
     .min(1, 'La capacidad debe ser al menos 1')
     .max(500, 'La capacidad máxima admitida es de 500 personas'),
 

@@ -3,13 +3,8 @@ package mx.unam.icf.aulas.modules.reports.infrastructure;
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.infrastructure.web.controllers.ResponseHandler;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
-import mx.unam.icf.aulas.modules.reports.app.ReportPeriod;
-import mx.unam.icf.aulas.modules.reports.app.ReservationReportService;
 import mx.unam.icf.aulas.modules.reports.app.ReservationStatisticsService;
 import mx.unam.icf.aulas.modules.reports.app.dtos.ReservationStatisticsDTO;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,62 +12,30 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * REST controller for reservation reports and statistics.
+ * REST controller for reservation statistics.
  *
  * <p>All endpoints are restricted to the {@code ADMIN} role. Exposed under
  * {@code /api/v1/reports}.</p>
  *
  * <ul>
- *   <li>{@code GET /reservations} — generates and streams a PDF report for a given month.</li>
  *   <li>{@code GET /statistics} — returns aggregated JSON statistics for the dashboard.</li>
  *   <li>{@code GET /available-months} — returns the {@code yyyy-MM} months that have at least
  *       one active reservation, for the MONTHLY scope's period dropdown.</li>
  * </ul>
+ *
+ * <p>PDF export of the "Reportes y Estadísticas" dashboard is generated client-side from
+ * this same statistics data (see the frontend's {@code exportStatisticsPdf.js}); there is
+ * no server-rendered PDF endpoint.</p>
  */
 @RestController
 @RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor
 public class ReportController implements ResponseHandler {
 
-    private final ReservationReportService     reportService;
     private final ReservationStatisticsService statisticsService;
-
-    /**
-     * Generates and downloads a PDF report of active reservations for the requested period.
-     *
-     * <p>{@code GET /api/v1/reports/reservations?period=CURRENT_MONTH|PREVIOUS_MONTH[&classroomUuid=...]}</p>
-     *
-     * @param period        report period; defaults to {@code CURRENT_MONTH} when omitted
-     * @param classroomUuid optional UUID to filter by a specific classroom; omit for all classrooms
-     * @return PDF bytes as {@code application/pdf} with a {@code Content-Disposition: attachment} header
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping(value = "/reservations", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> reservationReport(
-            @RequestParam(defaultValue = "CURRENT_MONTH") ReportPeriod period,
-            @RequestParam(required = false) java.util.UUID classroomUuid) {
-
-        byte[] pdf = reportService.generatePdf(period, classroomUuid);
-
-        YearMonth month = period == ReportPeriod.PREVIOUS_MONTH
-                ? YearMonth.now().minusMonths(1)
-                : YearMonth.now();
-
-        String filename = "reporte-reservas-" + month.format(DateTimeFormatter.ofPattern("yyyy-MM")) + ".pdf";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
-
-        return ResponseEntity.ok()
-                .headers(headers)
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(pdf);
-    }
 
     /**
      * Returns aggregated statistics for the "Reportes y Estadísticas" dashboard.

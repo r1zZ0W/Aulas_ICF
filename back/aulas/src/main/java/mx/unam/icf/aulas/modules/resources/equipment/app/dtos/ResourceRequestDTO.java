@@ -17,14 +17,14 @@ import jakarta.validation.constraints.Size;
  */
 public record ResourceRequestDTO(
 
-        @NotBlank(message = "Name is required")
-        @Size(max = 50, message = "Name must be at most 50 characters")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 50, message = "FIELD_OUT_OF_RANGE")
         String name,
 
-        @Size(max = 255, message = "Description must be at most 255 characters")
+        @Size(max = 255, message = "FIELD_OUT_OF_RANGE")
         String description,
 
-        @NotNull(message = "Quantity is required")
-        @Min(value = 1, message = "Quantity must be at least 1")
+        @NotNull(message = "FIELD_REQUIRED")
+        @Min(value = 1, message = "FIELD_OUT_OF_RANGE")
         Integer quantity
 ) {}

@@ -7,13 +7,14 @@
  *    the backend generates every date occurrence atomically.
  *  - Dates are always exchanged as plain YYYY-MM-DD strings — never ISO UTC timestamps —
  *    to avoid timezone-shift bugs when constructing Date objects later.
- *  - 409 Conflict responses carry a structured `{ date, timeSlotId }` payload; the error
- *    message is humanised here (in the API layer) so all callers get a ready-to-toast string.
+ *  - 409 Conflict responses carry a structured `{ date, timeSlotId }` payload; 422 roster
+ *    failures carry `{ expected, actual }` or `{ row, value }`. All three are humanized by
+ *    `resolveApiError` (via ERROR_CATALOG's structured-payload branch), not duplicated here.
  *  - Paginated list functions (`getReservations`, `getReservationsByUser`) return the raw
  *    PagedResultDTO shape so `parsePageResponse` (queryUtils) can extract items/totalPages.
  */
 import { z } from 'zod';
-import { createApiClient, HttpError } from './base.js';
+import { createApiClient } from './base.js';
 import {
   ReservInstanceResponseSchema,
   BookingRequestSchema,
@@ -21,28 +22,9 @@ import {
   StudentResponseSchema,
 } from '../schemas/reservation.js';
 import { buildPageParams } from '../utils/queryUtils.js';
+import { assertValidRequestPayload } from '../errors/resolveApiError.js';
 
 const api = createApiClient();
-
-/**
- * Resolves an error message based on the HTTP status code.
- * @param {HttpError} error
- * @param {Object} overrides
- * @returns {string}
- */
-function resolveErrorMessage(error, overrides = {}) {
-  if (overrides[error.status]) return overrides[error.status];
-  const serverMessage = error.data?.message;
-  const defaults = {
-    0: 'No se pudo conectar con el servidor. Verifica tu conexión.',
-    400: serverMessage || 'Los datos enviados no son válidos.',
-    401: 'No autorizado.',
-    403: 'No tienes permisos para realizar esta acción.',
-    404: 'La reserva solicitada no existe.',
-    500: serverMessage || 'Error interno del servidor. Intenta de nuevo más tarde.',
-  };
-  return defaults[error.status] || serverMessage || `Error inesperado (${error.status}).`;
-}
 
 /**
  * Returns a paginated list of all reservation instances (admin use).
@@ -52,21 +34,13 @@ function resolveErrorMessage(error, overrides = {}) {
  * Returns the raw API response so `parsePageResponse` can extract items/totalPages.
  *
  * @param {{ page?: number, size?: number, sort?: string, direction?: string, search?: string, status?: string, reassigned?: boolean, classroomId?: string, from?: string, to?: string }} [params={}]
- * @returns {Promise<object>} Raw API response containing `data.items`, `data.totalPages`, etc.
+ * @returns {Promise<object>} Raw API response containing `items`, `totalPages`, etc.
  */
 export async function getReservations({ page, size, sort = 'date', direction = 'desc', search, status, reassigned, classroomId, from, to } = {}) {
-  try {
-    const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, classroomId, from, to });
-    const { data } = await api.get(`/api/v1/reservations${qs}`);
-    // Validate each item in the page without stripping the envelope
-    if (Array.isArray(data?.data?.items)) {
-      data.data.items = z.array(ReservInstanceResponseSchema).parse(data.data.items);
-    }
-    return data;
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, classroomId, from, to });
+  const pageResult = await api.getValidated(`/api/v1/reservations${qs}`);
+  if (Array.isArray(pageResult?.items)) pageResult.items = z.array(ReservInstanceResponseSchema).parse(pageResult.items);
+  return pageResult;
 }
 
 /**
@@ -79,22 +53,15 @@ export async function getReservations({ page, size, sort = 'date', direction = '
  *
  * @param {string} userUuid
  * @param {{ page?: number, size?: number, sort?: string, direction?: string, search?: string, status?: string, reassigned?: boolean, classroomId?: string, from?: string, to?: string }} [params={}]
- * @returns {Promise<object>} Raw API response containing `data.items`, `data.totalPages`, etc.
+ * @returns {Promise<object>} Raw API response containing `items`, `totalPages`, etc.
  */
 export async function getReservationsByUser(userUuid, { page, size, sort = 'date', direction = 'desc', search, status, reassigned, classroomId, from, to } = {}) {
-  try {
-    const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, classroomId, from, to });
-    const { data } = await api.get(`/api/v1/reservations/user/${userUuid}${qs}`);
-    if (Array.isArray(data?.data?.items)) {
-      data.data.items = z.array(ReservInstanceResponseSchema).parse(data.data.items);
-    }
-    return data;
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error, {
-      403: 'Solo puedes consultar tu propio historial de reservas.',
-    }));
-    throw error;
-  }
+  const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, classroomId, from, to });
+  const pageResult = await api.getValidated(`/api/v1/reservations/user/${userUuid}${qs}`, {
+    overrides: { ACCESS_DENIED: 'Solo puedes consultar tu propio historial de reservas.' },
+  });
+  if (Array.isArray(pageResult?.items)) pageResult.items = z.array(ReservInstanceResponseSchema).parse(pageResult.items);
+  return pageResult;
 }
 
 /**
@@ -106,15 +73,11 @@ export async function getReservationsByUser(userUuid, { page, size, sort = 'date
  * @returns {Promise<object[]>} Array of ReservInstanceResponseDTO objects
  */
 export async function getAvailability({ from, to, classroomUuid } = {}) {
-  try {
-    const params = new URLSearchParams({ from, to });
-    if (classroomUuid) params.set('classroomUuid', classroomUuid);
-    const { data } = await api.get(`/api/v1/reservations/availability?${params}`);
-    return z.array(ReservInstanceResponseSchema).parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  const params = new URLSearchParams({ from, to });
+  if (classroomUuid) params.set('classroomUuid', classroomUuid);
+  return api.getValidated(`/api/v1/reservations/availability?${params}`, {
+    schema: z.array(ReservInstanceResponseSchema),
+  });
 }
 
 /**
@@ -129,58 +92,25 @@ export async function getAvailability({ from, to, classroomUuid } = {}) {
  * that the row count equals `attendeeCount`) before creating anything. `base.js` detects
  * the FormData body and lets the browser set the multipart boundary header.
  *
- * On 409 Conflict the backend returns `{ data: { date, timeSlotId } }`;
- * on 422 it returns either `{ expected, actual }` (count mismatch) or `{ row, value }`
- * (duplicate/empty roster) — each is formatted here as a human-readable message.
+ * `payload` is built by the caller from transformed form state (`labelsToTimeSlotIds`, etc.),
+ * not a straight pass-through of what `useZodForm` already validated, so it's the one payload
+ * in this module still worth validating client-side — see `assertValidRequestPayload`.
  *
  * @param {object} payload - Matches BookingRequestSchema
  * @param {File}   file    - The roster .xlsx selected by the user
  * @returns {Promise<object[]>} Array of created ReservInstanceResponseDTO objects
  */
 export async function createBooking(payload, file) {
-  try {
-    const body = BookingRequestSchema.parse(payload);
+  const body = assertValidRequestPayload(BookingRequestSchema, payload);
 
-    const formData = new FormData();
-    formData.append('data', new Blob([JSON.stringify(body)], { type: 'application/json' }));
-    formData.append('file', file);
+  const formData = new FormData();
+  formData.append('data', new Blob([JSON.stringify(body)], { type: 'application/json' }));
+  formData.append('file', file);
 
-    const { data } = await api.post('/api/v1/reservations/booking', formData);
-    return z.array(ReservInstanceResponseSchema).parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      // 409: structured conflict payload → friendly message
-      if (error.status === 409 && error.data?.data) {
-        const { date, timeSlotId } = error.data.data;
-        throw new Error(
-          `Ya existe una reserva el ${date} en el bloque de horario ${timeSlotId}. ` +
-          'Elige otro horario o fecha.'
-        );
-      }
-      // 422: roster validation — count mismatch carries { expected, actual },
-      // duplicate/empty carries { row, value }
-      if (error.status === 422) {
-        const detail = error.data?.data;
-        if (detail && typeof detail.expected === 'number') {
-          throw new Error(
-            `El Excel tiene ${detail.actual} alumnos pero indicaste ${detail.expected} asistentes. ` +
-            'Corrige la lista o el número de asistentes.'
-          );
-        }
-        if (detail?.row != null) {
-          throw new Error(
-            `El alumno "${detail.value}" está repetido en la fila ${detail.row} del Excel.`
-          );
-        }
-        throw new Error('La lista de alumnos está vacía o no es válida.');
-      }
-      throw new Error(resolveErrorMessage(error, {
-        400: error.data?.message || 'Los datos enviados no son válidos.',
-        413: 'El archivo excede el tamaño máximo permitido (1 MB).',
-      }));
-    }
-    throw error;
-  }
+  return api.postValidated('/api/v1/reservations/booking', formData, {
+    schema: z.array(ReservInstanceResponseSchema),
+    overrides: { FILE_TOO_LARGE: 'El archivo excede el tamaño máximo permitido (1 MB).' },
+  });
 }
 
 /**
@@ -191,16 +121,10 @@ export async function createBooking(payload, file) {
  * @returns {Promise<object>} Updated ReservInstanceResponseDTO
  */
 export async function cancelReservation(uuid) {
-  try {
-    const { data } = await api.patch(`/api/v1/reservations/${uuid}/cancel`);
-    return ReservInstanceResponseSchema.parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error, {
-      403: 'Solo puedes cancelar tus propias reservas.',
-      400: error.data?.message || 'La reserva no puede ser cancelada.',
-    }));
-    throw error;
-  }
+  return api.patchValidated(`/api/v1/reservations/${uuid}/cancel`, undefined, {
+    schema: ReservInstanceResponseSchema,
+    overrides: { ACCESS_DENIED: 'Solo puedes cancelar tus propias reservas.' },
+  });
 }
 
 /**
@@ -211,37 +135,28 @@ export async function cancelReservation(uuid) {
  * @returns {Promise<object>} Updated ReservInstanceResponseDTO
  */
 export async function cancelReservationAdmin(uuid) {
-  try {
-    const { data } = await api.patch(`/api/v1/reservations/${uuid}/cancel-admin`);
-    return ReservInstanceResponseSchema.parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error, {
-      400: error.data?.message || 'La reserva no puede ser cancelada.',
-    }));
-    throw error;
-  }
+  return api.patchValidated(`/api/v1/reservations/${uuid}/cancel-admin`, undefined, {
+    schema: ReservInstanceResponseSchema,
+  });
 }
 
 /**
  * Reassigns an active reservation to a different classroom and/or time-slot block. ADMIN only.
  * PATCH /api/v1/reservations/{uuid}/reassign
  *
+ * `payload` comes from `ReasignarModal`'s own form state (`ReasignFormSchema`, not
+ * `ReassignRequestSchema`) transformed into the request shape — nothing else validates the
+ * transformed result, so it's kept here too.
+ *
  * @param {string} uuid    - Public UUID of the reservation instance
  * @param {object} payload - Matches ReassignRequestSchema
  * @returns {Promise<object>} Updated ReservInstanceResponseDTO
  */
 export async function reassignReservation(uuid, payload) {
-  try {
-    const body = ReassignRequestSchema.parse(payload);
-    const { data } = await api.patch(`/api/v1/reservations/${uuid}/reassign`, body);
-    return ReservInstanceResponseSchema.parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error, {
-      400: error.data?.message || 'La reasignación no es válida.',
-      409: error.data?.message || 'El aula o horario destino ya está ocupado.',
-    }));
-    throw error;
-  }
+  const body = assertValidRequestPayload(ReassignRequestSchema, payload);
+  return api.patchValidated(`/api/v1/reservations/${uuid}/reassign`, body, {
+    schema: ReservInstanceResponseSchema,
+  });
 }
 
 /**
@@ -258,13 +173,8 @@ export async function reassignReservation(uuid, payload) {
  * @returns {Promise<object[]>} Array of { firstName, lastName, email }
  */
 export async function getReservationStudents(groupUuid) {
-  try {
-    const { data } = await api.get(`/api/v1/reservations/groups/${groupUuid}/students`);
-    return z.array(StudentResponseSchema).parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error, {
-      403: 'No tienes permisos para ver la lista de estudiantes.',
-    }));
-    throw error;
-  }
+  return api.getValidated(`/api/v1/reservations/groups/${groupUuid}/students`, {
+    schema: z.array(StudentResponseSchema),
+    overrides: { ACCESS_DENIED: 'No tienes permisos para ver la lista de estudiantes.' },
+  });
 }

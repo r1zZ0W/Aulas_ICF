@@ -7,6 +7,7 @@ import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDet
 import mx.unam.icf.aulas.modules.reservations.students.app.ReservationStudentService;
 import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentUploadResponseDTO;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -136,7 +137,7 @@ public class StudentListController implements ResponseHandler {
         try {
             return file.getBytes();
         } catch (IOException e) {
-            throw new InvalidExcelFileException("Could not read the uploaded file.", e);
+            throw new InvalidExcelFileException(ErrorCode.ROSTER_FILE_UNREADABLE, "Could not read the uploaded file.", e);
         }
     }
 }

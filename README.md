@@ -194,19 +194,27 @@ cp .env.example .env
 # Edita .env: como mínimo, DB_USERNAME/DB_PASSWORD y JWT_SECRET.
 ```
 
-Spring Boot carga `back/aulas/.env` automáticamente (vía `spring.config.import` en
-`application.properties`) cuando el proceso se ejecuta con ese directorio como working
-directory. Ver todas las variables disponibles, con su propósito, en
+Spring Boot carga `back/aulas/.env` automáticamente (vía `spring.config.import`, declarado
+únicamente en `application-dev.properties`) cuando el proceso se ejecuta con ese directorio
+como working directory. Ver todas las variables disponibles, con su propósito, en
 [`back/aulas/.env.example`](back/aulas/.env.example).
+
+> **Nunca pongas `SPRING_PROFILES_ACTIVE` dentro de `.env`.** Declarar un perfil desde un
+> archivo importado vía `spring.config.import` entra en conflicto con la resolución de
+> perfiles que Spring Boot ya tiene en curso y el arranque falla. El perfil se elige con una
+> variable de entorno real del sistema operativo o con `--spring.profiles.active`, nunca
+> desde este archivo. Si el backend deja de arrancar en local justo después de tocar el
+> `.env`, esto es lo primero a revisar.
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Por defecto corre con el perfil `dev` (`spring.profiles.active=${SPRING_PROFILES_ACTIVE:dev}`),
-que activa un JWT secret de desarrollo y un admin sembrado (`Admin@12345!`,
-`admin@icf.unam.mx`) contra una base de datos con `ddl-auto=update` (Hibernate crea/altera
-las tablas automáticamente). **Esto es solo para desarrollo local** — ver
+Por defecto corre con el perfil `dev` (`spring.profiles.default=dev`), que activa un JWT
+secret de desarrollo y un admin sembrado (`Admin@12345!`, `admin@icf.unam.mx`). El esquema
+de base de datos lo gestiona Flyway en ambos perfiles (ver punto 4) — Hibernate nunca crea
+ni altera tablas, solo valida que coincidan con las entidades (`ddl-auto=validate`).
+**El admin sembrado por defecto es solo para desarrollo local** — ver
 [Despliegue en producción](#despliegue-en-producción) para el flujo de producción.
 
 ### 3. Configurar el frontend
@@ -224,9 +232,9 @@ pnpm dev
 
 ### 4. Base de datos (desarrollo)
 
-En desarrollo, con el perfil `dev` y `ddl-auto=update`, Hibernate crea el esquema
-automáticamente contra una base de datos MySQL vacía — solo necesitas crearla y apuntar
-`DB_URL`/`DB_USERNAME`/`DB_PASSWORD` en tu `.env`:
+Solo necesitas crear una base de datos MySQL vacía y apuntar `DB_USERNAME`/`DB_PASSWORD` en
+tu `.env` — Flyway se encarga del resto (schema + catálogos de roles/horarios) en el primer
+arranque:
 
 ```sql
 CREATE DATABASE test_aulas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -237,42 +245,87 @@ CREATE DATABASE test_aulas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ## Despliegue en producción
 
 Producción usa el perfil `prod` (`SPRING_PROFILES_ACTIVE=prod`), que difiere de `dev` en
-varios puntos deliberados: `ddl-auto=validate` (Hibernate nunca altera el esquema en
-producción), Swagger/OpenAPI deshabilitado, sin admin sembrado por defecto (debe
-provisionarse explícitamente), y sin lazy-initialization (falla rápido en el arranque si hay
-un error de wiring, en vez de ocultarlo hasta la primera petición).
+varios puntos deliberados: Swagger/OpenAPI deshabilitado, sin admin sembrado por defecto
+(debe provisionarse explícitamente), sin lazy-initialization (falla rápido en el arranque si
+hay un error de wiring, en vez de ocultarlo hasta la primera petición), y sin ningún valor
+por defecto en las variables sensibles — si falta una, la aplicación **no arranca**, en vez
+de arrancar con una configuración insegura o a medias.
 
-### 1. Base de datos: aplicar el esquema base
+### 0. Requisitos del servidor (pre-flight)
 
-Con `ddl-auto=validate`, la aplicación **no crea el esquema** — debe existir de antemano.
-Sobre una base de datos vacía, aplica una sola vez:
+Tres dependencias de infraestructura que viven fuera de este repositorio. Si no se cumplen,
+el despliegue falla o se degrada de formas poco obvias:
 
-```bash
-mysql -u <usuario> -p <base_de_datos> < back/aulas/docs/migration_v1.0__baseline.sql
-```
+1. **Versión del motor de base de datos.** Confirma con `SELECT VERSION();` antes de
+   desplegar. La migración inicial (`V1__initial_schema.sql`) no fija ninguna collation
+   explícita, así que funciona igual sobre MySQL 5.7, MySQL 8.x o MariaDB — la collation
+   efectiva la decide el `CREATE DATABASE`:
+   ```sql
+   CREATE DATABASE aulas_icf CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+   `utf8mb4_unicode_ci` existe en las tres variantes. Si el servidor es MySQL 8.0+,
+   `utf8mb4_0900_ai_ci` también sirve.
 
-Este script crea todas las tablas, el catálogo de roles (`ADMIN`, `MAESTRO`) y el catálogo de
-horarios (`time_slots`, 1–24). No ejecutes las migraciones incrementales `v1.1`–`v1.6` ni
-`reservations-refactor.sql` después — sus cambios ya están incorporados en el baseline.
+2. **Permisos de `STORAGE_BASE_DIR`.** El directorio raíz debe existir con permisos de
+   escritura para el mismo usuario del sistema operativo que ejecuta el servicio systemd —
+   la aplicación crea las subcarpetas internas automáticamente, y desde este cambio **aborta
+   el arranque** si el directorio raíz existe pero no es escribible (en vez de fallar en
+   silencio en la primera subida de un roster, semanas después):
+   ```bash
+   sudo mkdir -p /var/lib/aulas-icf/uploads
+   sudo chown -R aulasuser:aulasuser /var/lib/aulas-icf
+   sudo chmod 750 /var/lib/aulas-icf
+   ```
+
+3. **Cabeceras de proxy en Apache2.** Ver el punto 3 más abajo — `trust-proxy` y
+   `forward-headers-strategy` dependen de que el `VirtualHost` reenvíe las cabeceras
+   correctas; si el proxy real de tu servidor es otro (nginx, Caddy, un ALB), la directriz
+   equivalente cambia mas la necesidad no.
+
+### 1. Base de datos: Flyway aplica el esquema automáticamente
+
+A diferencia de versiones anteriores de este proyecto, **no hay ningún script SQL que
+ejecutar a mano**. Con la base de datos vacía creada (paso 0.1), Flyway corre embebido en el
+arranque de la aplicación y aplica, en orden:
+
+- `V1__initial_schema.sql` — crea las 11 tablas, índices y llaves foráneas.
+- `R__reference_data.sql` — garantiza que existan los roles (`ADMIN`, `TEACHER`) y los 24
+  `time_slots` (07:00–19:00). Es una migración *repetible*: puede volver a ejecutarse si su
+  contenido cambia, pero nunca borra filas — solo inserta/actualiza.
+
+Los scripts SQL manuales usados antes de este cambio (incluido
+`migration_v1.0__baseline.sql`) se movieron a
+[`docs/legacy/`](docs/legacy/README.md) como registro histórico. **No los ejecutes** —
+usan literales de estado en español (`ACTIVA`, `CANCELADA_POR_MAESTRO`) que ya no existen en
+el código y su contenido ya está incorporado en `V1__initial_schema.sql`.
+
+**Nota operativa — MySQL no tiene DDL transaccional.** `CREATE TABLE`/`ALTER TABLE` hacen
+*implicit commit*; si `V1` fallara a la mitad, Flyway marca la migración como `failed` en
+`flyway_schema_history` y no reintenta automáticamente. Sobre una instalación nueva sin
+datos, el procedimiento de recuperación es simplemente recrear la base de datos y volver a
+arrancar — es más simple y más seguro que reparar el historial a mano.
 
 ### 2. Variables de entorno
 
 Copia [`back/aulas/.env.example`](back/aulas/.env.example) como punto de partida y define,
 como mínimo: `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`, un `JWT_SECRET` fuerte y único (nunca
 reutilices el de desarrollo), `APP_CORS_ALLOWED_ORIGINS` (el origen público real del
-frontend — solo scheme+host+puerto, sin ruta), `APP_FRONTEND_URL`, y
-`APP_SEED_ADMIN_PASSWORD`/`APP_SEED_ADMIN_EMAIL` para el primer arranque (ver punto 4).
+frontend — solo scheme+host+puerto, sin ruta), `APP_FRONTEND_URL`, `MAIL_*`,
+`APP_NOTIFICATIONS_SUPER_ADMIN_EMAIL`, y `APP_SEED_ADMIN_PASSWORD`/`APP_SEED_ADMIN_EMAIL`
+para el primer arranque (ver punto 4). Cada una de estas es un placeholder sin valor por
+defecto en `application.properties` — si falta alguna, la aplicación no arranca y el log de
+Spring cita el nombre exacto de la variable faltante.
 
-**El arranque en servidor no debe depender de dónde vive el `.env`**: `spring.config.import`
-resuelve esa ruta relativa al directorio de trabajo del proceso. En un servidor, usa en su
-lugar una de estas vías (cualquiera funciona; las variables de entorno del sistema operativo
-tienen prioridad sobre el archivo):
+**El arranque en servidor no debe depender de un `.env`**: `spring.config.import` solo está
+declarado en el perfil `dev` — en producción no existe ningún mecanismo para leer un `.env`,
+por diseño (así un archivo traspapelado en el servidor no puede degradar el perfil activo ni
+inyectar nada). En un servidor, las variables llegan por una de estas vías:
 
-- **systemd** (recomendado): `EnvironmentFile=/ruta/a/.env` en la unidad `.service`. Ver el
-  ejemplo completo más abajo.
-- **Script/CLI**: `set -a; . ./.env; set +a; java -jar aulas.jar` ejecutado desde el
-  directorio donde vive el `.env`.
-- **Variables de entorno del SO**: exportar `DB_URL`, `JWT_SECRET`, etc. directamente.
+| Estrategia | Uso recomendado |
+|---|---|
+| A. `export` en la shell | ❌ No sobrevive a reinicios ni a `systemctl restart` — no reproducible |
+| **B. systemd + `EnvironmentFile`** | ✅ **Producción.** Reproducible, permisos `640`, independiente del working directory, arranca solo en boot |
+| C. `.env` vía `spring.config.import` | ✅ Solo desarrollo — nunca cargado en el perfil `prod` |
 
 Ejemplo de unidad systemd (ajusta rutas, usuario y tamaño de heap al servidor real):
 
@@ -285,8 +338,9 @@ Wants=network-online.target
 [Service]
 User=aulasuser
 WorkingDirectory=/opt/aulas
+Environment=SPRING_PROFILES_ACTIVE=prod
 ExecStart=/usr/bin/java -Xms256m -Xmx1g -jar /opt/aulas/aulas-backend.jar
-EnvironmentFile=/opt/aulas/.env
+EnvironmentFile=/etc/aulas/aulas.env
 Restart=always
 RestartSec=5s
 
@@ -294,21 +348,21 @@ RestartSec=5s
 WantedBy=multi-user.target
 ```
 
-`-Xmx1g` (no menos): Apache POI carga el árbol DOM completo de cada `.xlsx` de lista de
-alumnos en memoria al parsearlo; con subidas concurrentes, un heap más chico arriesga
-`OutOfMemoryError`. `RestartSec=5s` evita que systemd agote sus reintentos si el primer
-arranque falla por una config incorrecta. `After=network-online.target` (no `mysql.service`):
-si MySQL corre en otra máquina, esa unidad no existe localmente.
-
-El directorio de `STORAGE_BASE_DIR` (rosters de alumnos) debe existir con permisos de
-escritura para el usuario del servicio — la aplicación crea las subcarpetas internas
-automáticamente, solo el directorio raíz necesita existir con los permisos correctos:
-
 ```bash
-sudo mkdir -p /var/lib/aulas-icf/uploads
-sudo chown -R aulasuser:aulasuser /var/lib/aulas-icf
-sudo chmod 750 /var/lib/aulas-icf
+sudo mkdir -p /etc/aulas
+sudo cp back/aulas/.env.example /etc/aulas/aulas.env
+sudo chown root:aulasuser /etc/aulas/aulas.env
+sudo chmod 640 /etc/aulas/aulas.env
+# Edita /etc/aulas/aulas.env con los valores reales de producción.
 ```
+
+El `EnvironmentFile` vive fuera de `/opt/aulas` a propósito — nunca conviva con el JAR, que
+no se modifica jamás: toda la configuración entra por el entorno. `-Xmx1g` (no menos): Apache
+POI carga el árbol DOM completo de cada `.xlsx` de lista de alumnos en memoria al parsearlo;
+con subidas concurrentes, un heap más chico arriesga `OutOfMemoryError`. `RestartSec=5s` evita
+que systemd agote sus reintentos si el primer arranque falla por una config incorrecta.
+`After=network-online.target` (no `mysql.service`): si MySQL corre en otra máquina, esa
+unidad no existe localmente.
 
 ### 3. Frontend: build de producción
 
@@ -319,45 +373,90 @@ pnpm install
 pnpm build
 ```
 
-Sirve el contenido de `dist/` con tu servidor web (Nginx, Apache, etc.). Si la aplicación se
-publica bajo un subpath (p. ej. `/salasicf/`) en vez de la raíz del dominio, además necesitas:
+**Este paso bloquea el despliegue si se salta.** Vite hornea las variables `VITE_*` dentro
+del bundle estático en tiempo de build — si `VITE_API_URL` queda en su valor de desarrollo
+(`http://localhost:8080`), el navegador de cada visitante intentará pedir datos a su propia
+máquina, no al servidor. El backend puede estar perfecto y la interfaz quedaría 100%
+inoperativa. El valor correcto depende del punto de montaje (los módulos del front ya
+incluyen `/api/v1` en su propio path, así que **no** es `/api`):
+
+| Despliegue | `VITE_API_URL` | URL resultante |
+|---|---|---|
+| Raíz del dominio (`https://aulas.fis.unam.mx`) | *(vacío)* | `/api/v1/auth/login` |
+| Subpath (`/salasicf/api/` → `:8080/api/`) | `/salasicf` | `/salasicf/api/v1/auth/login` |
+
+Si el despliegue es en la raíz, declara la variable vacía (`VITE_API_URL=`) — **omitirla** del
+todo la deja en su default de `http://localhost:8080`.
+
+Sirve el contenido de `dist/` con tu servidor web. Si la aplicación se publica bajo un
+subpath (p. ej. `/salasicf/`) en vez de la raíz del dominio, además necesitas:
 `base: '/salasicf/'` en `vite.config.js` y `<BrowserRouter basename={import.meta.env.BASE_URL}>`
 en `src/main.jsx` — sin esto, los assets se piden fuera del proxy y la SPA muestra 404/pantalla
 en blanco al refrescar subrutas.
 
-Ejemplo de bloque Nginx para un despliegue bajo subpath, con proxy al backend y paridad de
-tamaño de subida con `spring.servlet.multipart.max-request-size` (10 MB):
+La infraestructura de referencia de este despliegue es **Apache2**. Ejemplo de `VirtualHost`
+para un despliegue bajo subpath, con proxy al backend y paridad de tamaño de subida con
+`spring.servlet.multipart.max-request-size` (10 MB → 12582912 bytes con margen):
 
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name www.fis.unam.mx;
-    client_max_body_size 12M;
+```apache
+<VirtualHost *:443>
+    ServerName www.fis.unam.mx
+    LimitRequestBody 12582912
 
-    # SPA estática. Usar `root`, no `alias` — alias combinado con try_files tiene un bug
-    # histórico de Nginx (rutas duplicadas / internal redirect cycle 500).
-    location /salasicf/ {
-        root /var/www;
-        try_files $uri $uri/ /salasicf/index.html;
-    }
+    # Apache/mod_proxy_http añade X-Forwarded-For automáticamente al usar ProxyPass — no
+    # hace falta declararla. X-Forwarded-Proto SÍ hay que declararla explícitamente, o
+    # Spring reconstruye los enlaces (p. ej. de restablecimiento de contraseña) con
+    # esquema http:// en vez de https://.
+    RequestHeader set X-Forwarded-Proto "expr=%{REQUEST_SCHEME}"
 
-    location /salasicf/api/ {
-        proxy_pass http://127.0.0.1:8080/api/;  # la barra final strippea /salasicf
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+    ProxyPreserveHost On
+    ProxyPass        /salasicf/api/  http://127.0.0.1:8080/api/
+    ProxyPassReverse /salasicf/api/  http://127.0.0.1:8080/api/
+
+    Alias /salasicf /var/www/salasicf
+    <Directory /var/www/salasicf>
+        Require all granted
+        FallbackResource /salasicf/index.html
+    </Directory>
+</VirtualHost>
 ```
+
+Requiere `a2enmod proxy proxy_http headers`.
+
+> **Nota de sintaxis**: `RequestHeader set X "%{VAR}s"` en `mod_headers` referencia
+> variables de entorno de `mod_ssl`, no variables arbitrarias — usar esa forma con
+> `REQUEST_SCHEME` o `REMOTE_ADDR` produce una cadena vacía o literal. La sintaxis correcta
+> en Apache 2.4 es `"expr=%{VAR}"` (evaluación `ap_expr`), como en el bloque de arriba.
+>
+> Sobre el spoofing de `X-Forwarded-For`: `RateLimitFilter.resolveClientIp()` ya toma el
+> valor **más a la derecha** de la cabecera (el que añade el proxy de confianza, no
+> falsificable por el cliente), así que la app no es vulnerable a un `X-Forwarded-For`
+> inyectado por fuera. Como defensa en profundidad opcional, puede anteponerse
+> `RequestHeader set X-Forwarded-For "expr=%{REMOTE_ADDR}"` para descartar cualquier
+> valor inyectado antes de que `mod_proxy` anexe el real.
 
 ### 4. Primer arranque: usuario administrador
 
-Con la base de datos ya provisionada (paso 1) y `APP_SEED_ADMIN_PASSWORD`/
-`APP_SEED_ADMIN_EMAIL` definidas, `AdminSeeder` crea el primer usuario `ADMIN` automáticamente
-al arrancar la aplicación (una sola vez; es idempotente). **Tras iniciar sesión exitosamente,
-borra esas dos variables del `.env` de producción** — dejarlas significa que un futuro arranque
-contra una tabla `users` vacía (p. ej. por error) recrearía ese mismo admin con esa contraseña.
+Con la base de datos vacía (Flyway crea el schema y los roles automáticamente, paso 1) y
+`APP_SEED_ADMIN_PASSWORD`/`APP_SEED_ADMIN_EMAIL` definidas, `AdminSeeder` crea el primer
+usuario `ADMIN` automáticamente al arrancar la aplicación (una sola vez; es idempotente).
+
+**Si esas variables faltan (o la contraseña tiene menos de 12 caracteres) en un arranque
+contra una base de datos sin ningún `ADMIN`, la aplicación aborta el arranque** — no queda
+"funcionando" sin que nadie pueda entrar. Para arrancar deliberadamente sin sembrar un admin
+(p. ej. restaurando desde un backup que ya trae usuarios), usa `APP_SEED_ADMIN_ENABLED=false`.
+
+**Tras iniciar sesión exitosamente, retira esas dos variables** de
+`/etc/aulas/aulas.env` — dejarlas no aporta nada a partir de ese momento (el seeder ya no
+las vuelve a leer una vez que existe un `ADMIN`) y mantener una contraseña en texto plano en
+el servidor es riesgo sin contrapartida:
+
+```bash
+sudo sed -i '/^APP_SEED_ADMIN_PASSWORD=/d;/^APP_SEED_ADMIN_EMAIL=/d' /etc/aulas/aulas.env
+sudo systemctl restart aulas
+```
+
+El reinicio de paso confirma que la aplicación arranca sin ellas.
 
 ***
 

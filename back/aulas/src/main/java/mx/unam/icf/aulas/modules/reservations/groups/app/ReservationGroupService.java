@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.reservations.groups.app;
 
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
 import mx.unam.icf.aulas.modules.access.users.domain.User;
@@ -75,7 +76,7 @@ public class ReservationGroupService {
     public ReservationGroupResponseDTO findByUuid(UUID uuid) {
         return mapper.toDto(
             repository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Reservation group not found: " + uuid))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_GROUP_NOT_FOUND, "Reservation group not found: " + uuid))
         );
     }
 
@@ -100,10 +101,10 @@ public class ReservationGroupService {
             throw new AccessDeniedException("You can only create reservation groups for yourself");
 
         User user = userRepository.findByUuid(dto.userUuid())
-            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + dto.userUuid()));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + dto.userUuid()));
 
         Semester semester = semesterRepository.findById(dto.semesterId())
-            .orElseThrow(() -> new ResourceNotFoundException("Semester not found: " + dto.semesterId()));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.SEMESTER_NOT_FOUND, "Semester not found: " + dto.semesterId()));
 
         ReservationGroup group = mapper.toEntity(dto);
         group.setUser(user);
@@ -130,13 +131,13 @@ public class ReservationGroupService {
     @Transactional(rollbackFor = Exception.class)
     public ReservationGroupResponseDTO cancel(UUID uuid, UUID principalUuid, boolean isAdmin) {
         ReservationGroup group = repository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Reservation group not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_GROUP_NOT_FOUND, "Reservation group not found: " + uuid));
 
         if (!isAdmin && !group.getUser().getUuid().equals(principalUuid))
             throw new AccessDeniedException("You can only cancel your own reservation groups");
 
         if (group.getStatus() == ReservationGroupStatus.CANCELLED)
-            throw new DomainException("Reservation group is already cancelled");
+            throw new DomainException(ErrorCode.RESERVATION_GROUP_ALREADY_CANCELLED, "Reservation group is already cancelled");
 
         group.setStatus(ReservationGroupStatus.CANCELLED);
         return mapper.toDto(repository.save(group));

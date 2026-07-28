@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.kernel.infrastructure.web;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -28,14 +29,15 @@ public class FilterResponseWriter {
      * Provides a safe HTTP response from the server that will be displayed into the frontend without using <code>ResponseEntity<?></code>
      * @param response          what the server will respond.
      * @param status            what HTTP status it will provide.
-     * @param message           the message it will display in the JSON.
+     * @param code              the stable error identifier the client resolves to a user-facing message.
+     * @param message           a debugging message (logs only — never shown to the user as-is).
      * @throws IOException      the connection failure.
      */
-    public void writeError(HttpServletResponse response, HttpStatus status, String message)
+    public void writeError(HttpServletResponse response, HttpStatus status, ErrorCode code, String message)
             throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        objectMapper.writeValue(response.getWriter(), ApiResponse.error(message));
+        objectMapper.writeValue(response.getWriter(), ApiResponse.error(code, message));
     }
 }

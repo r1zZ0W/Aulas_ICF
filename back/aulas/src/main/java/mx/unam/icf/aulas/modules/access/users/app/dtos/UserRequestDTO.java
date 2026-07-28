@@ -22,22 +22,22 @@ import jakarta.validation.constraints.Size;
  */
 public record UserRequestDTO(
 
-        @NotBlank(message = "First name is required")
-        @Size(max = 100, message = "First name must be at most 100 characters")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         String firstName,
 
-        @NotBlank(message = "Last names are required")
-        @Size(max = 100, message = "Last names must be at most 100 characters")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         String lastNames,
 
-        @NotBlank(message = "Email is required")
-        @Email(message = "Invalid email format")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Email(message = "FIELD_INVALID_FORMAT")
         String email,
 
-        @NotBlank(message = "Password is required")
-        @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(min = 8, max = 128, message = "FIELD_OUT_OF_RANGE")
         String password,
 
-        @NotNull(message = "Role id is required")
+        @NotNull(message = "FIELD_REQUIRED")
         Long roleId
 ) {}

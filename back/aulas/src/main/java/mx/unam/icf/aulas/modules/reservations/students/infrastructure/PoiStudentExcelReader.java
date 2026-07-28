@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.reservations.students.infrastructure;
 
 import mx.unam.icf.aulas.modules.reservations.students.app.ParsedStudentRow;
 import mx.unam.icf.aulas.modules.reservations.students.app.StudentExcelReader;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
 import mx.unam.icf.aulas.modules.reservations.students.domain.Student;
 import org.apache.poi.ss.usermodel.Cell;
@@ -68,7 +69,7 @@ public class PoiStudentExcelReader implements StudentExcelReader {
         } catch (InvalidExcelFileException e) {
             throw e;
         } catch (Exception e) {
-            throw new InvalidExcelFileException("Could not read the uploaded file as a valid .xlsx workbook.", e);
+            throw new InvalidExcelFileException(ErrorCode.ROSTER_FILE_UNREADABLE, "Could not read the uploaded file as a valid .xlsx workbook.", e);
         }
     }
 

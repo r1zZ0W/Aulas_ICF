@@ -3,6 +3,7 @@ package mx.unam.icf.aulas.kernel.infrastructure.services;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import mx.unam.icf.aulas.kernel.app.FileStorageService;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.FileStorageException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -32,18 +33,34 @@ public class LocalFileStorageService implements FileStorageService {
 
     private final Path rootLocation;
 
-    public LocalFileStorageService(@Value("${app.storage.base-dir:./data}") String baseDir) {
+    // No default: app.storage.base-dir is a bare placeholder in application.properties
+    // (${STORAGE_BASE_DIR}), so a missing value already fails startup before this bean is
+    // even constructed. A local "./data" default here would silently resolve against
+    // whatever the process's working directory happens to be in production.
+    public LocalFileStorageService(@Value("${app.storage.base-dir}") String baseDir) {
         this.rootLocation = Path.of(baseDir);
     }
 
-    /** Ensures the storage root exists before the service handles any request. */
+    /**
+     * Ensures the storage root exists and is writable before the service handles any request.
+     *
+     * <p>{@code createDirectories} is a no-op if the directory already exists, so it alone
+     * cannot detect a root that exists but is read-only for the service's OS user (e.g. a
+     * misconfigured {@code chown} on the systemd deployment target). The explicit
+     * {@link Files#isWritable} check below catches that case and fails startup with the path
+     * in the message, instead of failing silently on the first roster upload weeks later.</p>
+     */
     @PostConstruct
     void init() {
         try {
             Files.createDirectories(rootLocation);
         } catch (IOException e) {
-            throw new FileStorageException("Could not initialize storage root: " + rootLocation, e);
+            throw new FileStorageException(ErrorCode.FILE_STORAGE_ERROR, "Could not initialize storage root: " + rootLocation, e);
         }
+
+        if (!Files.isWritable(rootLocation))
+            throw new FileStorageException(ErrorCode.FILE_STORAGE_ERROR, "Storage root exists but is not writable: " + rootLocation
+                    + " — check ownership/permissions for the service's OS user.");
     }
 
     @Override
@@ -55,7 +72,7 @@ public class LocalFileStorageService implements FileStorageService {
             Path destination = targetFolder.resolve(filename).normalize();
             Files.write(destination, content, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
-            throw new FileStorageException("Failed to store file: " + folder + "/" + filename, e);
+            throw new FileStorageException(ErrorCode.FILE_STORAGE_ERROR, "Failed to store file: " + folder + "/" + filename, e);
         }
     }
 
@@ -68,7 +85,7 @@ public class LocalFileStorageService implements FileStorageService {
         try {
             return Optional.of(Files.readAllBytes(target));
         } catch (IOException e) {
-            throw new FileStorageException("Failed to read file: " + folder + "/" + filename, e);
+            throw new FileStorageException(ErrorCode.FILE_STORAGE_ERROR, "Failed to read file: " + folder + "/" + filename, e);
         }
     }
 
@@ -110,7 +127,7 @@ public class LocalFileStorageService implements FileStorageService {
                         }
                     });
         } catch (IOException e) {
-            throw new FileStorageException("Failed to list folder: " + folder, e);
+            throw new FileStorageException(ErrorCode.FILE_STORAGE_ERROR, "Failed to list folder: " + folder, e);
         }
     }
 
@@ -120,7 +137,7 @@ public class LocalFileStorageService implements FileStorageService {
         try {
             Files.deleteIfExists(target);
         } catch (IOException e) {
-            throw new FileStorageException("Failed to delete file: " + folder + "/" + filename, e);
+            throw new FileStorageException(ErrorCode.FILE_STORAGE_ERROR, "Failed to delete file: " + folder + "/" + filename, e);
         }
     }
 }

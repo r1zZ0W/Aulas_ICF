@@ -172,8 +172,12 @@ export default function ClassroomResourcesModal({ open, onClose, classroom }) {
       await assignMutation.mutateAsync({ classroomUuid, ...parsed.data });
       setAddResourceUuid('');
       setAddQuantity('1');
-    } catch {
-      // toast already emitted by useApiMutation.onError
+    } catch (err) {
+      // toast already emitted by useApiMutation.onError; additionally surface the
+      // server's own field message in this row's existing error slot when it applies
+      // (e.g. ALLOCATION_QUANTITY_INVALID), instead of leaving it unexplained locally.
+      const fieldMessage = err.fieldErrors?.quantity ?? err.fieldErrors?.resourceUuid;
+      if (fieldMessage) setAddError(fieldMessage);
     } finally {
       clearBusy(parsed.data.resourceUuid);
     }

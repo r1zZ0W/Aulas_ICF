@@ -111,8 +111,10 @@ export function useResourcesForm({ createMutation, updateMutation }) {
     try {
       await createMutation.mutateAsync(createZod.formData);
       closeCreate();
-    } catch {
-      // error already handled by useResources onError (toast)
+    } catch (err) {
+      // useResources' onError already toasted; additionally highlight the
+      // offending input if the server told us which field caused it.
+      if (err.fieldErrors) createZod.setServerErrors(err.fieldErrors);
     }
   }
 
@@ -123,8 +125,10 @@ export function useResourcesForm({ createMutation, updateMutation }) {
     try {
       await updateMutation.mutateAsync({ uuid: editResource.uuid, payload: editZod.formData });
       closeEdit();
-    } catch {
-      // error already handled by useResources onError (toast)
+    } catch (err) {
+      // useResources' onError already toasted; additionally highlight the
+      // offending input if the server told us which field caused it.
+      if (err.fieldErrors) editZod.setServerErrors(err.fieldErrors);
     }
   }
 

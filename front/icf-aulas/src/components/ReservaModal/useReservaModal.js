@@ -7,7 +7,7 @@ import { getAvailableTimeSlots } from '../../api/timeslots';
 import { getActiveSemester } from '../../api/semesters';
 import { labelsToTimeSlotIds, toDateString } from '../../utils/reservations';
 import { useZodForm } from '../../hooks/useZodForm';
-import { ReservaFormSchema } from '../../schemas/reservation/reservaForm.js';
+import { ReservaFormSchema, BOOKING_DTO_MAP } from '../../schemas/reservation/reservaForm.js';
 
 /**
  * Empty/default state for the Zod-backed form fields (user-authored inputs only).
@@ -244,7 +244,7 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
   // Zod-backed form instance — single source of truth for every user-authored field.
   // File required/size/format rules live in the schema too (see reservaForm.js), so
   // there is no separate fileError state: errors.file is the only source of file errors.
-  const zod = useZodForm(EMPTY_RESERVA, ReservaFormSchema);
+  const zod = useZodForm(EMPTY_RESERVA, ReservaFormSchema, { dtoMap: BOOKING_DTO_MAP });
   const {
     roomId, className, startLabel, endLabel, attendees, file,
     recurring, repeatUntil, selectedDays, reserveForOther, selectedUser,
@@ -267,11 +267,13 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     staleTime: 30_000,
   });
 
-  // Reset room selection when the room gets hidden from the sidebar
+  // Reset room selection when the room gets hidden from the sidebar. Programmatic — not a
+  // user edit — so it must not clear a server error still shown on another field; see
+  // useZodForm.js's syncFieldValue vs handleChange doc comment.
   useEffect(() => {
     if (roomId && !visibleRooms.has(roomId)) {
-      zod.handleChange('roomId', '');
-      zod.handleChange('attendees', '');
+      zod.syncFieldValue('roomId', '');
+      zod.syncFieldValue('attendees', '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleRooms, roomId]);
@@ -435,28 +437,31 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
 
     setLastAutoSelected({ roomId, dateStr });
 
+    // Programmatic reconciliation, not a user edit — syncFieldValue, so a server error
+    // shown on startLabel/endLabel from a prior submit survives this recompute.
     if (plannedStart && plannedEnd) {
       if (isRangeAvailable(availableSlots, plannedStart, plannedEnd)) {
-        zod.handleChange('startLabel', plannedStart);
-        zod.handleChange('endLabel', plannedEnd);
+        zod.syncFieldValue('startLabel', plannedStart);
+        zod.syncFieldValue('endLabel', plannedEnd);
       } else {
         const closest = findClosestAvailableRange(availableSlots, startSlots, plannedStart, plannedEnd);
         if (closest) {
-          zod.handleChange('startLabel', closest.start);
-          zod.handleChange('endLabel', closest.end);
+          zod.syncFieldValue('startLabel', closest.start);
+          zod.syncFieldValue('endLabel', closest.end);
         } else {
-          zod.handleChange('startLabel', '');
-          zod.handleChange('endLabel', '');
+          zod.syncFieldValue('startLabel', '');
+          zod.syncFieldValue('endLabel', '');
         }
       }
     } else {
       const next = startSlots[0]?.startTime ?? '';
-      zod.handleChange('startLabel', next);
-      zod.handleChange('endLabel', next ? (availableSlots.find(s => s.startTime === next)?.endTime ?? '') : '');
+      zod.syncFieldValue('startLabel', next);
+      zod.syncFieldValue('endLabel', next ? (availableSlots.find(s => s.startTime === next)?.endTime ?? '') : '');
     }
   }, [roomId, dateStr, slotsLoading, availableSlots, startSlots, plannedStart, plannedEnd, lastAutoSelected]);
 
-  // Validation fallback for user manual edits
+  // Reconciles startLabel/endLabel against freshly (re)computed availability — runs whenever
+  // the derived slot lists change, not directly from a user event, so it's programmatic too.
   useEffect(() => {
     if (!queryEnabled || slotsLoading) return;
 
@@ -464,8 +469,8 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
       const startValid = startSlots.some(s => s.startTime === startLabel);
       if (!startValid) {
         const next = startSlots[0]?.startTime ?? '';
-        zod.handleChange('startLabel', next);
-        zod.handleChange('endLabel', next ? (availableSlots.find(s => s.startTime === next)?.endTime ?? '') : '');
+        zod.syncFieldValue('startLabel', next);
+        zod.syncFieldValue('endLabel', next ? (availableSlots.find(s => s.startTime === next)?.endTime ?? '') : '');
         return;
       }
     }
@@ -473,7 +478,7 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     if (endLabel) {
       const endValid = endSlots.some(s => s.value === endLabel);
       if (!endValid) {
-        zod.handleChange('endLabel', endSlots[0]?.value ?? '');
+        zod.syncFieldValue('endLabel', endSlots[0]?.value ?? '');
       }
     }
   }, [queryEnabled, slotsLoading, startSlots, endSlots, startLabel, endLabel, availableSlots]);
@@ -511,8 +516,10 @@ export function useReservaModal({ open, onClose, initialStart, initialEnd }) {
     try {
       await createBookingMutation.mutateAsync({ payload, file });
       onClose();
-    } catch (_) {
-      // toast already shown by useApiMutation's onError handler
+    } catch (err) {
+      // toast already shown by useApiMutation's onError handler; additionally highlight
+      // the offending input(s) — e.g. a slot conflict marks both startLabel and endLabel.
+      if (err.fieldErrors) zod.setServerErrors(err.fieldErrors);
     }
   };
 

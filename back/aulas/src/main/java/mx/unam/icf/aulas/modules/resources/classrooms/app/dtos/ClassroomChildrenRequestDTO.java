@@ -18,6 +18,6 @@ import java.util.UUID;
  * @param childUuids desired set of child classroom public UUIDs (may be empty, never {@code null})
  */
 public record ClassroomChildrenRequestDTO(
-        @NotNull(message = "childUuids is required (pass an empty list to remove all children)")
+        @NotNull(message = "FIELD_REQUIRED")
         List<UUID> childUuids
 ) {}

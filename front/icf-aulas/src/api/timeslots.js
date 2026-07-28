@@ -4,7 +4,7 @@
  * Clients should cache aggressively — it never changes unless the backend is redeployed.
  */
 import { z } from 'zod';
-import { createApiClient, HttpError } from './base.js';
+import { createApiClient } from './base.js';
 import { TimeSlotSchema } from '../schemas/timeSlot.js';
 
 const api = createApiClient();
@@ -17,14 +17,7 @@ const api = createApiClient();
  * @returns {Promise<import('../schemas/timeSlot.js').TimeSlot[]>}
  */
 export async function getTimeSlots() {
-  try {
-    const { data } = await api.get('/api/v1/timeslots');
-    return z.array(TimeSlotSchema).parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError)
-      throw new Error('No se pudo cargar el catálogo de horarios. Intenta de nuevo.');
-    throw error;
-  }
+  return api.getValidated('/api/v1/timeslots', { schema: z.array(TimeSlotSchema) });
 }
 
 /**
@@ -40,13 +33,8 @@ export async function getTimeSlots() {
  * @returns {Promise<import('../schemas/timeSlot.js').TimeSlot[]>} available slots, chronologically ordered
  */
 export async function getAvailableTimeSlots({ classroomUuid, date }) {
-  try {
-    const params = new URLSearchParams({ classroomUuid, date });
-    const { data } = await api.get(`/api/v1/reservations/available-slots?${params}`);
-    return z.array(TimeSlotSchema).parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError)
-      throw new Error('No se pudo cargar la disponibilidad de horarios. Intenta de nuevo.');
-    throw error;
-  }
+  const params = new URLSearchParams({ classroomUuid, date });
+  return api.getValidated(`/api/v1/reservations/available-slots?${params}`, {
+    schema: z.array(TimeSlotSchema),
+  });
 }

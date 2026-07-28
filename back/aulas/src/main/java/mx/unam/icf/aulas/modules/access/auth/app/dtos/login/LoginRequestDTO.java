@@ -12,11 +12,11 @@ import jakarta.validation.constraints.Size;
  */
 public record LoginRequestDTO(
 
-        @NotBlank(message = "El nombre de usuario es obligatorio")
-        @Size(min = 3, max = 50, message = "El nombre de usuario debe tener entre 3 y 50 caracteres")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(min = 3, max = 50, message = "FIELD_OUT_OF_RANGE")
         String username,
 
-        @NotBlank(message = "La contraseña es obligatoria")
-        @Size(max = 128, message = "La contraseña excede la longitud máxima permitida")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 128, message = "FIELD_OUT_OF_RANGE")
         String password
 ) {}

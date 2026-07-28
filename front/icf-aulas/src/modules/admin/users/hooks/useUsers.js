@@ -40,6 +40,8 @@ export function useUsers({ search, page = 0, size = 20, sort, direction } = {}) 
   const {
     data: pageData,
     isLoading: usersLoading,
+    isError: usersError,
+    refetch: refetchUsers,
   } = useQuery({
     queryKey: ['users', 'list', { search, page, size, sort, direction }],
     queryFn: () => getUsers({ search, page, size, sort, direction }),
@@ -90,6 +92,8 @@ export function useUsers({ search, page = 0, size = 20, sort, direction } = {}) 
     roles,
     stats,
     usersLoading,
+    usersError,
+    refetchUsers,
     createMutation,
     updateMutation,
     deleteMutation,

@@ -36,7 +36,11 @@ export const UserCreateSchema = z.object({
       STRONG_PASSWORD_REGEX,
       'La contraseña debe incluir mayúscula, minúscula, número y carácter especial (@$!%*?&#^()_-+=)'
     ),
-  roleId: z.number().int().positive('El rol es requerido').optional(),
+  roleId: z
+    .number({ error: 'Selecciona un rol' })
+    .int('Selecciona un rol')
+    .positive('El rol es requerido')
+    .optional(),
 });
 
 export default UserCreateSchema;

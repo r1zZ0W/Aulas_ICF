@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.kernel.infrastructure.web.paging;
 
 import lombok.extern.slf4j.Slf4j;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.MethodParameter;
 import org.springframework.data.domain.Sort;
@@ -125,7 +126,7 @@ public class PageCriteriaArgumentResolver implements HandlerMethodArgumentResolv
         String sort;
         if (sortParam != null && !sortParam.isBlank()) {
             if (!allowed.contains(sortParam))
-                throw new DomainException(
+                throw new DomainException(ErrorCode.INVALID_SORT_FIELD,
                         "Invalid sort field '" + sortParam + "'. Allowed fields: " + allowed);
             sort = sortParam;
         } else {

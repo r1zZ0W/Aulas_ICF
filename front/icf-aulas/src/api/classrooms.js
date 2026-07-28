@@ -1,29 +1,14 @@
-import { createApiClient, HttpError } from './base.js';
+import { createApiClient } from './base.js';
 import {
   ClassroomResponseSchema,
-  ClassroomRequestSchema,
   ClassroomStatsSchema,
 } from '../schemas/classroom.js';
 import { PagedResultSchema } from '../schemas/pagedResult.js';
 import { buildPageParams } from '../utils/queryUtils.js';
+import { resolveApiError } from '../errors/resolveApiError.js';
+import { ApiError } from '../errors/ApiError.js';
 
 const api = createApiClient();
-
-function resolveErrorMessage(error, overrides = {}) {
-  if (overrides[error.status]) return overrides[error.status];
-  const serverMessage = error.data?.message;
-  const defaults = {
-    0: 'No se pudo conectar con el servidor. Verifica tu conexión.',
-    400: 'Los datos enviados no son válidos.',
-    401: 'No autorizado.',
-    403: 'No tienes permisos para realizar esta acción.',
-    404: 'El aula solicitada no existe.',
-    405: 'Operación no permitida en este recurso.',
-    409: 'Ya existe un aula con ese nombre.',
-    500: 'Error interno del servidor. Intenta de nuevo más tarde.',
-  };
-  return defaults[error.status] || serverMessage || `Error inesperado (${error.status}).`;
-}
 
 /**
  * Retrieves a paginated list of classrooms.
@@ -35,14 +20,8 @@ function resolveErrorMessage(error, overrides = {}) {
  * GET /api/v1/classrooms[?search=&page=&size=&sort=&direction=]
  */
 export async function getClassrooms({ search, page, size, sort, direction } = {}) {
-  try {
-    const qs = buildPageParams({ search, page, size, sort, direction });
-    const { data } = await api.get(`/api/v1/classrooms${qs}`);
-    return PagedResultSchema(ClassroomResponseSchema).parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  const qs = buildPageParams({ search, page, size, sort, direction });
+  return api.getValidated(`/api/v1/classrooms${qs}`, { schema: PagedResultSchema(ClassroomResponseSchema) });
 }
 
 /**
@@ -50,13 +29,7 @@ export async function getClassrooms({ search, page, size, sort, direction } = {}
  * GET /api/v1/classrooms/{uuid}
  */
 export async function getClassroom(uuid) {
-  try {
-    const { data } = await api.get(`/api/v1/classrooms/${uuid}`);
-    return ClassroomResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.getValidated(`/api/v1/classrooms/${uuid}`, { schema: ClassroomResponseSchema });
 }
 
 /**
@@ -69,30 +42,24 @@ export async function getClassroom(uuid) {
  */
 export async function getClassroomStats() {
   try {
-    const { data } = await api.get('/api/v1/classrooms/stats');
-    return ClassroomStatsSchema.parse(data.data);
+    return await api.getValidated('/api/v1/classrooms/stats', { schema: ClassroomStatsSchema });
   } catch (error) {
     // 404 means the backend hasn't implemented the endpoint yet — return null
     // so the UI can show a graceful placeholder instead of an error toast.
-    if (error instanceof HttpError && error.status === 404) return null;
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw resolveApiError(error);
   }
 }
 
 /**
  * Creates a new classroom. ADMIN only.
  * POST /api/v1/classrooms
+ *
+ * `payload` is not re-validated here: the caller's `useZodForm(ClassroomRequestSchema)`
+ * already ran `validateAll()` before submit.
  */
 export async function createClassroom(payload) {
-  try {
-    const body = ClassroomRequestSchema.parse(payload);
-    const { data } = await api.post('/api/v1/classrooms', body);
-    return ClassroomResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.postValidated('/api/v1/classrooms', payload, { schema: ClassroomResponseSchema });
 }
 
 /**
@@ -100,14 +67,7 @@ export async function createClassroom(payload) {
  * PUT /api/v1/classrooms/{uuid}
  */
 export async function updateClassroom(uuid, payload) {
-  try {
-    const body = ClassroomRequestSchema.parse(payload);
-    const { data } = await api.put(`/api/v1/classrooms/${uuid}`, body);
-    return ClassroomResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.putValidated(`/api/v1/classrooms/${uuid}`, payload, { schema: ClassroomResponseSchema });
 }
 
 /**
@@ -120,13 +80,7 @@ export async function updateClassroom(uuid, payload) {
  * @returns {Promise<object>} the updated classroom with its new isActive value
  */
 export async function toggleClassroomStatus(uuid) {
-  try {
-    const { data } = await api.patch(`/api/v1/classrooms/${uuid}/toggle-status`);
-    return ClassroomResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.patchValidated(`/api/v1/classrooms/${uuid}/toggle-status`, undefined, { schema: ClassroomResponseSchema });
 }
 
 /**
@@ -134,12 +88,7 @@ export async function toggleClassroomStatus(uuid) {
  * DELETE /api/v1/classrooms/{uuid}
  */
 export async function deleteClassroom(uuid) {
-  try {
-    await api.delete(`/api/v1/classrooms/${uuid}`);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.deleteValidated(`/api/v1/classrooms/${uuid}`);
 }
 
 /**
@@ -154,10 +103,5 @@ export async function deleteClassroom(uuid) {
  * @param {string[]} childUuids - Full desired set of child classroom UUIDs.
  */
 export async function setClassroomChildren(parentUuid, childUuids) {
-  try {
-    await api.put(`/api/v1/classrooms/${parentUuid}/children`, { childUuids });
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.putValidated(`/api/v1/classrooms/${parentUuid}/children`, { childUuids });
 }

@@ -29,7 +29,7 @@ import java.util.UUID;
  *   <li>{@code aud}    – audience ("aulas-client")</li>
  *   <li>{@code uuid}   – public user UUID (same as sub, kept for client convenience)</li>
  *   <li>{@code nombre} – user's full name (auth tokens only)</li>
- *   <li>{@code role}   – role name e.g. "MAESTRO", "ADMIN" (auth tokens only)</li>
+ *   <li>{@code role}   – role name e.g. "TEACHER", "ADMIN" (auth tokens only)</li>
  *   <li>{@code type}   – token purpose: "auth" | "refresh" | "reset"</li>
  *   <li>{@code ip}     – client IP at issuance (auth tokens only, for audit)</li>
  *   <li>{@code ua}     – User-Agent at issuance (auth tokens only, for audit)</li>
@@ -130,7 +130,7 @@ public class JwtProvider {
      * modification (e.g., via localStorage or a forged header) invalidates the signature
      * and is rejected by {@link #isTokenInvalid} before this method is ever called.</p>
      *
-     * @return the role name (e.g. "ADMIN", "MAESTRO"), or {@code null} if the token type
+     * @return the role name (e.g. "ADMIN", "TEACHER"), or {@code null} if the token type
      *         does not carry a role claim (refresh / reset tokens)
      */
     public String getRoleFromToken(String token) {

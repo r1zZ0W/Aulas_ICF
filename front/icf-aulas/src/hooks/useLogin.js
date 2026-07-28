@@ -77,13 +77,10 @@ export function useLogin() {
       persistSession(session);
       navigate(route, { replace: true });
     } catch (err) {
-
-      const msg = (err instanceof Error && err.name === 'ZodError')
-        ? 'Ocurrió un problema de compatibilidad. Intenta de nuevo.'
-        : (err.message ?? 'Ocurrió un error inesperado.');
-
-      setFormError(msg);
-
+      // login() always rejects with an ApiError now — resolveApiError already resolved
+      // err.code (INVALID_CREDENTIALS, ACCOUNT_LOCKED, RATE_LIMITED, ...) to Spanish text
+      // via the catalog, so there's nothing left to branch on here.
+      setFormError(err.message ?? 'Ocurrió un error inesperado.');
     } finally {
       setLoading(false);
     }

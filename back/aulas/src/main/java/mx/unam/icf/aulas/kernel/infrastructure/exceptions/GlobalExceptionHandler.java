@@ -4,13 +4,14 @@ import jakarta.persistence.PersistenceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.AccountLockedException;
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidCredentialsException;
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.InvalidTokenException;
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.MissingTokenException;
 import mx.unam.icf.aulas.modules.access.auth.app.exceptions.TokenRevokedException;
 import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ApiResponse;
-import mx.unam.icf.aulas.modules.reports.app.exceptions.ReportGenerationException;
+import mx.unam.icf.aulas.kernel.infrastructure.web.responses.ValidationErrorDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ConflictDetailDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.exceptions.ReservationConflictException;
 import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentCountMismatchDTO;
@@ -19,12 +20,16 @@ import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.DuplicateS
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.EmptyStudentListException;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.StudentCountMismatchException;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -32,17 +37,22 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.Arrays;
-import java.util.stream.Collectors;
+import java.sql.SQLIntegrityConstraintViolationException;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Centralized exception handler for all REST endpoints.
  *
  * <p>Converts application exceptions into consistent {@link ApiResponse} payloads with
- * the appropriate HTTP status code. All client-facing messages are in English and are
- * deliberately terse to avoid leaking implementation details or enabling account-enumeration
- * attacks.</p>
+ * the appropriate HTTP status code and a stable {@link ErrorCode}. The {@code message}
+ * field is English prose kept for logs/debugging — the client never renders it directly;
+ * it resolves {@code code} to Spanish text via its own catalog.</p>
  */
 @Slf4j
 @RestControllerAdvice
@@ -52,25 +62,25 @@ public class GlobalExceptionHandler {
     private final Environment env;
 
     private boolean isDev() {
-        return Arrays.asList(env.getActiveProfiles()).contains("dev");
+        return env.acceptsProfiles(Profiles.of("dev"));
     }
 
     // ── Domain / business ────────────────────────────────────────────────────
 
-    /** Handles a missing entity lookup; returns 404 with the exception message as body. */
+    /** Handles a missing entity lookup; returns 404 with the exception's own code. */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(ex.getMessage()));
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
     }
 
-    /** Handles business-rule violations raised in the domain layer; returns 400 with the rule message. */
+    /** Handles business-rule violations raised in the domain layer; returns 400 with the exception's own code. */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiResponse<Void>> handleDomain(DomainException ex) {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
+                .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
     }
 
     /**
@@ -83,11 +93,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<ConflictDetailDTO>> handleConflict(ReservationConflictException ex) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ApiResponse.<ConflictDetailDTO>builder()
-                        .error(true)
-                        .message(ex.getMessage())
-                        .data(new ConflictDetailDTO(ex.getConflictDate(), ex.getConflictTimeSlotId()))
-                        .build());
+                .body(ApiResponse.error(
+                        ErrorCode.RESERVATION_SLOT_CONFLICT,
+                        ex.getMessage(),
+                        new ConflictDetailDTO(ex.getConflictDate(), ex.getConflictTimeSlotId())));
     }
 
     /**
@@ -100,17 +109,17 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler({ EmptyStudentListException.class, DuplicateStudentException.class })
     public ResponseEntity<ApiResponse<StudentValidationErrorDTO>> handleStudentListValidation(RuntimeException ex) {
+        boolean isDuplicate = ex instanceof DuplicateStudentException;
         StudentValidationErrorDTO detail = (ex instanceof DuplicateStudentException dup)
                 ? new StudentValidationErrorDTO(dup.getRow(), dup.getStudentFullName())
                 : new StudentValidationErrorDTO(null, null);
 
         return ResponseEntity
                 .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(ApiResponse.<StudentValidationErrorDTO>builder()
-                        .error(true)
-                        .message(ex.getMessage())
-                        .data(detail)
-                        .build());
+                .body(ApiResponse.error(
+                        isDuplicate ? ErrorCode.ROSTER_DUPLICATE_STUDENT : ErrorCode.ROSTER_EMPTY,
+                        ex.getMessage(),
+                        detail));
     }
 
     /**
@@ -124,11 +133,10 @@ public class GlobalExceptionHandler {
             StudentCountMismatchException ex) {
         return ResponseEntity
                 .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(ApiResponse.<StudentCountMismatchDTO>builder()
-                        .error(true)
-                        .message(ex.getMessage())
-                        .data(new StudentCountMismatchDTO(ex.getExpected(), ex.getActual()))
-                        .build());
+                .body(ApiResponse.error(
+                        ErrorCode.ROSTER_COUNT_MISMATCH,
+                        ex.getMessage(),
+                        new StudentCountMismatchDTO(ex.getExpected(), ex.getActual())));
     }
 
     // ── Security ─────────────────────────────────────────────────────────────
@@ -139,7 +147,8 @@ public class GlobalExceptionHandler {
         log.warn("Locked account login attempt: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.TOO_MANY_REQUESTS)
-                .body(ApiResponse.error("Account temporarily locked due to too many failed attempts. Try again in 10 minutes."));
+                .body(ApiResponse.error(ErrorCode.ACCOUNT_LOCKED,
+                        "Account temporarily locked due to too many failed attempts. Try again in 10 minutes."));
     }
 
     /**
@@ -151,7 +160,7 @@ public class GlobalExceptionHandler {
         log.warn("Authentication failed: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Invalid credentials."));
+                .body(ApiResponse.error(ErrorCode.INVALID_CREDENTIALS, "Invalid credentials."));
     }
 
     /** Handles requests that arrive without an Authorization header or token body; returns 401. */
@@ -160,7 +169,7 @@ public class GlobalExceptionHandler {
         log.warn("Missing token: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Authentication token is required."));
+                .body(ApiResponse.error(ErrorCode.TOKEN_MISSING, "Authentication token is required."));
     }
 
     /** Handles tokens that fail signature verification, are expired, or carry the wrong type claim; returns 401. */
@@ -169,7 +178,7 @@ public class GlobalExceptionHandler {
         log.warn("Invalid token: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("The provided token is invalid or has expired."));
+                .body(ApiResponse.error(ErrorCode.TOKEN_INVALID, "The provided token is invalid or has expired."));
     }
 
     /** Handles tokens that were explicitly revoked (blacklisted after logout or password reset); returns 401. */
@@ -178,7 +187,7 @@ public class GlobalExceptionHandler {
         log.warn("Revoked token used: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("The provided token has been revoked."));
+                .body(ApiResponse.error(ErrorCode.TOKEN_REVOKED, "The provided token has been revoked."));
     }
 
     /** Safety net for {@link BadCredentialsException} thrown internally by Spring Security's AuthenticationManager; returns 401. */
@@ -187,7 +196,7 @@ public class GlobalExceptionHandler {
         log.warn("BadCredentialsException (Spring Security): {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Invalid credentials."));
+                .body(ApiResponse.error(ErrorCode.INVALID_CREDENTIALS, "Invalid credentials."));
     }
 
     /** Handles role-based access control rejections from {@code @PreAuthorize}; returns 403. */
@@ -196,35 +205,61 @@ public class GlobalExceptionHandler {
         log.debug("Access denied: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("You do not have permission to perform this action."));
+                .body(ApiResponse.error(ErrorCode.ACCESS_DENIED, "You do not have permission to perform this action."));
     }
 
     // ── Input validation ─────────────────────────────────────────────────────
 
     /**
-     * Handles Bean Validation failures ({@code @Valid} on controller parameters).
-     * In {@code dev} profile the individual field errors are included; in production
-     * a generic message is returned to avoid leaking field names.
+     * Handles Bean Validation failures ({@code @Valid} on controller parameters). Always
+     * returns a per-field {@link ValidationErrorDTO}, in both {@code dev} and prod — unlike
+     * the previous behavior, field names are not hidden in production: the frontend's
+     * {@code *_DTO_MAP} already knows every DTO's field names, so withholding them only
+     * broke the ability to highlight the offending input.
+     *
+     * <p>Each annotation's {@code message} is meant to already be an {@link ErrorCode} name
+     * (see the enum's Javadoc). If it isn't — e.g. a new constraint was added without a
+     * {@code message}, so Hibernate emitted its own default text like {@code "must not be null"}
+     * — {@link #resolveFieldErrorCode} degrades to a generic code based on the constraint type,
+     * so the client never sees raw Hibernate English.</p>
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
-        String message = isDev()
-                ? ex.getBindingResult().getFieldErrors().stream()
-                        .map(err -> err.getField() + ": " + err.getDefaultMessage())
-                        .collect(Collectors.joining("; "))
-                : "The submitted data is not valid.";
+    public ResponseEntity<ApiResponse<ValidationErrorDTO>> handleValidation(MethodArgumentNotValidException ex) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        for (FieldError err : ex.getBindingResult().getFieldErrors()) {
+            fieldErrors.putIfAbsent(err.getField(), resolveFieldErrorCode(err));
+        }
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(message));
+                .body(ApiResponse.error(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Validation failed for one or more fields.",
+                        new ValidationErrorDTO(fieldErrors)));
     }
 
-    /** Handles unreadable or malformed JSON request bodies that cannot be deserialized; returns 400. */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException ex) {
-        log.debug("Unreadable request body: {}", ex.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Request body is malformed or unreadable."));
+    private static String resolveFieldErrorCode(FieldError err) {
+        String msg = err.getDefaultMessage();
+        return isErrorCodeName(msg) ? msg : mapConstraintToCode(err.getCode());
+    }
+
+    private static boolean isErrorCodeName(String msg) {
+        if (msg == null) return false;
+        try {
+            ErrorCode.valueOf(msg);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private static String mapConstraintToCode(String constraint) {
+        return switch (constraint != null ? constraint : "") {
+            case "NotNull", "NotBlank", "NotEmpty" -> ErrorCode.FIELD_REQUIRED.name();
+            case "Pattern", "Email", "URL" -> ErrorCode.FIELD_INVALID_FORMAT.name();
+            case "Size", "Min", "Max", "Positive", "PositiveOrZero", "Negative", "NegativeOrZero",
+                 "Future", "FutureOrPresent", "Past", "PastOrPresent" -> ErrorCode.FIELD_OUT_OF_RANGE.name();
+            default -> ErrorCode.VALIDATION_FAILED.name();
+        };
     }
 
     /**
@@ -233,17 +268,38 @@ public class GlobalExceptionHandler {
      * {@code @RequestPart}/{@code @RequestParam} parameter — may fire instead of
      * {@link MethodArgumentNotValidException}. Defensive twin of {@link #handleValidation}
      * so multipart binding failures never fall through to the 500 catch-all.
+     *
+     * <p>Field names come from {@link ParameterValidationResult#getMethodParameter()}, which
+     * requires the parameter name to be resolvable (compiled with {@code -parameters}, present
+     * here). If it can't be resolved, that entry is skipped rather than emitted with a
+     * {@code null} key — better a missing field than a broken map.</p>
      */
     @ExceptionHandler(HandlerMethodValidationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMethodValidation(HandlerMethodValidationException ex) {
-        String message = isDev()
-                ? ex.getAllErrors().stream()
-                        .map(err -> String.valueOf(err.getDefaultMessage()))
-                        .collect(Collectors.joining("; "))
-                : "The submitted data is not valid.";
+    public ResponseEntity<ApiResponse<ValidationErrorDTO>> handleMethodValidation(HandlerMethodValidationException ex) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        for (ParameterValidationResult result : ex.getParameterValidationResults()) {
+            String field = result.getMethodParameter().getParameterName();
+            if (field == null) continue;
+            String msg = result.getResolvableErrors().isEmpty()
+                    ? null
+                    : result.getResolvableErrors().get(0).getDefaultMessage();
+            fieldErrors.putIfAbsent(field, isErrorCodeName(msg) ? msg : ErrorCode.VALIDATION_FAILED.name());
+        }
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(message));
+                .body(ApiResponse.error(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Method validation failed for one or more parameters.",
+                        new ValidationErrorDTO(fieldErrors)));
+    }
+
+    /** Handles unreadable or malformed JSON request bodies that cannot be deserialized; returns 400. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException ex) {
+        log.debug("Unreadable request body: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ErrorCode.MALFORMED_REQUEST, "Request body is malformed or unreadable."));
     }
 
     /**
@@ -254,7 +310,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleMissingPart(MissingServletRequestPartException ex) {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Required request part is missing: " + ex.getRequestPartName()));
+                .body(ApiResponse.error(ErrorCode.FILE_PART_MISSING,
+                        "Required request part is missing: " + ex.getRequestPartName()));
     }
 
     /**
@@ -267,7 +324,7 @@ public class GlobalExceptionHandler {
         log.debug("Upload rejected, exceeds max size: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.PAYLOAD_TOO_LARGE)
-                .body(ApiResponse.error("The uploaded file exceeds the maximum allowed size."));
+                .body(ApiResponse.error(ErrorCode.FILE_TOO_LARGE, "The uploaded file exceeds the maximum allowed size."));
     }
 
     /**
@@ -282,18 +339,73 @@ public class GlobalExceptionHandler {
                 : "Invalid parameters.";
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(message));
+                .body(ApiResponse.error(ErrorCode.INVALID_PARAMETERS, message));
     }
 
     // ── Persistence ───────────────────────────────────────────────────────────
 
-    /** Handles Spring Data access failures (query errors, connection issues, constraint violations); returns 500. */
+    /**
+     * Known DB unique-constraint names mapped to their {@link ErrorCode}. Only constraints
+     * that already carry a stable name in the SQL baseline are listed here — most of this
+     * schema's unique constraints are Hibernate-generated hashes (e.g. {@code UK6dotkott2kjsp8vw4d0m25fb7}
+     * for {@code users.email}) that a future migration still needs to rename before they can
+     * be added. Until then, a race against those columns' pre-check falls through to the
+     * generic {@link ErrorCode#DB_CONSTRAINT_VIOLATION} below — worse than a field-specific
+     * message, but still a 409 instead of the previous opaque 500.
+     */
+    private static final Map<String, ErrorCode> KNOWN_CONSTRAINT_CODES = Map.of(
+            "uk_reserv_slots_classroom_time", ErrorCode.RESERVATION_SLOT_CONFLICT,
+            "uk_reserv_slots_user_time", ErrorCode.RESERVATION_SLOT_CONFLICT
+    );
+
+    /** Matches MySQL's {@code Duplicate entry '...' for key 'table.constraint'} (or just {@code 'constraint'}). */
+    private static final Pattern MYSQL_DUPLICATE_KEY_PATTERN =
+            Pattern.compile("for key '([^']+)'", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Handles unique-constraint races that slip past the service layer's pre-check (two
+     * concurrent requests both pass the {@code findByEmail} check before either commits).
+     * Declared before {@link #handleDataAccess} so Spring dispatches here first — this is
+     * a subtype of {@link DataAccessException}.
+     *
+     * <p>Parses the constraint name only from MySQL's {@link SQLIntegrityConstraintViolationException}
+     * message — this project has a single DB engine (MySQL, see {@code pom.xml}), so there is
+     * no cross-driver format to reconcile. Any parse failure — unrecognized format, unmapped
+     * constraint — falls back to a generic 409 rather than throwing; the parsing is an
+     * opportunistic improvement, never a hard dependency.</p>
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        ErrorCode code = ErrorCode.DB_CONSTRAINT_VIOLATION;
+        Throwable cause = ex.getMostSpecificCause();
+        if (cause instanceof SQLIntegrityConstraintViolationException) {
+            String constraint = extractMysqlConstraintName(cause.getMessage());
+            if (constraint != null && KNOWN_CONSTRAINT_CODES.containsKey(constraint)) {
+                code = KNOWN_CONSTRAINT_CODES.get(constraint);
+            }
+        }
+        log.warn("Data integrity violation resolved to {}: {}", code, ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(code, "A database constraint was violated."));
+    }
+
+    private static String extractMysqlConstraintName(String message) {
+        if (message == null) return null;
+        Matcher matcher = MYSQL_DUPLICATE_KEY_PATTERN.matcher(message);
+        if (!matcher.find()) return null;
+        String key = matcher.group(1);
+        int dot = key.lastIndexOf('.');
+        return (dot >= 0 ? key.substring(dot + 1) : key).toLowerCase(Locale.ROOT);
+    }
+
+    /** Handles Spring Data access failures (query errors, connection issues) not more specifically matched above; returns 500. */
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataAccess(DataAccessException ex) {
         log.error("Data access error", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("The operation could not be completed. Please try again later."));
+                .body(ApiResponse.error(ErrorCode.INTERNAL_ERROR, "The operation could not be completed. Please try again later."));
     }
 
     /** Handles low-level JPA/Hibernate persistence exceptions not caught by Spring's exception translation; returns 500. */
@@ -302,7 +414,7 @@ public class GlobalExceptionHandler {
         log.error("JPA persistence error", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("The operation could not be completed. Please try again later."));
+                .body(ApiResponse.error(ErrorCode.INTERNAL_ERROR, "The operation could not be completed. Please try again later."));
     }
 
     // ── Infrastructure ────────────────────────────────────────────────────────
@@ -319,7 +431,7 @@ public class GlobalExceptionHandler {
                 : "The email could not be sent. Please try again later.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(message));
+                .body(ApiResponse.error(ex.getCode(), message));
     }
 
     /**
@@ -335,23 +447,20 @@ public class GlobalExceptionHandler {
                 : "The file could not be processed. Please try again later.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(message));
+                .body(ApiResponse.error(ex.getCode(), message));
     }
 
+    // ── Routing ──────────────────────────────────────────────────────────────
+
     /**
-     * Handles failures while producing the reservations report PDF (template rendering,
-     * embedded font loading, HTML-to-PDF conversion); returns 500. In {@code dev} profile
-     * the raw message is forwarded; in production a generic message is used.
+     * Handles requests to routes that don't exist. Without this handler an unknown route fell
+     * through to the {@link Exception} catch-all below, reporting an unmatched URL as a 500.
      */
-    @ExceptionHandler(ReportGenerationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleReportGeneration(ReportGenerationException ex) {
-        log.error("Report generation error", ex);
-        String message = isDev() && ex.getMessage() != null && !ex.getMessage().isBlank()
-                ? ex.getMessage()
-                : "The report could not be generated. Please try again later.";
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex) {
         return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(message));
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ErrorCode.ENDPOINT_NOT_FOUND, "No handler found for this route."));
     }
 
     // ── Fallback ──────────────────────────────────────────────────────────────
@@ -368,6 +477,6 @@ public class GlobalExceptionHandler {
                 : "An internal error occurred. Please try again later.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(message));
+                .body(ApiResponse.error(ErrorCode.INTERNAL_ERROR, message));
     }
 }

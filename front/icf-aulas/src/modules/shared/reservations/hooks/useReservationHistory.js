@@ -80,14 +80,14 @@ export function useReservationHistory({
     direction,
   };
 
-  const { data: allData, isLoading: allLoading } = useQuery({
+  const { data: allData, isLoading: allLoading, isError: allError, refetch: refetchAll } = useQuery({
     queryKey: ['reservations', 'history', 'all', filterParams],
     queryFn:  () => getReservations(filterParams),
     placeholderData: keepPreviousData,
     enabled: queryAll,
   });
 
-  const { data: userHistData, isLoading: userHistLoading } = useQuery({
+  const { data: userHistData, isLoading: userHistLoading, isError: userHistError, refetch: refetchUserHist } = useQuery({
     queryKey: ['reservations', 'history', 'user', effectiveUuid, filterParams],
     queryFn:  () => getReservationsByUser(effectiveUuid, filterParams),
     placeholderData: keepPreviousData,
@@ -96,8 +96,10 @@ export function useReservationHistory({
 
   const rawData = queryAll ? allData : userHistData;
   const loading  = queryAll ? allLoading : userHistLoading;
+  const isError  = queryAll ? allError : userHistError;
+  const refetch  = queryAll ? refetchAll : refetchUserHist;
 
   const { items, totalPages, totalElements } = parsePageResponse(rawData);
 
-  return { items, totalElements, totalPages, loading, tab, setTab, isAdmin };
+  return { items, totalElements, totalPages, loading, isError, refetch, tab, setTab, isAdmin };
 }

@@ -7,7 +7,7 @@ import { typeLabel } from '../../schemas/classroom';
 import { getTimeSlots } from '../../api/timeslots';
 import { labelsToTimeSlotIds } from '../../utils/reservations';
 import { useZodForm } from '../../hooks/useZodForm';
-import { ReasignFormSchema } from '../../schemas/reservation/reasignForm.js';
+import { ReasignFormSchema, REASSIGN_DTO_MAP } from '../../schemas/reservation/reasignForm.js';
 import '../ReservaModal/ReservaModal.css';
 import './ReasignarModal.css';
 import { TriangleAlert } from 'lucide-react';
@@ -83,7 +83,7 @@ export default function ReasignarModal({ open, onClose, reservation }) {
   });
 
   // Zod-backed form instance — single source of truth for roomId/startLabel/endLabel.
-  const zod = useZodForm(EMPTY_REASIGN, ReasignFormSchema);
+  const zod = useZodForm(EMPTY_REASIGN, ReasignFormSchema, { dtoMap: REASSIGN_DTO_MAP });
   const { roomId, startLabel, endLabel } = zod.formData;
 
   useEffect(() => {
@@ -144,8 +144,10 @@ export default function ReasignarModal({ open, onClose, reservation }) {
     try {
       await reassignMutation.mutateAsync(payload);
       onClose();
-    } catch (_) {
-      // toast already shown by useApiMutation's onError handler
+    } catch (err) {
+      // toast already shown by useApiMutation's onError handler; additionally highlight
+      // the offending input(s) — e.g. a slot conflict marks both startLabel and endLabel.
+      if (err.fieldErrors) zod.setServerErrors(err.fieldErrors);
     }
   };
 

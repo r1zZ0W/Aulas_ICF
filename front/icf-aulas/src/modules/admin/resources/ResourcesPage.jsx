@@ -10,6 +10,7 @@ import Card from '../../../components/Card/Card';
 import Buscador from '../../../components/Buscador/Buscador';
 import DataTable from '../../../components/DataTable/DataTable';
 import EmptyState from '../../../components/EmptyState/EmptyState';
+import ErrorBanner from '../../../components/ErrorBanner/ErrorBanner';
 import Pagination from '../../../components/Pagination/Pagination';
 import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
@@ -35,6 +36,8 @@ export default function ResourcesPage() {
     totalPages,
     stats,
     resourcesLoading,
+    resourcesError,
+    refetchResources,
     createMutation,
     updateMutation,
     deleteMutation,
@@ -167,6 +170,13 @@ export default function ResourcesPage() {
 
       {/* Table card */}
       <div className="resources-page__table-card">
+        {resourcesError && (
+          <ErrorBanner
+            message="No se pudo cargar el catálogo de recursos."
+            onDismiss={() => refetchResources()}
+          />
+        )}
+
         {/* Toolbar */}
         <div className="resources-page__table-toolbar">
           <Buscador

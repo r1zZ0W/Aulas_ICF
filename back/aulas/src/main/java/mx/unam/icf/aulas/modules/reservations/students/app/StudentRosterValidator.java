@@ -1,6 +1,7 @@
 package mx.unam.icf.aulas.modules.reservations.students.app;
 
 import lombok.RequiredArgsConstructor;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.DuplicateStudentException;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.EmptyStudentListException;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
@@ -80,11 +81,11 @@ public class StudentRosterValidator {
      */
     private void validateMagicNumber(byte[] fileBytes) {
         if (fileBytes.length < OOXML_MAGIC_NUMBER.length)
-            throw new InvalidExcelFileException("The uploaded file is empty or too small to be a valid .xlsx document.");
+            throw new InvalidExcelFileException(ErrorCode.ROSTER_FILE_INVALID, "The uploaded file is empty or too small to be a valid .xlsx document.");
 
         for (int i = 0; i < OOXML_MAGIC_NUMBER.length; i++) {
             if (fileBytes[i] != OOXML_MAGIC_NUMBER[i])
-                throw new InvalidExcelFileException(
+                throw new InvalidExcelFileException(ErrorCode.ROSTER_FILE_INVALID,
                         "The uploaded file is not a valid .xlsx (OOXML) document. " +
                         "Renamed .xls files and other formats are rejected.");
         }

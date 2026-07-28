@@ -117,8 +117,10 @@ export function useClassroomsForm({
     try {
       await createMutation.mutateAsync(result.data);
       closeCreate();
-    } catch {
-      // error already surfaced by useApiMutation onError (toast)
+    } catch (err) {
+      // useApiMutation's onError already toasted; additionally highlight the
+      // offending input if the server told us which field caused it.
+      if (err.fieldErrors) zod.setServerErrors(err.fieldErrors);
     }
   }
 
@@ -132,8 +134,10 @@ export function useClassroomsForm({
     // 1. Update the classroom's own fields
     try {
       await updateMutation.mutateAsync({ uuid: editTarget.uuid, payload: result.data });
-    } catch {
-      // error already surfaced as a toast — abort without closing
+    } catch (err) {
+      // error already surfaced as a toast — abort without closing, and highlight
+      // the offending input if the server told us which field caused it.
+      if (err.fieldErrors) zod.setServerErrors(err.fieldErrors);
       return;
     }
 

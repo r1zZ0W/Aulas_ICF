@@ -25,29 +25,29 @@ import jakarta.validation.constraints.Size;
  */
 public record UserUpdateRequestDTO(
 
-        @NotBlank(message = "First name is required")
-        @Size(max = 100, message = "First name must be at most 100 characters")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         String firstName,
 
-        @NotBlank(message = "Last name is required")
-        @Size(max = 100, message = "Last name must be at most 100 characters")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         String lastNames,
 
-        @NotBlank(message = "Username is required")
-        @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(min = 3, max = 50, message = "FIELD_OUT_OF_RANGE")
         @Pattern(
                 regexp = "^[a-zA-Z0-9][a-zA-Z0-9._-]{2,49}$",
-                message = "Username may only contain letters, numbers, dots, hyphens and underscores"
+                message = "USER_USERNAME_CHARSET_INVALID"
         )
         String username,
 
-        @NotBlank(message = "Email is required")
-        @Email(message = "Invalid email format")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Email(message = "FIELD_INVALID_FORMAT")
         String email,
 
-        @NotNull(message = "Role is required")
+        @NotNull(message = "FIELD_REQUIRED")
         Long roleId,
 
-        @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
+        @Size(min = 8, max = 128, message = "FIELD_OUT_OF_RANGE")
         String password
 ) {}

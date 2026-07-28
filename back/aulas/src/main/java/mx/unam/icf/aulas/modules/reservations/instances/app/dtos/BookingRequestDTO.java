@@ -41,18 +41,18 @@ import java.util.UUID;
  */
 public record BookingRequestDTO(
 
-        @NotNull(message = "Classroom UUID is required")
+        @NotNull(message = "FIELD_REQUIRED")
         UUID classroomUuid,
 
-        @NotNull(message = "Number of attendees is required")
-        @Positive(message = "Number of attendees must be positive")
+        @NotNull(message = "FIELD_REQUIRED")
+        @Positive(message = "FIELD_OUT_OF_RANGE")
         Integer attendeeCount,
 
-        @NotEmpty(message = "At least one time slot is required")
+        @NotEmpty(message = "FIELD_REQUIRED")
         List<Integer> timeSlotIds,
 
-        @NotNull(message = "Start date is required")
-        @FutureOrPresent(message = "Start date must not be in the past")
+        @NotNull(message = "FIELD_REQUIRED")
+        @FutureOrPresent(message = "FIELD_OUT_OF_RANGE")
         LocalDate startDate,
 
         /*
@@ -62,7 +62,7 @@ public record BookingRequestDTO(
          */
         List<DayOfWeek> daysOfWeek,
 
-        @Size(max = 150, message = "Title must not exceed 150 characters")
+        @Size(max = 150, message = "FIELD_OUT_OF_RANGE")
         String title,
         UUID userUuid
 ) {}

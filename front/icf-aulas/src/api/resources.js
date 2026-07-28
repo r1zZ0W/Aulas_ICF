@@ -1,32 +1,15 @@
 import { z } from 'zod';
-import { createApiClient, HttpError } from './base.js';
+import { createApiClient } from './base.js';
 import {
-  ResourceRequestSchema,
   ResourceResponseSchema,
   ResourceStatsSchema,
   ResourceCatalogItemSchema,
   ClassroomResourceResponseSchema,
-  ClassroomResourceMutationSchema,
 } from '../schemas/resource.js';
 import { PagedResultSchema } from '../schemas/pagedResult.js';
 import { buildPageParams } from '../utils/queryUtils.js';
 
 const api = createApiClient();
-
-function resolveErrorMessage(error, overrides = {}) {
-  if (overrides[error.status]) return overrides[error.status];
-  const serverMessage = error.data?.message;
-  const defaults = {
-    0: 'No se pudo conectar con el servidor. Verifica tu conexión.',
-    400: 'Los datos enviados no son válidos.',
-    401: 'No autorizado.',
-    403: 'No tienes permisos para realizar esta acción.',
-    404: 'El recurso solicitado no existe.',
-    409: 'Ya existe un recurso con ese nombre.',
-    500: 'Error interno del servidor. Intenta de nuevo más tarde.',
-  };
-  return defaults[error.status] || serverMessage || `Error inesperado (${error.status}).`;
-}
 
 // ── Global resource catalog (admin CRUD) ────────────────────────────────────────
 
@@ -43,14 +26,8 @@ function resolveErrorMessage(error, overrides = {}) {
  * @returns {Promise<{items: object[], totalElements: number, totalPages: number}>}
  */
 export async function getResources({ search, page, size, sort, direction } = {}) {
-  try {
-    const qs = buildPageParams({ search, page, size, sort, direction });
-    const { data } = await api.get(`/api/v1/resources${qs}`);
-    return PagedResultSchema(ResourceResponseSchema).parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  const qs = buildPageParams({ search, page, size, sort, direction });
+  return api.getValidated(`/api/v1/resources${qs}`, { schema: PagedResultSchema(ResourceResponseSchema) });
 }
 
 /**
@@ -60,13 +37,7 @@ export async function getResources({ search, page, size, sort, direction } = {})
  * @returns {Promise<{ totalTypes: number, totalUnits: number }>}
  */
 export async function getResourceStats() {
-  try {
-    const { data } = await api.get('/api/v1/resources/stats');
-    return ResourceStatsSchema.parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.getValidated('/api/v1/resources/stats', { schema: ResourceStatsSchema });
 }
 
 /**
@@ -74,32 +45,18 @@ export async function getResourceStats() {
  * GET /api/v1/resources/{uuid}
  */
 export async function getResource(uuid) {
-  try {
-    const { data } = await api.get(`/api/v1/resources/${uuid}`);
-    return ResourceResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.getValidated(`/api/v1/resources/${uuid}`, { schema: ResourceResponseSchema });
 }
 
 /**
  * Creates a new equipment resource in the global catalog. ADMIN only.
  * POST /api/v1/resources
+ *
+ * `payload` is not re-validated here: the caller's `useZodForm(ResourceRequestSchema)`
+ * already ran `validateAll()` before submit.
  */
 export async function createResource(payload) {
-  try {
-    const body = ResourceRequestSchema.parse(payload);
-    const { data } = await api.post('/api/v1/resources', body);
-    return ResourceResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      throw new Error(resolveErrorMessage(error, {
-        409: 'Ya existe un recurso con ese nombre.',
-      }));
-    }
-    throw error;
-  }
+  return api.postValidated('/api/v1/resources', payload, { schema: ResourceResponseSchema });
 }
 
 /**
@@ -107,18 +64,7 @@ export async function createResource(payload) {
  * PUT /api/v1/resources/{uuid}
  */
 export async function updateResource(uuid, payload) {
-  try {
-    const body = ResourceRequestSchema.parse(payload);
-    const { data } = await api.put(`/api/v1/resources/${uuid}`, body);
-    return ResourceResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      throw new Error(resolveErrorMessage(error, {
-        409: 'Ya existe un recurso con ese nombre.',
-      }));
-    }
-    throw error;
-  }
+  return api.putValidated(`/api/v1/resources/${uuid}`, payload, { schema: ResourceResponseSchema });
 }
 
 /**
@@ -130,12 +76,7 @@ export async function updateResource(uuid, payload) {
  * DELETE /api/v1/resources/{uuid}
  */
 export async function deleteResource(uuid) {
-  try {
-    await api.delete(`/api/v1/resources/${uuid}`);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.deleteValidated(`/api/v1/resources/${uuid}`);
 }
 
 // ── Classroom ⇄ equipment allocation ────────────────────────────────────────────
@@ -161,24 +102,19 @@ const CATALOG_PAGE_SIZE = 100;
  * @returns {Promise<Array<{uuid:string, name:string, description?:string|null, quantity?:number}>>}
  */
 export async function getResourceCatalog() {
-  try {
-    const items = [];
-    let page = 0;
-    let totalPages = 1;
-    do {
-      const { data } = await api.get(
-        `/api/v1/resources?page=${page}&size=${CATALOG_PAGE_SIZE}&sort=name&direction=asc`
-      );
-      const parsed = PagedResultSchema(ResourceCatalogItemSchema).parse(data.data ?? data);
-      items.push(...parsed.items);
-      totalPages = parsed.totalPages;
-      page += 1;
-    } while (page < totalPages);
-    return items;
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  const items = [];
+  let page = 0;
+  let totalPages;
+  do {
+    const parsed = await api.getValidated(
+      `/api/v1/resources?page=${page}&size=${CATALOG_PAGE_SIZE}&sort=name&direction=asc`,
+      { schema: PagedResultSchema(ResourceCatalogItemSchema) },
+    );
+    items.push(...parsed.items);
+    totalPages = parsed.totalPages;
+    page += 1;
+  } while (page < totalPages);
+  return items;
 }
 
 /**
@@ -186,13 +122,9 @@ export async function getResourceCatalog() {
  * GET /api/v1/classrooms/{classroomUuid}/resources
  */
 export async function getClassroomResources(classroomUuid) {
-  try {
-    const { data } = await api.get(`/api/v1/classrooms/${classroomUuid}/resources`);
-    return z.array(ClassroomResourceResponseSchema).parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.getValidated(`/api/v1/classrooms/${classroomUuid}/resources`, {
+    schema: z.array(ClassroomResourceResponseSchema),
+  });
 }
 
 /**
@@ -200,19 +132,16 @@ export async function getClassroomResources(classroomUuid) {
  * POST /api/v1/classrooms/{classroomUuid}/resources
  *
  * Sends only `{ resourceUuid, quantity }` — the backend derives the classroom from the path UUID.
+ * `payload` is not re-validated here: `ClassroomResourcesModal` already runs
+ * `ClassroomResourceMutationSchema.safeParse` before calling this.
  *
  * @param {string} classroomUuid
  * @param {{ resourceUuid: string, quantity: number }} payload
  */
 export async function assignClassroomResource(classroomUuid, payload) {
-  try {
-    const body = ClassroomResourceMutationSchema.parse(payload);
-    const { data } = await api.post(`/api/v1/classrooms/${classroomUuid}/resources`, body);
-    return ClassroomResourceResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.postValidated(`/api/v1/classrooms/${classroomUuid}/resources`, payload, {
+    schema: ClassroomResourceResponseSchema,
+  });
 }
 
 /**
@@ -220,10 +149,5 @@ export async function assignClassroomResource(classroomUuid, payload) {
  * DELETE /api/v1/classrooms/{classroomUuid}/resources/{resourceUuid}
  */
 export async function removeClassroomResource(classroomUuid, resourceUuid) {
-  try {
-    await api.delete(`/api/v1/classrooms/${classroomUuid}/resources/${resourceUuid}`);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.deleteValidated(`/api/v1/classrooms/${classroomUuid}/resources/${resourceUuid}`);
 }

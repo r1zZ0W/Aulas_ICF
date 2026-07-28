@@ -22,56 +22,56 @@ import jakarta.validation.constraints.Size;
  */
 public record RegisterRequestDTO(
 
-        @NotBlank(message = "El nombre es obligatorio")
-        @Size(max = 100, message = "El nombre debe tener como máximo 100 caracteres")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         @Pattern(
                 regexp = "^[a-zA-ZÀ-ÿ '\\-]{1,100}$",
-                message = "El nombre solo puede contener letras, espacios y guiones"
+                message = "PERSON_NAME_CHARSET_INVALID"
         )
         String firstName,
 
-        @NotBlank(message = "Los apellidos son obligatorios")
-        @Size(max = 100, message = "Los apellidos deben tener como máximo 100 caracteres")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         @Pattern(
                 regexp = "^[a-zA-ZÀ-ÿ '\\-]{1,100}$",
-                message = "Los apellidos solo pueden contener letras, espacios y guiones"
+                message = "PERSON_NAME_CHARSET_INVALID"
         )
         String lastNames,
 
-        @NotBlank(message = "El nombre de usuario es obligatorio")
-        @Size(min = 3, max = 50, message = "El nombre de usuario debe tener entre 3 y 50 caracteres")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(min = 3, max = 50, message = "FIELD_OUT_OF_RANGE")
         @Pattern(
                 regexp = "^[a-zA-Z0-9][a-zA-Z0-9._-]{2,49}$",
-                message = "El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos, y debe comenzar con una letra o número"
+                message = "USER_USERNAME_CHARSET_INVALID"
         )
         String username,
 
-        @NotBlank(message = "El correo electrónico es obligatorio")
-        @Email(message = "Formato de correo electrónico inválido")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Email(message = "FIELD_INVALID_FORMAT")
         @Pattern(
                 regexp = "^[^\\s@]+@icf\\.unam\\.mx$",
-                message = "El correo debe pertenecer al dominio @icf.unam.mx"
+                message = "USER_EMAIL_DOMAIN_INVALID"
         )
         String email,
 
-        @NotBlank(message = "La contraseña es obligatoria")
-        @Size(min = 8, max = 128, message = "La contraseña debe tener entre 8 y 128 caracteres")
+        @NotBlank(message = "FIELD_REQUIRED")
+        @Size(min = 8, max = 128, message = "FIELD_OUT_OF_RANGE")
         @Pattern(
                 regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&#^()_\\-+=])"
                        + "[A-Za-z\\d@$!%*?&#^()_\\-+=]{8,128}$",
-                message = "La contraseña debe contener al menos una letra minúscula, una mayúscula, un número y un carácter especial (@$!%*?&#^()_-+=)"
+                message = "USER_PASSWORD_WEAK"
         )
         String password,
 
         /**
          * Optional department or area. Free-text, maximum 100 characters.
          */
-        @Size(max = 100, message = "El departamento debe tener como máximo 100 caracteres")
+        @Size(max = 100, message = "FIELD_OUT_OF_RANGE")
         String departamento,
 
         /**
          * Optional role identifier. When {@code null}, the system defaults to the
-         * {@code MAESTRO} role (DFR §3.1).
+         * {@code TEACHER} role (DFR §3.1).
          */
         Long roleId
 ) {}

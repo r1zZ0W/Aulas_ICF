@@ -4,6 +4,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.*;
 import mx.unam.icf.aulas.kernel.infrastructure.services.MailSender;
 import org.springframework.beans.factory.annotation.Value;
@@ -99,7 +100,7 @@ public class MailSenderImpl implements MailSender {
 
 
         } catch (MessagingException e) {
-            throw new MailSendingException("Failed to send email message.", e);
+            throw new MailSendingException(ErrorCode.MAIL_SENDING_ERROR, "Failed to send email message.", e);
         }
     }
 }

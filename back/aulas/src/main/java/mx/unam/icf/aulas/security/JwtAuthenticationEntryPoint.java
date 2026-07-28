@@ -3,6 +3,7 @@ package mx.unam.icf.aulas.security;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.web.FilterResponseWriter;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatus;
@@ -32,6 +33,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         filterResponseWriter.writeError(
                 response,
                 HttpStatus.UNAUTHORIZED,
+                ErrorCode.TOKEN_MISSING,
                 "Authentication required. Provide a valid Bearer token."
         );
     }

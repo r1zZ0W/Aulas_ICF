@@ -1,6 +1,7 @@
 package mx.unam.icf.aulas.modules.reservations.students.app.exceptions;
 
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 
 /**
  * Thrown when an uploaded roster file fails the OOXML magic-number check
@@ -15,11 +16,11 @@ import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
  */
 public class InvalidExcelFileException extends DomainException {
 
-    public InvalidExcelFileException(String message) {
-        super(message);
+    public InvalidExcelFileException(ErrorCode code, String message) {
+        super(code, message);
     }
 
-    public InvalidExcelFileException(String message, Throwable cause) {
-        super(message, cause);
+    public InvalidExcelFileException(ErrorCode code, String message, Throwable cause) {
+        super(code, message, cause);
     }
 }

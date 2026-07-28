@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import lombok.RequiredArgsConstructor;
 
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.web.FilterResponseWriter;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.userdetails.UserDetailsServiceImpl;
 import org.jspecify.annotations.NonNull;
@@ -53,18 +54,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(token)) {
             if (jwtProvider.isTokenInvalid(token)) {
-                filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+                filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, ErrorCode.TOKEN_INVALID, "Invalid or expired token");
                 return;
             }
 
             if (!"auth".equals(jwtProvider.getTypeFromToken(token))) {
-                filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, "Invalid token type");
+                filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, ErrorCode.TOKEN_WRONG_TYPE, "Invalid token type");
                 return;
             }
 
             String jti = jwtProvider.getJtiFromToken(token);
             if (blacklistService.isBlacklisted(jti)) {
-                filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, "Token has been revoked");
+                filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, ErrorCode.TOKEN_REVOKED, "Token has been revoked");
                 return;
             }
 
@@ -76,7 +77,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // client or from a separate header the frontend could forge via localStorage.
             UserDetails user = userDetailsService.loadUserByUuid(uuid);
             if (!user.isEnabled()) {
-                filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, "Account is disabled");
+                filterResponseWriter.writeError(response, HttpStatus.UNAUTHORIZED, ErrorCode.ACCOUNT_DISABLED, "Account is disabled");
                 return;
             }
 

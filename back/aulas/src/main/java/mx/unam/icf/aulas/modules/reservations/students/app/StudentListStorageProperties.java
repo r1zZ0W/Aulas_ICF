@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 @Getter
 @Setter
 @Component
-@ConfigurationProperties(prefix = "app.reservations.storage-dir")
+@ConfigurationProperties(prefix = "app.reservations")
 public class StudentListStorageProperties {
 
     /** Subfolder (under {@code app.storage.base-dir}) where roster files are stored. */

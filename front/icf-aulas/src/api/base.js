@@ -1,3 +1,5 @@
+import { resolveApiError } from '../errors/resolveApiError.js';
+
 /**
  * Custom HTTP Error class that extends the native Error.
  * It carries the HTTP status code and response payload, allowing consumers
@@ -107,12 +109,15 @@ export function createApiClient({
     // We do it with parsed body for HttpError.data.
     if (!response.ok) {
       // Response interceptor: detect a revoked/expired/tampered session.
+      // Only 401 means the session itself is invalid — a 403 is an authorization decision
+      // about a perfectly valid session (e.g. a teacher hitting an admin-only endpoint), and
+      // forcing a logout for it hid every permission-denied message the catalog defines.
       // The guard `storedToken` prevents this branch from firing on intentionally
       // unauthenticated requests like POST /auth/login (401 = wrong credentials).
       // `skipAuthRedirect` lets callers (e.g. the logout endpoint) opt-out so a
       // server-side 401 during logout doesn't re-trigger the redirect while the
       // local session is already being cleared.
-      if ((response.status === 401 || response.status === 403) && storedToken && !skipAuthRedirect) {
+      if (response.status === 401 && storedToken && !skipAuthRedirect) {
         // Signal the Login page to show the "session expired" modal after the
         // hard reload. sessionStorage survives a same-tab location change but
         // NOT a cross-tab or a new window, which is the desired scope.
@@ -137,6 +142,36 @@ export function createApiClient({
       headers: response.headers,
       ok: true,
     };
+  }
+
+  // ── Validated request (single point of error routing) ───────────────────────
+
+  /**
+   * Runs a request and, on success, unwraps the `ApiResponse` envelope and validates the
+   * inner payload against `schema` (when given). On failure — network error, non-2xx status,
+   * or the payload not matching `schema` — routes through {@link resolveApiError} exactly
+   * once, so every one of the 8 API modules gets identical error handling instead of each
+   * repeating its own `try/catch { if (error instanceof HttpError) ... }` block.
+   *
+   * @param {'GET'|'POST'|'PUT'|'DELETE'|'PATCH'} method
+   * @param {string} url
+   * @param {Object} [options={}]
+   * @param {*} [options.body] - Request payload, forwarded to `request`.
+   * @param {import('zod').ZodSchema} [options.schema] - Validates `envelope.data`. Omit for
+   *   endpoints with no meaningful response body (e.g. a bare DELETE).
+   * @param {Record<string, string>} [options.overrides] - Per-call message overrides keyed by
+   *   ErrorCode name or HTTP status, forwarded to `resolveApiError`.
+   * @returns {Promise<*>} the parsed inner payload (not the envelope).
+   * @throws {ApiError}
+   */
+  async function requestAndValidate(method, url, { schema, overrides, ...options } = {}) {
+    try {
+      const { data: envelope } = await request(method, url, options);
+      const payload = envelope?.data;
+      return schema ? schema.parse(payload) : payload;
+    } catch (error) {
+      throw resolveApiError(error, overrides);
+    }
   }
 
   // ── Public methods ─────────────────────────────────────────────────────────
@@ -183,5 +218,48 @@ export function createApiClient({
      * @returns {Promise<{data: *, status: number, headers: Headers, ok: boolean}>}
      */
     patch: (url, body, options) => request('PATCH', url, { body, ...options }),
+
+    /**
+     * GET + unwrap + validate + route errors through resolveApiError. See {@link requestAndValidate}.
+     * @param {string} url
+     * @param {Object} [options] - `{ schema, overrides, ...fetchOptions }`
+     * @returns {Promise<*>} the parsed inner payload
+     */
+    getValidated: (url, options) => requestAndValidate('GET', url, options),
+
+    /**
+     * DELETE + unwrap + validate + route errors through resolveApiError.
+     * @param {string} url
+     * @param {Object} [options] - `{ schema, overrides, ...fetchOptions }`
+     * @returns {Promise<*>} the parsed inner payload
+     */
+    deleteValidated: (url, options) => requestAndValidate('DELETE', url, options),
+
+    /**
+     * POST + unwrap + validate + route errors through resolveApiError.
+     * @param {string} url
+     * @param {*} body
+     * @param {Object} [options] - `{ schema, overrides, ...fetchOptions }`
+     * @returns {Promise<*>} the parsed inner payload
+     */
+    postValidated: (url, body, options) => requestAndValidate('POST', url, { body, ...options }),
+
+    /**
+     * PUT + unwrap + validate + route errors through resolveApiError.
+     * @param {string} url
+     * @param {*} body
+     * @param {Object} [options] - `{ schema, overrides, ...fetchOptions }`
+     * @returns {Promise<*>} the parsed inner payload
+     */
+    putValidated: (url, body, options) => requestAndValidate('PUT', url, { body, ...options }),
+
+    /**
+     * PATCH + unwrap + validate + route errors through resolveApiError.
+     * @param {string} url
+     * @param {*} body
+     * @param {Object} [options] - `{ schema, overrides, ...fetchOptions }`
+     * @returns {Promise<*>} the parsed inner payload
+     */
+    patchValidated: (url, body, options) => requestAndValidate('PATCH', url, { body, ...options }),
   };
 }

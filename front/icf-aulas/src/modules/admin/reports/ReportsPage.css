@@ -191,6 +191,55 @@
   min-width: 160px;
 }
 
+/* ── Exportable region (cover + KPI grid + charts) ───────────────────────────────
+   Wrapper that `exportRootRef` points to (see ReportsPage.jsx). Needs its own
+   flex/gap since it's now a nested div rather than the KPI grid and charts grid
+   sitting as direct children of `.reports-page` — this reproduces that spacing. */
+
+.reports-page__export-root {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── PDF cover (export-only) ──────────────────────────────────────────────────────
+   Hidden on screen; revealed only while `.reports-page--exporting` is toggled on
+   `.reports-page__export-root` during PDF capture (see handleExportPdf). html2canvas
+   skips `display:none` elements, so this must be a real display toggle, not
+   `visibility`/opacity tricks that would still leave the node occupying layout space
+   and getting captured as an empty box. */
+
+.reports-page__pdf-cover {
+  display: none;
+}
+
+.reports-page--exporting .reports-page__pdf-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 4px 20px;
+}
+
+.reports-page__pdf-cover-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--moon-bulma, #1a1a2e);
+  margin: 0;
+}
+
+.reports-page__pdf-cover-period {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moon-piccolo, #005687);
+  margin: 0;
+}
+
+.reports-page__pdf-cover-meta {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
 /* ── KPI grid ─────────────────────────────────────────────────────────────────── */
 
 .reports-page__kpi-grid {

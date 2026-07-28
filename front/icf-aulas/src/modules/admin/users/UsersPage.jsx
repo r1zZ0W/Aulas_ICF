@@ -13,6 +13,7 @@ import Buscador from '../../../components/Buscador/Buscador';
 import DataTable from '../../../components/DataTable/DataTable';
 import Badge from '../../../components/Badge/Badge';
 import EmptyState from '../../../components/EmptyState/EmptyState';
+import ErrorBanner from '../../../components/ErrorBanner/ErrorBanner';
 import Pagination from '../../../components/Pagination/Pagination';
 import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
@@ -34,6 +35,8 @@ export default function UsersPage() {
     stats,
     roles,
     usersLoading,
+    usersError,
+    refetchUsers,
     createMutation,
     updateMutation,
     deleteMutation,
@@ -170,6 +173,13 @@ export default function UsersPage() {
 
       {/* Table card */}
       <div className="users-page__table-card">
+        {usersError && (
+          <ErrorBanner
+            message="No se pudo cargar la lista de usuarios."
+            onDismiss={() => refetchUsers()}
+          />
+        )}
+
         {/* Toolbar */}
         <div className="users-page__table-toolbar">
           <Buscador

@@ -1,18 +1,14 @@
 /**
  * @fileoverview API client for the /api/v1/users and /api/v1/roles endpoints.
  *
- * All functions follow the same pattern as api/auth.js:
+ * All functions follow the same pattern as the other api/*.js modules:
  *  - Use createApiClient with the project base URL.
- *  - Unwrap the ApiResponse envelope (data.data).
- *  - Validate with Zod schemas.
- *  - Map HttpErrors to user-facing Spanish messages.
+ *  - Call the *Validated methods, which unwrap the ApiResponse envelope, validate the
+ *    response with a Zod schema, and route any failure through resolveApiError.
  */
-import { createApiClient, HttpError } from './base.js';
+import { createApiClient } from './base.js';
 import {
   UserResponseSchema,
-  UserCreateSchema,
-  UserUpdateSchema,
-  UserSelfEditSchema,
   UserStatsSchema,
   RoleResponseSchema,
   PagedResultSchema,
@@ -20,28 +16,6 @@ import {
 import { buildPageParams } from '../utils/queryUtils.js';
 
 const api = createApiClient();
-
-/**
- * Maps an HttpError to a user-facing Spanish message.
- * @param {HttpError} error
- * @param {Record<number,string>} [overrides]
- * @returns {string}
- */
-function resolveErrorMessage(error, overrides = {}) {
-  if (overrides[error.status]) return overrides[error.status];
-  const serverMessage = error.data?.message;
-  const defaults = {
-    0:   'No se pudo conectar con el servidor. Verifica tu conexión.',
-    400: serverMessage || 'Los datos enviados no son válidos.',
-    401: 'No autorizado.',
-    403: 'No tienes permisos para realizar esta acción.',
-    404: 'El usuario solicitado no existe.',
-    409: 'Ya existe un usuario con ese correo o nombre de usuario.',
-    422: 'Los datos enviados no pudieron ser procesados.',
-    500: 'Error interno del servidor. Intenta de nuevo más tarde.',
-  };
-  return defaults[error.status] || serverMessage || `Error inesperado (${error.status}).`;
-}
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
@@ -60,14 +34,8 @@ function resolveErrorMessage(error, overrides = {}) {
  * @returns {Promise<import('../schemas/pagedResult.js').PagedResultSchema>} Parsed paged result.
  */
 export async function getUsers({ search, page, size, sort, direction } = {}) {
-  try {
-    const qs = buildPageParams({ search, page, size, sort, direction });
-    const { data } = await api.get(`/api/v1/users${qs}`);
-    return PagedResultSchema(UserResponseSchema).parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  const qs = buildPageParams({ search, page, size, sort, direction });
+  return api.getValidated(`/api/v1/users${qs}`, { schema: PagedResultSchema(UserResponseSchema) });
 }
 
 /**
@@ -77,54 +45,33 @@ export async function getUsers({ search, page, size, sort, direction } = {}) {
  * @returns {Promise<{ total: number, active: number, inactive: number, admins: number }>}
  */
 export async function getUserStats() {
-  try {
-    const { data } = await api.get('/api/v1/users/stats');
-    return UserStatsSchema.parse(data.data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.getValidated('/api/v1/users/stats', { schema: UserStatsSchema });
 }
 
 /**
  * Creates a new user account. ADMIN only.
- * @param {z.infer<typeof UserCreateSchema>} payload
+ *
+ * `payload` is not re-validated here: the caller's `useZodForm(UserCreateSchema)` already
+ * ran `validateAll()` before submit — parsing again would just duplicate that check.
+ *
+ * @param {object} payload - matches UserCreateSchema
  * @returns {Promise<void>}
  */
 export async function createUser(payload) {
-  try {
-    const body = UserCreateSchema.parse(payload);
-    await api.post('/api/v1/users/register', body);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      throw new Error(resolveErrorMessage(error, {
-        409: 'Ya existe un usuario con ese correo o nombre de usuario.',
-      }));
-    }
-    throw error;
-  }
+  return api.postValidated('/api/v1/users/register', payload);
 }
 
 /**
  * Updates a user's profile. ADMIN only.
  * @param {string} uuid
- * @param {z.infer<typeof UserUpdateSchema>} payload
+ * @param {object} payload - matches UserUpdateSchema (already validated by the caller's useZodForm)
  * @returns {Promise<object>} Updated UserResponseDTO
  */
 export async function updateUser(uuid, payload) {
-  try {
-    const body = UserUpdateSchema.parse(payload);
-    const { data } = await api.put(`/api/v1/users/${uuid}`, body);
-    return UserResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      throw new Error(resolveErrorMessage(error, {
-        409: 'Ya existe un usuario con ese correo o nombre de usuario.',
-        403: 'No puedes modificar tu propia cuenta desde aquí.',
-      }));
-    }
-    throw error;
-  }
+  return api.putValidated(`/api/v1/users/${uuid}`, payload, {
+    schema: UserResponseSchema,
+    overrides: { ACCESS_DENIED: 'No puedes modificar tu propia cuenta desde aquí.' },
+  });
 }
 
 /**
@@ -134,36 +81,21 @@ export async function updateUser(uuid, payload) {
  * @returns {Promise<object>} Current user profile.
  */
 export async function getMyProfile() {
-  try {
-    const { data } = await api.get('/api/v1/users/me');
-    return UserResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.getValidated('/api/v1/users/me', { schema: UserResponseSchema });
 }
 
 /**
  * Updates the authenticated user's own profile.
  * PUT /api/v1/users/me
  *
- * @param {z.infer<typeof UserSelfEditSchema>} payload
+ * @param {object} payload - matches UserSelfEditSchema (already validated by the caller's useZodForm)
  * @returns {Promise<object>} Updated user profile.
  */
 export async function updateMyProfile(payload) {
-  try {
-    const body = UserSelfEditSchema.parse(payload);
-    const { data } = await api.put('/api/v1/users/me', body);
-    return UserResponseSchema.parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      throw new Error(resolveErrorMessage(error, {
-        409: 'Ya existe un usuario con ese correo o nombre de usuario.',
-        403: 'No puedes cambiar tu contraseña desde este perfil.',
-      }));
-    }
-    throw error;
-  }
+  return api.putValidated('/api/v1/users/me', payload, {
+    schema: UserResponseSchema,
+    overrides: { USER_PASSWORD_CHANGE_FORBIDDEN: 'No puedes cambiar tu contraseña desde este perfil.' },
+  });
 }
 
 /**
@@ -173,17 +105,7 @@ export async function updateMyProfile(payload) {
  * @returns {Promise<void>}
  */
 export async function deleteUser(uuid) {
-  try {
-    await api.delete(`/api/v1/users/${uuid}`);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      throw new Error(resolveErrorMessage(error, {
-        403: 'No puedes eliminar tu propia cuenta.',
-        404: 'El usuario solicitado no existe.',
-      }));
-    }
-    throw error;
-  }
+  return api.deleteValidated(`/api/v1/users/${uuid}`);
 }
 
 // ── Roles ─────────────────────────────────────────────────────────────────────
@@ -193,11 +115,5 @@ export async function deleteUser(uuid) {
  * @returns {Promise<Array<{id: number, name: string}>>}
  */
 export async function getRoles() {
-  try {
-    const { data } = await api.get('/api/v1/roles');
-    return RoleResponseSchema.array().parse(data.data ?? data);
-  } catch (error) {
-    if (error instanceof HttpError) throw new Error(resolveErrorMessage(error));
-    throw error;
-  }
+  return api.getValidated('/api/v1/roles', { schema: RoleResponseSchema.array() });
 }

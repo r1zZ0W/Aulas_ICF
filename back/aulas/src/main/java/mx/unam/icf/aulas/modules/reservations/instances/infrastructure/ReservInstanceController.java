@@ -18,6 +18,7 @@ import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceF
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
 
 import org.springframework.format.annotation.DateTimeFormat;
@@ -244,7 +245,7 @@ public class ReservInstanceController implements ResponseHandler {
         try {
             return file.getBytes();
         } catch (IOException e) {
-            throw new InvalidExcelFileException("Could not read the uploaded file.", e);
+            throw new InvalidExcelFileException(ErrorCode.ROSTER_FILE_UNREADABLE, "Could not read the uploaded file.", e);
         }
     }
 

@@ -104,8 +104,11 @@ export function useSemestersForm({ createMutation, updateMutation }) {
         await updateMutation.mutateAsync({ uuid: editTarget.uuid, payload: result.data });
       }
       close();
-    } catch {
-      // Error already surfaced as a toast by useApiMutation's onError handler.
+    } catch (err) {
+      // Error already surfaced as a toast by useApiMutation's onError handler;
+      // additionally highlight the offending input if the server told us which
+      // field caused it (e.g. duplicate semester name).
+      if (err.fieldErrors) zod.setServerErrors(err.fieldErrors);
     }
   }
 

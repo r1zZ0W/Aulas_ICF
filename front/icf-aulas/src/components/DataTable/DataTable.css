@@ -2,12 +2,15 @@
 
 .data-table-wrap {
   width: 100%;
+  max-height: 60vh;
   overflow-x: auto;
+  overflow-y: auto;
 }
 
 .data-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-family: var(--moon-font-sans);
   font-size: 14px;
 }
@@ -15,6 +18,12 @@
 /* Head */
 .data-table__head {
   background: #f9fafb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table__head tr {
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -26,6 +35,8 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .data-table__th:first-child {

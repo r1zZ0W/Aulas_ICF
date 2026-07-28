@@ -24,12 +24,12 @@ import java.time.LocalDate;
  */
 public record SemesterRequestDTO(
 
-        @NotBlank(message = "Semester name is required")
+        @NotBlank(message = "FIELD_REQUIRED")
         String name,
 
-        @NotNull(message = "Start date is required")
+        @NotNull(message = "FIELD_REQUIRED")
         LocalDate startDate,
 
-        @NotNull(message = "End date is required")
+        @NotNull(message = "FIELD_REQUIRED")
         LocalDate endDate
 ) {}

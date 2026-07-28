@@ -12,6 +12,7 @@ import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import mx.unam.icf.aulas.modules.reservations.students.app.StudentListPdfGenerator;
 import mx.unam.icf.aulas.modules.reservations.students.app.StudentRosterContext;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
 import mx.unam.icf.aulas.modules.reservations.students.domain.Student;
 import org.jspecify.annotations.NonNull;
@@ -24,11 +25,9 @@ import java.util.List;
 /**
  * OpenPDF implementation of {@link StudentListPdfGenerator}.
  *
- * <p>Mirrors the institutional style established by
- * {@link mx.unam.icf.aulas.modules.reports.app.ReservationReportService}: an A4 document
- * built entirely in memory with {@link PdfPTable}, a blue header row, and alternating
- * row backgrounds for readability. Columns mirror the source spreadsheet:
- * Nombre(s) | Apellido(s) | Correo electrónico.</p>
+ * <p>Follows the institutional report style (blue header row, alternating row
+ * backgrounds): an A4 document built entirely in memory with {@link PdfPTable}.
+ * Columns mirror the source spreadsheet: Nombre(s) | Apellido(s) | Correo electrónico.</p>
  *
  * @author Ithera
  * @version 1.0
@@ -78,7 +77,7 @@ public class OpenPdfStudentListGenerator implements StudentListPdfGenerator {
             // Should not happen for well-formed in-memory data, but a generator failure
             // is still a "the source data could not be turned into the expected output"
             // problem — reuse InvalidExcelFileException rather than leaking a 500.
-            throw new InvalidExcelFileException("Failed to generate the student roster PDF.", e);
+            throw new InvalidExcelFileException(ErrorCode.ROSTER_PDF_FAILED, "Failed to generate the student roster PDF.", e);
         }
 
         return bos.toByteArray();

@@ -13,8 +13,8 @@ import { z } from 'zod';
 export const ClassroomResourceMutationSchema = z.object({
   resourceUuid: z.string().uuid('UUID de recurso no válido'),
   quantity: z
-    .number()
-    .int()
+    .number({ error: 'La cantidad debe ser un número' })
+    .int('La cantidad debe ser un número entero')
     .min(1, 'La cantidad del recurso debe ser al menos 1')
     .default(1),
 });

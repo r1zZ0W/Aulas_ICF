@@ -13,3 +13,13 @@ export const ReasignFormSchema = z.object({
 });
 
 export default ReasignFormSchema;
+
+/**
+ * Translates `ReassignRequestDTO` (backend) field names to `ReasignFormSchema` (this file's)
+ * field names, for `useZodForm`'s `dtoMap` option — see ReasignarModal.jsx.
+ * `newTimeSlotIds` is one DTO field built from two controls, so a conflict on it highlights both.
+ */
+export const REASSIGN_DTO_MAP = {
+  newClassroomUuid: 'roomId',
+  newTimeSlotIds: ['startLabel', 'endLabel'],
+};

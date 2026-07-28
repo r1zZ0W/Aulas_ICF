@@ -148,8 +148,10 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
     try {
       await createMutation.mutateAsync(payload);
       closeCreate();
-    } catch {
-      // error already handled by useUsers onError (toast)
+    } catch (err) {
+      // useUsers' onError already toasted; additionally highlight the offending
+      // input if the server told us which field caused it (e.g. duplicate email).
+      if (err.fieldErrors) createZod.setServerErrors(err.fieldErrors);
     }
   }
 
@@ -167,8 +169,10 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
     try {
       await updateMutation.mutateAsync({ uuid: editUser.uuid, payload });
       closeEdit();
-    } catch {
-      // error already handled by useUsers onError (toast)
+    } catch (err) {
+      // useUsers' onError already toasted; additionally highlight the offending
+      // input if the server told us which field caused it (e.g. duplicate email).
+      if (err.fieldErrors) editZod.setServerErrors(err.fieldErrors);
     }
   }
 

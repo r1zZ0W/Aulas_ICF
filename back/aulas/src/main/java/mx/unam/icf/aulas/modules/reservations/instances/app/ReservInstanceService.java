@@ -7,6 +7,7 @@ import mx.unam.icf.aulas.kernel.domain.events.reservations.cancellations.ReservI
 import mx.unam.icf.aulas.kernel.domain.events.reservations.creations.ReservInstanceCreatedEventDTO;
 import mx.unam.icf.aulas.kernel.domain.events.reservations.reassigns.ReservInstanceReassignEventDTO;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.modules.reservations.history.app.ReservationHistoryService;
 import mx.unam.icf.aulas.modules.reservations.history.domain.ReservationEvent;
@@ -141,7 +142,7 @@ public class ReservInstanceService {
     public ReservInstanceResponseDTO findByUuid(UUID uuid) {
         return mapper.toDto(
             reservInstanceRepository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Reservation instance not found: " + uuid))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_NOT_FOUND, "Reservation instance not found: " + uuid))
         );
     }
 
@@ -206,7 +207,7 @@ public class ReservInstanceService {
     @Transactional(readOnly = true)
     public List<TimeSlotDTO> findAvailableSlots(UUID classroomUuid, LocalDate date) {
         Classroom classroom = classroomRepository.findByUuid(classroomUuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + classroomUuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + classroomUuid));
 
         // Resolve the conflict scope for this classroom (parent + direct children or child + parent)
         List<Long> scope = resolveConflictClassroomScope(classroom.getId()).stream().toList();
@@ -278,23 +279,23 @@ public class ReservInstanceService {
 
         // 1. Resolve classroom
         Classroom classroom = classroomRepository.findByUuid(dto.classroomUuid())
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + dto.classroomUuid()));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + dto.classroomUuid()));
         if (!Boolean.TRUE.equals(classroom.getIsActive()))
-            throw new DomainException("The requested classroom is inactive and cannot be reserved");
+            throw new DomainException(ErrorCode.CLASSROOM_INACTIVE, "The requested classroom is inactive and cannot be reserved");
 
         // 2.1 Resolve user by its UUID
         UUID target = dto.userUuid() != null ? dto.userUuid() : principalUuid;
 
         // 2.2 Fetch it into the database
         User user = userRepository.findByUuid(target)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with UUID: " + target));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND, "User not found with UUID: " + target));
 
         // 3. Ensure the requested start date does not exceed the currently active semester
         Semester currentSemester = semesterRepository.findCurrent(LocalDate.now())
-            .orElseThrow(() -> new DomainException("No active semester available at this time"));
+            .orElseThrow(() -> new DomainException(ErrorCode.SEMESTER_NO_ACTIVE, "No active semester available at this time"));
 
         if (dto.startDate().isAfter(currentSemester.getEndDate()))
-            throw new DomainException("Requested start date " + dto.startDate() + " is after the active semester end date " + currentSemester.getEndDate());
+            throw new DomainException(ErrorCode.RESERVATION_DATE_OUT_OF_SEMESTER, "Requested start date " + dto.startDate() + " is after the active semester end date " + currentSemester.getEndDate());
 
         // 4. Resolve target weekdays
         Set<DayOfWeek> days = (dto.daysOfWeek() == null || dto.daysOfWeek().isEmpty())
@@ -327,14 +328,14 @@ public class ReservInstanceService {
 
 
         if (targetDates.isEmpty())
-            throw new DomainException(
+            throw new DomainException(ErrorCode.RESERVATION_NO_VALID_DATES,
                 "No valid dates found between " + dto.startDate() + " and " + endDate +
                 " for the specified weekdays");
 
         // 8. Load time slots (validate IDs exist)
         List<TimeSlot> timeSlots = timeSlotRepository.findAllById(dto.timeSlotIds());
         if (timeSlots.size() != dto.timeSlotIds().size())
-            throw new ResourceNotFoundException("One or more time slots were not found");
+            throw new ResourceNotFoundException(ErrorCode.TIMESLOT_NOT_FOUND, "One or more time slots were not found");
 
 
         // 9. Per-date in-memory validations (no DB round-trips here)
@@ -342,13 +343,13 @@ public class ReservInstanceService {
         LocalTime nowTime  = LocalTime.now(ZoneId.of("America/Mexico_City"));
         for (LocalDate d : targetDates) {
             if (d.isBefore(today))
-                throw new DomainException("Date " + d + " is in the past");
+                throw new DomainException(ErrorCode.RESERVATION_DATE_IN_PAST, "Date " + d + " is in the past");
 
             if (d.getDayOfWeek() == DayOfWeek.SUNDAY)
-                throw new DomainException("Reservations cannot be made on Sundays (date: " + d + ")");
+                throw new DomainException(ErrorCode.RESERVATION_ON_SUNDAY, "Reservations cannot be made on Sundays (date: " + d + ")");
 
             if (d.isBefore(currentSemester.getStartDate()) || d.isAfter(currentSemester.getEndDate()))
-                throw new DomainException(
+                throw new DomainException(ErrorCode.RESERVATION_DATE_OUT_OF_SEMESTER,
                     "Date " + d + " falls outside the semester period " +
                     currentSemester.getStartDate() + " – " + currentSemester.getEndDate());
 
@@ -359,7 +360,7 @@ public class ReservInstanceService {
                     .orElseThrow();
 
                 if (earliest.getStartTime().isBefore(cutoff))
-                    throw new DomainException(
+                    throw new DomainException(ErrorCode.RESERVATION_TOO_SOON,
                         "Reservation must be made at least 15 minutes in advance");
 
             }
@@ -461,40 +462,40 @@ public class ReservInstanceService {
     @Transactional(rollbackFor = Exception.class)
     public ReservInstanceResponseDTO save(ReservInstanceRequestDTO dto, UUID principalUuid) {
         ReservationGroup group = groupRepository.findByUuid(dto.groupUuid())
-            .orElseThrow(() -> new ResourceNotFoundException("Reservation group not found: " + dto.groupUuid()));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_GROUP_NOT_FOUND, "Reservation group not found: " + dto.groupUuid()));
 
         if (!group.getUser().getUuid().equals(principalUuid))
             throw new AccessDeniedException("You can only create reservations for your own reservation groups");
 
         Classroom classroom = classroomRepository.findByUuid(dto.classroomUuid())
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + dto.classroomUuid()));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + dto.classroomUuid()));
 
         // Classroom must be explicitly active (null treated as inactive)
         if (!Boolean.TRUE.equals(classroom.getIsActive()))
-            throw new DomainException("The requested classroom is inactive and cannot be reserved");
+            throw new DomainException(ErrorCode.CLASSROOM_INACTIVE, "The requested classroom is inactive and cannot be reserved");
 
         if (dto.date().isBefore(LocalDate.now()))
-            throw new DomainException("Reservation date cannot be in the past");
+            throw new DomainException(ErrorCode.RESERVATION_DATE_IN_PAST, "Reservation date cannot be in the past");
 
         if (dto.date().getDayOfWeek() == DayOfWeek.SUNDAY)
-            throw new DomainException("Reservations cannot be made on Sundays");
+            throw new DomainException(ErrorCode.RESERVATION_ON_SUNDAY, "Reservations cannot be made on Sundays");
 
         // Date must fall within the semester's active window
         var semester = group.getSemester();
         if (dto.date().isBefore(semester.getStartDate()) || dto.date().isAfter(semester.getEndDate()))
-            throw new DomainException(
+            throw new DomainException(ErrorCode.RESERVATION_DATE_OUT_OF_SEMESTER,
                 "Reservation date " + dto.date() + " falls outside the semester period " +
                 semester.getStartDate() + " – " + semester.getEndDate());
 
         // Date's day-of-week must match the group's scheduled pattern
         if (!group.getDaysOfWeek().contains(dto.date().getDayOfWeek()))
-            throw new DomainException(
+            throw new DomainException(ErrorCode.RESERVATION_GROUP_SCHEDULE_MISMATCH,
                 "The group is not scheduled on " + dto.date().getDayOfWeek().name().toLowerCase() +
                 "s. Scheduled days: " + group.getDaysOfWeek());
 
         List<TimeSlot> timeSlots = dto.timeSlotIds().stream()
             .map(id -> timeSlotRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found: " + id)))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.TIMESLOT_NOT_FOUND, "Time slot not found: " + id)))
             .toList();
 
         if (dto.date().equals(LocalDate.now())) {
@@ -503,19 +504,19 @@ public class ReservInstanceService {
                 .min(Comparator.comparing(TimeSlot::getStartTime))
                 .orElseThrow();
             if (earliest.getStartTime().isBefore(cutoff))
-                throw new DomainException("Reservation must be made at least 15 minutes in advance");
+                throw new DomainException(ErrorCode.RESERVATION_TOO_SOON, "Reservation must be made at least 15 minutes in advance");
         }
 
         // Classroom double-booking check (backed by uk_reserv_slots_classroom_time)
         List<Long> scopeForSave = resolveConflictClassroomScope(classroom.getId()).stream().toList();
         if (reservInstanceRepository.existsConflictInScope(scopeForSave, dto.date(), dto.timeSlotIds()))
-             throw new DomainException(
+             throw new DomainException(ErrorCode.RESERVATION_SLOT_CONFLICT,
                  "The requested classroom already has a reservation for one or more of the selected time slots on " + dto.date());
 
         // User self-conflict check (backed by uk_reserv_slots_user_time)
         Long userId = group.getUser().getId();
         if (reservInstanceRepository.existsUserConflict(userId, dto.date(), dto.timeSlotIds()))
-            throw new DomainException(
+            throw new DomainException(ErrorCode.RESERVATION_OWN_CONFLICT,
                 "You already have a reservation for one or more of the selected time slots on " + dto.date());
 
         ReservInstance instance = mapper.toEntity(dto);
@@ -576,7 +577,7 @@ public class ReservInstanceService {
         if (!instance.getGroup().getUser().getUuid().equals(principalUuid))
             throw new AccessDeniedException("You can only cancel your own reservations");
         if (isCancelled(instance))
-            throw new DomainException("Reservation is already cancelled");
+            throw new DomainException(ErrorCode.RESERVATION_ALREADY_CANCELLED, "Reservation is already cancelled");
 
         // Capture data BEFORE deleting slots (defensive — slots will be gone after deleteByInstance)
         String  maestroEmail    = instance.getGroup().getUser().getEmail();
@@ -615,7 +616,7 @@ public class ReservInstanceService {
     public ReservInstanceResponseDTO cancelByAdmin(UUID uuid) {
         ReservInstance instance = getOrThrow(uuid);
         if (isCancelled(instance))
-            throw new DomainException("Reservation is already cancelled");
+            throw new DomainException(ErrorCode.RESERVATION_ALREADY_CANCELLED, "Reservation is already cancelled");
 
         // Capture data BEFORE deleting slots (defensive — slots will be gone after deleteByInstance)
         String  maestroEmail    = instance.getGroup().getUser().getEmail();
@@ -663,20 +664,20 @@ public class ReservInstanceService {
     @Transactional(rollbackFor = Exception.class)
     public ReservInstanceResponseDTO reassign(UUID uuid, ReassignRequestDTO dto) {
         if (dto.newClassroomUuid() == null && (dto.newTimeSlotIds() == null || dto.newTimeSlotIds().isEmpty()))
-            throw new DomainException("At least one of newClassroomUuid or newTimeSlotIds must be provided");
+            throw new DomainException(ErrorCode.REASSIGN_TARGET_REQUIRED, "At least one of newClassroomUuid or newTimeSlotIds must be provided");
 
         ReservInstance instance = getOrThrow(uuid);
 
         if (instance.getStatus() != ReservInstanceStatus.ACTIVE)
-            throw new DomainException("Only active reservations can be reassigned");
+            throw new DomainException(ErrorCode.RESERVATION_NOT_ACTIVE, "Only active reservations can be reassigned");
 
         // Resolve destination classroom
         Classroom destClassroom;
         if (dto.newClassroomUuid() != null) {
             destClassroom = classroomRepository.findByUuid(dto.newClassroomUuid())
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + dto.newClassroomUuid()));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + dto.newClassroomUuid()));
             if (!Boolean.TRUE.equals(destClassroom.getIsActive()))
-                throw new DomainException("The target classroom is inactive");
+                throw new DomainException(ErrorCode.REASSIGN_CLASSROOM_INACTIVE, "The target classroom is inactive");
         } else {
             destClassroom = instance.getClassroom();
         }
@@ -690,7 +691,7 @@ public class ReservInstanceService {
             destTimeSlotIds = dto.newTimeSlotIds();
             destTimeSlots = destTimeSlotIds.stream()
                 .map(id -> timeSlotRepository.findById(id)
-                    .orElseThrow(() -> new ResourceNotFoundException("Time slot not found: " + id)))
+                    .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.TIMESLOT_NOT_FOUND, "Time slot not found: " + id)))
                 .toList();
             slotsChanging = true;
         } else {
@@ -709,14 +710,14 @@ public class ReservInstanceService {
         List<Long> destScope = resolveConflictClassroomScope(destClassroom.getId()).stream().toList();
         if (reservInstanceRepository.existsConflictExcludingInScope(
                 destScope, instance.getDate(), destTimeSlotIds, instance.getId())) {
-            throw new DomainException(
+            throw new DomainException(ErrorCode.RESERVATION_SLOT_CONFLICT,
                 "The target classroom already has a reservation for one or more of the selected time slots on " + instance.getDate());
         }
 
         // 2. User self-conflict re-check (self-excluding) — must run before any mutation
         Long userId = instance.getGroup().getUser().getId();
         if (reservInstanceRepository.existsUserConflictExcluding(userId, instance.getDate(), destTimeSlotIds, instance.getId())) {
-            throw new DomainException(
+            throw new DomainException(ErrorCode.RESERVATION_OWN_CONFLICT,
                 "The teacher already has a reservation for one or more of the selected time slots on " + instance.getDate());
         }
 
@@ -784,7 +785,7 @@ public class ReservInstanceService {
 
     private ReservInstance getOrThrow(UUID uuid) {
         return reservInstanceRepository.findByUuid(uuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Reservation instance not found: " + uuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_NOT_FOUND, "Reservation instance not found: " + uuid));
     }
 
     private boolean isCancelled(ReservInstance instance) {

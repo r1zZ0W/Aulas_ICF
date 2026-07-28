@@ -62,9 +62,10 @@ class ReservInstanceControllerBindingTest {
 
     @BeforeEach
     void setUp() {
-        // The handlers consult the active profiles (isDev); a raw mock would return null
-        // and NPE inside the handler, masking the status code under test.
-        lenient().when(env.getActiveProfiles()).thenReturn(new String[]{});
+        // The handlers consult isDev() (env.acceptsProfiles); unstubbed it's fine since a bare
+        // mock returns false for boolean methods, but lenient() keeps this test independent
+        // of that default if a case here ever needs isDev() to be true.
+        lenient().when(env.acceptsProfiles(org.springframework.core.env.Profiles.of("dev"))).thenReturn(false);
 
         ReservInstanceController controller = new ReservInstanceController(service);
         mockMvc = MockMvcBuilders

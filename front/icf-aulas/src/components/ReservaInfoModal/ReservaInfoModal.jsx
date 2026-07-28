@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { X, Info, Users, Clock, Pencil, Ban } from 'lucide-react';
 import Modal from '../Modal/Modal';
+import ConfirmDeleteModal from '../ConfirmDeleteModal/ConfirmDeleteModal';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../utils/roles';
 import { useReservation } from '../../context/ReservationContext';
@@ -70,11 +72,21 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
   // Admins bypass this check — they can act on any reservation.
   const isOwner = user?.uuid === reservation.userUuid;
 
+  const [showConfirmCancel, setShowConfirmCancel] = useState(false);
+
   const handleCancelAdmin = () =>
     cancelReservationAdminMutation.mutate(reservation.uuid, { onSuccess: onClose });
 
   const handleCancelOwn = () =>
     cancelReservationMutation.mutate(reservation.uuid, { onSuccess: onClose });
+
+  const handleConfirmCancel = () => {
+    if (isAdmin) {
+      handleCancelAdmin();
+    } else {
+      handleCancelOwn();
+    }
+  };
 
   const isCancelling =
     cancelReservationMutation.isPending || cancelReservationAdminMutation.isPending;
@@ -206,7 +218,7 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
                 <button
                   type="button"
                   className="reserva-modal__btn reserva-modal__btn--danger"
-                  onClick={handleCancelAdmin}
+                  onClick={() => setShowConfirmCancel(true)}
                   disabled={isCancelling}
                 >
                   <Ban size={16} />
@@ -230,7 +242,7 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
               <button
                 type="button"
                 className="reserva-modal__btn reserva-modal__btn--danger"
-                onClick={handleCancelOwn}
+                onClick={() => setShowConfirmCancel(true)}
                 disabled={isCancelling}
               >
                 <Ban size={16} />
@@ -240,6 +252,16 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
           </footer>
         </div>
       </div>
+
+      <ConfirmDeleteModal
+        open={showConfirmCancel}
+        onClose={() => setShowConfirmCancel(false)}
+        onConfirm={handleConfirmCancel}
+        title="¿Confirmar cancelación?"
+        message="¿Estás seguro de que deseas cancelar esta reserva? Esta acción no se puede deshacer."
+        confirmLabel="Cancelar reserva"
+        cancelLabel="Volver"
+      />
     </Modal>
   );
 }

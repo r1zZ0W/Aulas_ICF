@@ -31,23 +31,23 @@ import java.util.UUID;
  */
 public record ReservInstanceRequestDTO(
 
-        @NotNull(message = "Group UUID is required")
+        @NotNull(message = "FIELD_REQUIRED")
         UUID groupUuid,
 
-        @NotNull(message = "Classroom UUID is required")
+        @NotNull(message = "FIELD_REQUIRED")
         UUID classroomUuid,
 
-        @NotNull(message = "Reservation date is required")
-        @FutureOrPresent(message = "Reservation date must not be in the past")
+        @NotNull(message = "FIELD_REQUIRED")
+        @FutureOrPresent(message = "FIELD_OUT_OF_RANGE")
         LocalDate date,
 
-        @NotEmpty(message = "At least one time slot is required")
+        @NotEmpty(message = "FIELD_REQUIRED")
         List<Integer> timeSlotIds,
 
-        @NotNull(message = "Number of attendees is required")
-        @Positive(message = "Number of attendees must be positive")
+        @NotNull(message = "FIELD_REQUIRED")
+        @Positive(message = "FIELD_OUT_OF_RANGE")
         Integer attendeeCount,
 
-        @Size(max = 150, message = "Title must not exceed 150 characters")
+        @Size(max = 150, message = "FIELD_OUT_OF_RANGE")
         String title
 ) {}

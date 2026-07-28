@@ -10,7 +10,7 @@ import java.util.Optional;
  */
 public interface RoleRepository extends JpaRepository<Role, Long> {
 
-    /** Finds a role by its unique name (e.g. "ADMIN", "MAESTRO"). */
+    /** Finds a role by its unique name (e.g. "ADMIN", "TEACHER"). */
     Optional<Role> findByName(String name);
 }
 

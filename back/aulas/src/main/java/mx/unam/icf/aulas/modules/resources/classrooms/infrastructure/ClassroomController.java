@@ -53,7 +53,7 @@ public class ClassroomController implements ResponseHandler {
     /**
      * Retrieves classrooms from the system, paginated.
      * ADMIN users receive all classrooms (active and inactive) for management purposes.
-     * MAESTRO users receive only active classrooms (DFR §2.3).
+     * TEACHER users receive only active classrooms (DFR §2.3).
      * GET /api/v1/classrooms[?search=text&page=0&size=20&sort=name&direction=asc]
      *
      * <p>When {@code search} is provided, a case-insensitive {@code LIKE} filter is applied

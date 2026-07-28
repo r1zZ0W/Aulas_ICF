@@ -50,6 +50,8 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
   const {
     data: pageData,
     isFetching: loading,
+    isError: classroomsError,
+    refetch: refetchClassrooms,
   } = useQuery({
     queryKey: ['classrooms', 'list', { search, page, size, sort, direction }],
     queryFn: () => getClassrooms({ search, page, size, sort, direction }),
@@ -137,6 +139,8 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
     totalPages,
     stats,
     loading,
+    classroomsError,
+    refetchClassrooms,
     createMutation,
     updateMutation,
     deleteMutation,

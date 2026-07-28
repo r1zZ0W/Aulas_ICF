@@ -13,7 +13,7 @@ import mx.unam.icf.aulas.kernel.domain.entities.BaseEntity;
  * Entity class representing a system role.
  *
  * This catalog entity defines permissions through predefined role names
- * such as MAESTRO and ADMIN.
+ * such as TEACHER and ADMIN.
  *
  * @author Ithera
  * @version 1.0

@@ -3,6 +3,7 @@ package mx.unam.icf.aulas.modules.reservations.students.app;
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.app.FileStorageService;
 import mx.unam.icf.aulas.kernel.domain.events.reservations.creations.ReservInstanceCreatedEventDTO;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.modules.access.users.domain.User;
 import mx.unam.icf.aulas.modules.access.users.infrastructure.UserRepository;
@@ -98,7 +99,7 @@ public class ReservationStudentService {
     @Transactional(rollbackFor = Exception.class)
     public StudentUploadResponseDTO upload(UUID groupUuid, byte[] fileBytes, UUID principalUuid, boolean isAdmin) {
         ReservationGroup group = groupRepository.findByUuid(groupUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Reservation group not found: " + groupUuid));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_GROUP_NOT_FOUND, "Reservation group not found: " + groupUuid));
 
         if (!isAdmin && !group.getUser().getUuid().equals(principalUuid))
             throw new AccessDeniedException("You can only upload a roster for your own reservation groups");
@@ -136,12 +137,12 @@ public class ReservationStudentService {
     @Transactional(readOnly = true)
     public byte[] generatePdf(UUID groupUuid) {
         ReservationGroup group = groupRepository.findByUuid(groupUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Reservation group not found: " + groupUuid));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_GROUP_NOT_FOUND, "Reservation group not found: " + groupUuid));
 
         // A PDF with no roster makes no sense: absence of the file is a 404 here, unlike
         // listStudents (below), which treats absence as a legitimate empty result.
         byte[] fileBytes = fileStorage.load(properties.getStorageDir(), rosterFileName(groupUuid))
-                .orElseThrow(() -> new StudentListNotFoundException(
+                .orElseThrow(() -> new StudentListNotFoundException(ErrorCode.ROSTER_NOT_FOUND,
                         "No student roster has been uploaded for reservation group: " + groupUuid));
 
         List<Student> students = parseRoster(fileBytes);
@@ -172,7 +173,7 @@ public class ReservationStudentService {
     @Transactional(readOnly = true)
     public List<StudentResponseDTO> listStudents(UUID groupUuid) {
         groupRepository.findByUuid(groupUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Reservation group not found: " + groupUuid));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_GROUP_NOT_FOUND, "Reservation group not found: " + groupUuid));
 
         Optional<byte[]> fileBytes = fileStorage.load(properties.getStorageDir(), rosterFileName(groupUuid));
         if (fileBytes.isEmpty())

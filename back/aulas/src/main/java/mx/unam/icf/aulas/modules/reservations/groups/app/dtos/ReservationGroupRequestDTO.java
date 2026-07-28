@@ -24,14 +24,14 @@ import java.util.UUID;
  */
 public record ReservationGroupRequestDTO(
 
-        @NotNull(message = "User UUID is required")
+        @NotNull(message = "FIELD_REQUIRED")
         UUID userUuid,
 
-        @NotNull(message = "Semester ID is required")
+        @NotNull(message = "FIELD_REQUIRED")
         Long semesterId,
 
         ReservationGroupStatus status,
 
-        @NotNull(message = "Days of week are required")
+        @NotNull(message = "FIELD_REQUIRED")
         Set<DayOfWeek> daysOfWeek
 ) {}

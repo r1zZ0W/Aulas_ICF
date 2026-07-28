@@ -30,7 +30,8 @@ import java.util.List;
  * <p>Responsibilities:</p>
  * <ul>
  *   <li>CSRF disabled — the API is stateless and uses JWT bearer tokens.</li>
- *   <li>CORS configured from {@code app.cors.allowed-origins} (defaults to {@code http://localhost:5173}).</li>
+ *   <li>CORS configured from {@code app.cors.allowed-origins} — no default, must be set explicitly
+ *       per environment (dev defaults live in {@code application-dev.properties}).</li>
  *   <li>Session management set to {@code STATELESS} — no server-side session is created.</li>
  *   <li>Security headers: XSS protection enabled in block mode; CSP restricts scripts to {@code 'self'}.</li>
  *   <li>Public routes: only {@code /api/v1/auth/**} is accessible without authentication.</li>
@@ -48,7 +49,10 @@ public class MainSecurity {
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
     private final JwtAccessDeniedHandler      accessDeniedHandler;
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    // No default: app.cors.allowed-origins is a bare placeholder in application.properties
+    // (${APP_CORS_ALLOWED_ORIGINS}), so a missing value already fails startup before this
+    // bean is even constructed. A local default here would silently mask that in production.
+    @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
     /** Injected to check the active Spring profile for Swagger gating. */

@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Mail, BadgeInfo } from 'lucide-react';
 
 import { useAuth } from '../../../context/AuthContext';
 import { ROLES, roleBadgeVariant, roleLabel } from '../../../utils/roles';
 import { getInitials } from '../../../utils/format';
-import { UserSelfEditSchema } from '../../../schemas/index.js';
+import { getUserSelfEditFormSchema } from '../../../schemas/user/userSelfEditForm.js';
 import { getMyProfile, updateMyProfile } from '../../../api/users.js';
 import { useApiMutation } from '../../../hooks/useApiMutation.js';
+import { useZodForm } from '../../../hooks/useZodForm.js';
 
 import Card from '../../../components/Card/Card';
 import Badge from '../../../components/Badge/Badge';
@@ -29,15 +30,6 @@ function buildInitialForm(profile) {
     password: '',
     confirmPassword: '',
   };
-}
-
-function flattenZodError(zodError) {
-  const out = {};
-  for (const issue of zodError.issues ?? []) {
-    const key = issue.path[0];
-    if (key && !out[key]) out[key] = issue.message;
-  }
-  return out;
 }
 
 export default function ProfilePage() {
@@ -76,8 +68,13 @@ export default function ProfilePage() {
 function ProfileEditor({ profile }) {
   const { user, updateSession } = useAuth();
   const isAdmin = user.role === ROLES.ADMIN;
-  const [form, setForm] = useState(() => buildInitialForm(profile));
-  const [formErrors, setFormErrors] = useState({});
+
+  // Memoized: useZodForm keys its internal useCallbacks on schema identity — a fresh instance
+  // every render would reset/re-evaluate validation in a loop (see useSemestersForm.js for
+  // the same pattern with getSemesterSchema).
+  const schema = useMemo(() => getUserSelfEditFormSchema({ isAdmin }), [isAdmin]);
+  const zod = useZodForm(buildInitialForm(profile), schema);
+  const form = zod.formData;
 
   const saveMutation = useApiMutation({
     mutationFn: updateMyProfile,
@@ -88,55 +85,35 @@ function ProfileEditor({ profile }) {
         name: `${updatedProfile.firstName} ${updatedProfile.lastNames}`.trim(),
         email: updatedProfile.email,
       });
-      setForm(buildInitialForm(updatedProfile));
-      setFormErrors({});
+      zod.reset(buildInitialForm(updatedProfile));
     },
   });
 
   const fullName = `${profile.firstName} ${profile.lastNames}`.trim();
   const avatarInitials = getInitials(profile);
 
-  function handleField(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setFormErrors((current) => ({ ...current, [field]: undefined }));
-  }
+  async function handleSubmit(e) {
+    e.preventDefault();
+    // validateAll() marks every field as touched and returns false if Zod fails — this
+    // illuminates all required-field errors even on a direct "Guardar" click.
+    const isValid = zod.validateAll();
+    if (!isValid) return;
 
-  function validate() {
     const payload = {
       firstName: form.firstName.trim(),
       lastNames: form.lastNames.trim(),
       username: form.username.trim(),
       email: form.email.trim(),
       extension: form.extension.trim() || null,
-      password: isAdmin && form.password.trim() ? form.password : null,
+      password: isAdmin && form.password ? form.password : null,
     };
-
-    const parsed = UserSelfEditSchema.safeParse(payload);
-    if (!parsed.success) {
-      setFormErrors(flattenZodError(parsed.error));
-      return null;
-    }
-
-    if (isAdmin && form.password.trim() && form.password !== form.confirmPassword) {
-      setFormErrors((current) => ({
-        ...current,
-        confirmPassword: 'Las contraseñas no coinciden',
-      }));
-      return null;
-    }
-
-    return parsed.data;
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const payload = validate();
-    if (!payload) return;
 
     try {
       await saveMutation.mutateAsync(payload);
-    } catch {
-      // toast handling is centralized in useApiMutation
+    } catch (err) {
+      // toast handling is centralized in useApiMutation; additionally highlight the
+      // offending input if the server told us which field caused it.
+      if (err.fieldErrors) zod.setServerErrors(err.fieldErrors);
     }
   }
 
@@ -189,27 +166,30 @@ function ProfileEditor({ profile }) {
             <Input
               label="Nombre completo *"
               value={form.firstName}
-              onChange={(e) => handleField('firstName', e.target.value)}
+              onChange={(e) => zod.handleChange('firstName', e.target.value)}
+              onBlur={() => zod.handleBlur('firstName')}
               placeholder="Ingresa tu nombre completo"
-              error={formErrors.firstName}
+              error={zod.errors.firstName}
               required
             />
 
             <Input
               label="Apellidos *"
               value={form.lastNames}
-              onChange={(e) => handleField('lastNames', e.target.value)}
+              onChange={(e) => zod.handleChange('lastNames', e.target.value)}
+              onBlur={() => zod.handleBlur('lastNames')}
               placeholder="Ingresa tus apellidos"
-              error={formErrors.lastNames}
+              error={zod.errors.lastNames}
               required
             />
 
             <Input
               label="Nombre de usuario *"
               value={form.username}
-              onChange={(e) => handleField('username', e.target.value)}
+              onChange={(e) => zod.handleChange('username', e.target.value)}
+              onBlur={() => zod.handleBlur('username')}
               placeholder="Ingresa un nombre de usuario"
-              error={formErrors.username}
+              error={zod.errors.username}
               required
             />
 
@@ -217,18 +197,20 @@ function ProfileEditor({ profile }) {
               label="Correo electrónico *"
               type="email"
               value={form.email}
-              onChange={(e) => handleField('email', e.target.value)}
+              onChange={(e) => zod.handleChange('email', e.target.value)}
+              onBlur={() => zod.handleBlur('email')}
               placeholder="correo@icf.unam.mx"
-              error={formErrors.email}
+              error={zod.errors.email}
               required
             />
 
             <Input
               label="Extensión"
               value={form.extension}
-              onChange={(e) => handleField('extension', e.target.value)}
+              onChange={(e) => zod.handleChange('extension', e.target.value)}
+              onBlur={() => zod.handleBlur('extension')}
               placeholder="Extensión interna"
-              error={formErrors.extension}
+              error={zod.errors.extension}
             />
 
             <div className="profile-page__access-block profile-page__grid--full">
@@ -253,17 +235,19 @@ function ProfileEditor({ profile }) {
                     label="Nueva contraseña"
                     type="password"
                     value={form.password}
-                    onChange={(e) => handleField('password', e.target.value)}
+                    onChange={(e) => zod.handleChange('password', e.target.value)}
+                    onBlur={() => zod.handleBlur('password')}
                     placeholder="Ingresa tu nueva contraseña"
-                    error={formErrors.password}
+                    error={zod.errors.password}
                   />
                   <Input
                     label="Confirmar contraseña"
                     type="password"
                     value={form.confirmPassword}
-                    onChange={(e) => handleField('confirmPassword', e.target.value)}
+                    onChange={(e) => zod.handleChange('confirmPassword', e.target.value)}
+                    onBlur={() => zod.handleBlur('confirmPassword')}
                     placeholder="Repite la nueva contraseña"
-                    error={formErrors.confirmPassword}
+                    error={zod.errors.confirmPassword}
                   />
                 </div>
               )}

@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.resources.allocations.app;
 
 import lombok.RequiredArgsConstructor;
 import mx.unam.icf.aulas.kernel.domain.exceptions.DomainException;
+import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.kernel.infrastructure.exceptions.ResourceNotFoundException;
 import mx.unam.icf.aulas.modules.resources.allocations.app.dtos.ClassroomResourceRequestDTO;
 import mx.unam.icf.aulas.modules.resources.allocations.app.dtos.ClassroomResourceResponseDTO;
@@ -47,7 +48,7 @@ public class ClassroomResourceService {
     @Transactional(readOnly = true)
     public List<ClassroomResourceResponseDTO> findByClassroom(UUID classroomUuid) {
         Classroom classroom = classroomRepository.findByUuid(classroomUuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + classroomUuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + classroomUuid));
         return mapper.toDtoList(allocationRepository.findByClassroomId(classroom.getId()));
     }
 
@@ -63,13 +64,13 @@ public class ClassroomResourceService {
     @Transactional(rollbackFor = Exception.class)
     public ClassroomResourceResponseDTO save(UUID classroomUuid, ClassroomResourceRequestDTO dto) {
         Classroom classroom = classroomRepository.findByUuid(classroomUuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + classroomUuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + classroomUuid));
 
         Resource resource = resourceRepository.findByUuid(dto.resourceUuid())
-            .orElseThrow(() -> new ResourceNotFoundException("Equipment resource not found: " + dto.resourceUuid()));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESOURCE_NOT_FOUND, "Equipment resource not found: " + dto.resourceUuid()));
 
         if (dto.quantity() == null || dto.quantity() < 1)
-            throw new DomainException("Quantity must be at least 1");
+            throw new DomainException(ErrorCode.ALLOCATION_QUANTITY_INVALID, "Quantity must be at least 1");
 
         ClassroomResourceId id = new ClassroomResourceId(classroom.getId(), resource.getId());
         ClassroomResource allocation = allocationRepository.findById(id)
@@ -90,14 +91,14 @@ public class ClassroomResourceService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(UUID classroomUuid, UUID resourceUuid) {
         Classroom classroom = classroomRepository.findByUuid(classroomUuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Classroom not found: " + classroomUuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CLASSROOM_NOT_FOUND, "Classroom not found: " + classroomUuid));
 
         Resource resource = resourceRepository.findByUuid(resourceUuid)
-            .orElseThrow(() -> new ResourceNotFoundException("Equipment resource not found: " + resourceUuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESOURCE_NOT_FOUND, "Equipment resource not found: " + resourceUuid));
 
         ClassroomResourceId id = new ClassroomResourceId(classroom.getId(), resource.getId());
         ClassroomResource allocation = allocationRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Equipment allocation not found for classroom " + classroomUuid + " and resource " + resourceUuid));
+            .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.ALLOCATION_NOT_FOUND, "Equipment allocation not found for classroom " + classroomUuid + " and resource " + resourceUuid));
 
         allocationRepository.delete(allocation);
     }

@@ -15,6 +15,7 @@ import Buscador from '../../../components/Buscador/Buscador';
 import DataTable from '../../../components/DataTable/DataTable';
 import Badge from '../../../components/Badge/Badge';
 import EmptyState from '../../../components/EmptyState/EmptyState';
+import ErrorBanner from '../../../components/ErrorBanner/ErrorBanner';
 import Pagination from '../../../components/Pagination/Pagination';
 import Select from '../../../components/Select/Select';
 
@@ -197,7 +198,7 @@ export default function HistoryPage() {
   const dateRangeValid = (!safeFrom || !safeTo) || (safeFrom <= safeTo);
   const blocked = isIncompleteSearch || !dateRangeValid;
 
-  const { items: rawItems, totalElements, totalPages, loading, tab, setTab, isAdmin } = useReservationHistory({
+  const { items: rawItems, totalElements, totalPages, loading, isError, refetch, tab, setTab, isAdmin } = useReservationHistory({
     user,
     page,
     size: DEFAULT_PAGE_SIZE,
@@ -310,6 +311,12 @@ export default function HistoryPage() {
 
       {/* Table card */}
       <div className="history-page__table-card">
+        {isError && (
+          <ErrorBanner
+            message="No se pudo cargar el historial de reservas."
+            onDismiss={() => refetch()}
+          />
+        )}
 
         {/* Toolbar row 1: text search + dropdowns + reset */}
         <div className="history-page__toolbar">
