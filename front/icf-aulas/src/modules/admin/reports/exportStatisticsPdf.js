@@ -36,6 +36,10 @@ const GAP = 6;
  * @returns {Promise<void>}
  */
 export async function exportBlocksToPdf({ blocks, filename, onProgress }) {
+  if (!blocks || blocks.length === 0) {
+    throw new Error('NO_BLOCKS_FOUND');
+  }
+
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
@@ -55,11 +59,21 @@ export async function exportBlocksToPdf({ blocks, filename, onProgress }) {
     // label actually has a chance to paint instead of the UI freezing solid.
     await new Promise(resolve => requestAnimationFrame(resolve));
 
-    const canvas = await html2canvas(block, {
-      scale,
-      backgroundColor: '#ffffff',
-      logging: false,
-    });
+    let canvas;
+    try {
+      canvas = await html2canvas(block, {
+        scale,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+    } catch (err) {
+      console.error(`[PDF Export] Error al capturar el bloque ${i + 1}:`, err);
+      throw new Error('CANVAS_CAPTURE_FAILED');
+    }
+
+    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+      throw new Error('CANVAS_EMPTY');
+    }
 
     let imgW = usableW;
     let imgH = (canvas.height * imgW) / canvas.width;
@@ -82,11 +96,22 @@ export async function exportBlocksToPdf({ blocks, filename, onProgress }) {
       cursorY = MARGIN;
     }
 
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, cursorY, imgW, imgH);
+    try {
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, cursorY, imgW, imgH);
+    } catch (err) {
+      console.error(`[PDF Export] Error al agregar el bloque ${i + 1} al PDF:`, err);
+      throw new Error('PDF_ADD_IMAGE_FAILED');
+    }
+
     cursorY += imgH + GAP;
   }
 
-  pdf.save(filename);
+  try {
+    pdf.save(filename);
+  } catch (err) {
+    console.error('[PDF Export] Error al guardar el PDF:', err);
+    throw new Error('PDF_SAVE_FAILED');
+  }
 }
 
 // ── Filename helper ──────────────────────────────────────────────────────────────

@@ -26,8 +26,92 @@ body {
   display: flex;
 }
 
+/*
+ * Login's 2-column split, previously Bootstrap's .row, .col-sm-5, .col-sm-7
+ * and .g-0 grid.
+ * Scoped here (not in the shared utilities.css) since Login is the only
+ * screen in the app using this layout. Stacks to 1 column below 576px,
+ * matching Bootstrap's `sm` breakpoint; DOM order is col-sm-7 (side panel)
+ * then col-sm-5 (form), so the grid tracks follow that 7:5 ratio in order.
+ */
 .card-container>.row {
   flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 576px) {
+  .card-container>.row {
+    grid-template-columns: 7fr 5fr;
+  }
+}
+
+/*
+ * Login's inner content wrappers, previously Bootstrap's .container.
+ * Verbatim copy of bootstrap's .container rule (including the responsive
+ * max-width steps) so large-screen centering behavior is unchanged.
+ */
+.container {
+  --bs-gutter-x: 1.5rem;
+  width: 100%;
+  padding-right: calc(var(--bs-gutter-x) * 0.5);
+  padding-left: calc(var(--bs-gutter-x) * 0.5);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+@media (min-width: 576px) {
+  .container {
+    max-width: 540px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 720px;
+  }
+}
+
+@media (min-width: 992px) {
+  .container {
+    max-width: 960px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .container {
+    max-width: 1140px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .container {
+    max-width: 1320px;
+  }
+}
+
+.bg-white {
+  background-color: #fff !important;
+}
+
+.fw-bolder {
+  font-weight: bolder !important;
+}
+
+.mt-3 {
+  margin-top: 1rem !important;
+}
+
+.mt-4 {
+  margin-top: 1.5rem !important;
+}
+
+.me-5 {
+  margin-right: 3rem !important;
+}
+
+.w-auto {
+  width: auto !important;
 }
 
 .open-box {

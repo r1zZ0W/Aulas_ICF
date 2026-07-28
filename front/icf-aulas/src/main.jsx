@@ -5,8 +5,8 @@ import { AuthProvider } from './context/AuthContext';
 import { ApiError } from './errors/ApiError.js';
 import { toast } from './utils/toast.jsx';
 
-import '/node_modules/bootstrap/dist/css/bootstrap.min.css';
-import '/node_modules/bootstrap-icons/font/bootstrap-icons.css';
+import './styles/reset.css';
+import './styles/utilities.css';
 import './styles/theme.css';
 
 import App from './App.jsx';

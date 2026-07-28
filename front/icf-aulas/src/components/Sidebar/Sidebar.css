@@ -1,5 +1,8 @@
 .sidebar {
   width: 240px;
+  min-width: 240px;
+  max-width: 240px;
+  box-sizing: border-box;
   height: 100vh;
   background-color: #ffffff;
   color: var(--moon-bulma);
@@ -8,8 +11,16 @@
   flex-shrink: 0;
   position: sticky;
   top: 0;
-  overflow-y: auto;
+  overflow: hidden;
   border-right: 1px solid var(--moon-beerus);
+}
+
+.sidebar__content {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Brand */
@@ -123,8 +134,8 @@
   color: var(--moon-trunks);
 }
 
-.sidebar__section-header i {
-  font-size: 0.6rem;
+.sidebar__section-header svg {
+  flex-shrink: 0;
 }
 
 /* Salas list */

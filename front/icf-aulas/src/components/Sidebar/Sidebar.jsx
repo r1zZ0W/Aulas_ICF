@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { Plus, ChevronUp, ChevronDown, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLogout } from '../../hooks/useLogout';
 import { PRIVATE_ROUTES } from '../../routes/routeConfig';
@@ -33,91 +34,93 @@ export default function Sidebar() {
     <>
       <aside className="sidebar">
         {loggingOut && <LoadingOverlay label="Cerrando sesión..." />}
-        {/* Brand */}
-        <div className="sidebar__brand">
-          <NavLink to="/reservations" className="sidebar__link">
-            <img src={aulasHeader} alt="ICF Aulas" className="sidebar__logo" />
-          </NavLink>
-        </div>
-
-        {/* Nav */}
-        <nav className="sidebar__nav">
-          {navItems.map(({ path, sidebar }) => (
-            <NavLink
-              key={path}
-              to={path}
-              className={({ isActive }) =>
-                `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
-              }
-            >
-              <span className="sidebar__icon">{sidebar.icon}</span>
-              <span>{sidebar.label}</span>
+        <div className="sidebar__content">
+          {/* Brand */}
+          <div className="sidebar__brand">
+            <NavLink to="/reservations" className="sidebar__link">
+              <img src={aulasHeader} alt="ICF Aulas" className="sidebar__logo" />
             </NavLink>
-          ))}
-        </nav>
+          </div>
 
-        {/* Nueva Reserva */}
-        <div className="sidebar__action">
-          <button className="sidebar__new-reserva-btn" onClick={() => openModal()}>
-            <i className="bi bi-plus-lg" />
-            <span>Nueva Reserva</span>
-          </button>
-        </div>
+          {/* Nav */}
+          <nav className="sidebar__nav">
+            {navItems.map(({ path, sidebar }) => (
+              <NavLink
+                key={path}
+                to={path}
+                className={({ isActive }) =>
+                  `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+                }
+              >
+                <span className="sidebar__icon">{sidebar.icon}</span>
+                <span>{sidebar.label}</span>
+              </NavLink>
+            ))}
+          </nav>
 
-        {/* Mini Calendar */}
-        <div className="sidebar__section">
-          <button
-            className="sidebar__section-header"
-            onClick={() => setCalOpen(o => !o)}
-            aria-expanded={calOpen}
-          >
-            <span>Mini Calendario</span>
-            <i className={`bi bi-chevron-${calOpen ? 'up' : 'down'}`} />
-          </button>
-          {calOpen && <MiniCalendar />}
-        </div>
+          {/* Nueva Reserva */}
+          <div className="sidebar__action">
+            <button className="sidebar__new-reserva-btn" onClick={() => openModal()}>
+              <Plus size={14} />
+              <span>Nueva Reserva</span>
+            </button>
+          </div>
 
-        {/* Aulas */}
-        <div className="sidebar__section">
-          <button
-            className="sidebar__section-header"
-            onClick={() => setRoomsOpen(o => !o)}
-            aria-expanded={roomsOpen}
-          >
-            <span>Aulas</span>
-            <i className={`bi bi-chevron-${roomsOpen ? 'up' : 'down'}`} />
-          </button>
-          {roomsOpen && (
-            <ul className="sidebar__salas">
-              {rooms.length === 0 ? (
-                <li className="sidebar__sala-empty">Sin aulas registradas</li>
-              ) : (
-                rooms.map(({ uuid, label, color }) => {
-                  const visible = visibleRooms.has(uuid);
-                  return (
-                    <li key={uuid} className="sidebar__sala-item">
-                      <button
-                        type="button"
-                        className={`sidebar__sala-toggle${visible ? ' sidebar__sala-toggle--on' : ''}`}
-                        onClick={() => toggleRoom(uuid)}
-                        aria-pressed={visible}
-                        aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${label}`}
-                        style={{ '--sala-color': color }}
-                      >
-                        <span
-                          className="sidebar__sala-dot"
-                          style={{ background: visible ? color : 'transparent', borderColor: color }}
-                        />
-                        <span className={`sidebar__sala-label${visible ? '' : ' sidebar__sala-label--off'}`}>
-                          {label}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })
-              )}
-            </ul>
-          )}
+          {/* Mini Calendar */}
+          <div className="sidebar__section">
+            <button
+              className="sidebar__section-header"
+              onClick={() => setCalOpen(o => !o)}
+              aria-expanded={calOpen}
+            >
+              <span>Mini Calendario</span>
+              {calOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </button>
+            {calOpen && <MiniCalendar />}
+          </div>
+
+          {/* Aulas */}
+          <div className="sidebar__section">
+            <button
+              className="sidebar__section-header"
+              onClick={() => setRoomsOpen(o => !o)}
+              aria-expanded={roomsOpen}
+            >
+              <span>Aulas</span>
+              {roomsOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </button>
+            {roomsOpen && (
+              <ul className="sidebar__salas">
+                {rooms.length === 0 ? (
+                  <li className="sidebar__sala-empty">Sin aulas registradas</li>
+                ) : (
+                  rooms.map(({ uuid, label, color }) => {
+                    const visible = visibleRooms.has(uuid);
+                    return (
+                      <li key={uuid} className="sidebar__sala-item">
+                        <button
+                          type="button"
+                          className={`sidebar__sala-toggle${visible ? ' sidebar__sala-toggle--on' : ''}`}
+                          onClick={() => toggleRoom(uuid)}
+                          aria-pressed={visible}
+                          aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${label}`}
+                          style={{ '--sala-color': color }}
+                        >
+                          <span
+                            className="sidebar__sala-dot"
+                            style={{ background: visible ? color : 'transparent', borderColor: color }}
+                          />
+                          <span className={`sidebar__sala-label${visible ? '' : ' sidebar__sala-label--off'}`}>
+                            {label}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
@@ -134,7 +137,7 @@ export default function Sidebar() {
             onClick={handleLogout}
             disabled={loggingOut}
           >
-            <i className="bi bi-box-arrow-right" />
+            <LogOut size={13} />
             <span>{loggingOut ? 'Cerrando…' : 'Cerrar Sesión'}</span>
           </button>
         </div>

@@ -48,14 +48,68 @@ function formatPct(value) {
   return pctFormatter.format(value ?? 0);
 }
 
-// ── Month label formatting ──────────────────────────────────────────────────────
+// ── Error formatting ────────────────────────────────────────────────────────────
 
-/** Formats a `yyyy-MM` string as "Mes Año" in es-MX (e.g. "2026-06" → "Junio 2026"). */
-function formatMonthLabel(yyyyMM) {
-  const [year, month] = yyyyMM.split('-').map(Number);
-  const d = new Date(year, month - 1, 1);
-  return d.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
-    .replace(/^\w/, c => c.toUpperCase());
+/**
+ * Convierte errores técnicos de generación y exportación de PDF en mensajes
+ * claros y legibles para el usuario final.
+ *
+ * @param {Error|unknown} error
+ * @returns {string} Mensaje entendible en español para tostadas / banners.
+ */
+function formatPdfErrorMessage(error) {
+  if (!error) {
+    return 'No se pudo generar el reporte en PDF. Por favor, inténtalo de nuevo.';
+  }
+
+  const msg = typeof error === 'string' ? error : (error.message || '');
+  const name = typeof error === 'object' && error?.name ? error.name : '';
+
+  if (msg.includes('NO_BLOCKS_FOUND'))
+    return 'No se encontraron elementos o gráficos disponibles en el reporte para exportar.';
+
+  if (msg.includes('CANVAS_CAPTURE_FAILED') || msg.includes('CANVAS_EMPTY'))
+    return 'No se pudieron procesar los gráficos del reporte. Verifica que la página haya cargado completamente e inténtalo de nuevo.';
+
+  if (msg.includes('PDF_ADD_IMAGE_FAILED'))
+    return 'Ocurrió un error al componer el documento PDF con los gráficos visuales.';
+
+  if (msg.includes('PDF_SAVE_FAILED'))
+    return 'No se pudo guardar el archivo PDF. Asegúrate de que tu navegador permita descargas.';
+
+  if (
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('ChunkLoadError') ||
+    name === 'ChunkLoadError'
+  )
+    return 'No se pudieron cargar los módulos de exportación a PDF. Comprueba tu conexión a internet e inténtalo de nuevo.';
+
+  if (msg.includes('Tainted canvas') || msg.includes('SecurityError') || name === 'SecurityError')
+    return 'No se pudieron exportar los gráficos debido a restricciones de seguridad de la página o imágenes externas.';
+
+  if (
+    msg.toLowerCase().includes('out of memory') ||
+    msg.toLowerCase().includes('canvas area exceeds') ||
+    msg.toLowerCase().includes('maximum size')
+  )
+    return 'El contenido del reporte excede los límites de memoria de la pantalla. Intenta ajustar el tamaño de la ventana o la escala visual.';
+
+  if (msg.toLowerCase().includes('download') || msg.toLowerCase().includes('permission'))
+    return 'El navegador ha bloqueado la descarga del archivo. Revisa los permisos de descargas.';
+
+  // Si el mensaje es limpio y sin detalles técnicos de JS (stack traces, undefined, etc.)
+  if (
+    msg &&
+    !msg.includes('TypeError') &&
+    !msg.includes('ReferenceError') &&
+    !msg.includes('undefined') &&
+    !msg.includes('null') &&
+    !msg.includes('at ')
+  )
+    return msg;
+
+  return 'Ocurrió un error al generar el reporte PDF. Por favor, inténtalo de nuevo o contacta al soporte técnico.';
 }
 
 // ── Subcomponents ──────────────────────────────────────────────────────────────
@@ -287,7 +341,8 @@ export default function ReportsPage() {
         onProgress: (current, total) => setExportProgress({ current, total }),
       });
     } catch (error) {
-      toast.error(error.message || 'No se pudo generar el reporte en PDF.');
+      console.error('Error al exportar el reporte a PDF:', error);
+      toast.error(formatPdfErrorMessage(error));
     } finally {
       // Always restore visibility, even on failure — the cover must never linger
       // visible on screen because the capture threw partway through.
@@ -444,158 +499,158 @@ export default function ReportsPage() {
             {/* ── Charts grid ───────────────────────────────────────────────────── */}
             <div className="reports-page__charts-grid">
 
-                {/* Aulas Más Ocupadas — BarChart vertical */}
-                <ChartCard
-                  title="Aulas Más Ocupadas"
-                  subtitle="Horas totales de reservación por aula"
-                  loading={loading}
-                >
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={stats?.mostOccupiedClassrooms ?? []} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                      <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit=" h" />} />
-                      <Bar dataKey="hours" radius={[4, 4, 0, 0]} maxBarSize={50}>
-                        {(stats?.mostOccupiedClassrooms ?? []).map((_, i) => (
-                          <Cell key={i} fill={COLOR_BARS[i % COLOR_BARS.length]} />
-                        ))
-                        }
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
+              {/* Aulas Más Ocupadas — BarChart vertical */}
+              <ChartCard
+                title="Aulas Más Ocupadas"
+                subtitle="Horas totales de reservación por aula"
+                loading={loading}
+              >
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={stats?.mostOccupiedClassrooms ?? []} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit=" h" />} />
+                    <Bar dataKey="hours" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                      {(stats?.mostOccupiedClassrooms ?? []).map((_, i) => (
+                        <Cell key={i} fill={COLOR_BARS[i % COLOR_BARS.length]} />
+                      ))
+                      }
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
 
-                {/* Usuarios con Más Reservas — BarChart horizontal */}
-                <ChartCard
-                  title="Usuarios con Más Reservas"
-                  subtitle="Top organizadores o departamentos"
-                  loading={loading}
-                >
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart
-                      layout="vertical"
-                      data={stats?.topUsers ?? []}
-                      margin={{ top: 8, right: 24, left: 8, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                      <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit="" />} />
-                      <Bar dataKey="reservations" radius={[0, 4, 4, 0]} maxBarSize={22}>
-                        {(stats?.topUsers ?? []).map((_, i) => (
-                          <Cell key={i} fill={i === 0 ? COLOR_PRIMARY : COLOR_LIGHT} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
+              {/* Usuarios con Más Reservas — BarChart horizontal */}
+              <ChartCard
+                title="Usuarios con Más Reservas"
+                subtitle="Top organizadores o departamentos"
+                loading={loading}
+              >
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    layout="vertical"
+                    data={stats?.topUsers ?? []}
+                    margin={{ top: 8, right: 24, left: 8, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit="" />} />
+                    <Bar dataKey="reservations" radius={[0, 4, 4, 0]} maxBarSize={22}>
+                      {(stats?.topUsers ?? []).map((_, i) => (
+                        <Cell key={i} fill={i === 0 ? COLOR_PRIMARY : COLOR_LIGHT} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
 
-                {/* Recurrencia de Reservas — PieChart (donut) */}
-                <ChartCard
-                  title="Recurrencia de Reservas"
-                  subtitle="Proporción de eventos recurrentes vs eventuales"
-                  loading={loading}
-                >
-                  <div style={{ position: 'relative', width: '100%', height: 250 }}>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={donutData}
-                          cx="50%"
-                          cy="46%"
-                          innerRadius={65}
-                          outerRadius={95}
-                          dataKey="value"
-                          startAngle={90}
-                          endAngle={-270}
-                          paddingAngle={paddingAngle}
-                        >
-                          <Cell fill={COLOR_REC} />
-                          <Cell fill={COLOR_EVE} />
-                        </Pie>
-                        <Legend
-                          iconType="circle"
-                          iconSize={11}
-                          wrapperStyle={{ fontSize: 12, color: '#6b7280', paddingTop: 4 }}
-                        />
-                        <Tooltip content={<SimpleTooltip unit=" reservas" />} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    {/* Central label — rendered over the chart */}
-                    {stats && (
-                      <div style={{
-                        position: 'absolute', top: 0, left: 0, right: 0,
-                        height: 'calc(100% - 40px)',   // subtract legend height
-                        display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', justifyContent: 'center',
-                        pointerEvents: 'none',
-                      }}>
-                        <span style={{ fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1 }}>
-                          {ratePct > 50 ? `${formatPct(ratePct)}%` : `${formatPct(100 - ratePct)}%`}
-                        </span>
-                        <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                          {ratePct > 50 ? 'Recurrentes' : 'Eventuales'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </ChartCard>
-
-                {/* Tendencia de Reservaciones — AreaChart */}
-                <ChartCard
-                  title="Tendencia de Reservaciones"
-                  subtitle="Volumen de reservas a lo largo del tiempo"
-                  loading={loading}
-                >
+              {/* Recurrencia de Reservas — PieChart (donut) */}
+              <ChartCard
+                title="Recurrencia de Reservas"
+                subtitle="Proporción de eventos recurrentes vs eventuales"
+                loading={loading}
+              >
+                <div style={{ position: 'relative', width: '100%', height: 250 }}>
                   <ResponsiveContainer width="100%" height={250}>
-                    <AreaChart
-                      data={stats?.trend ?? []}
-                      margin={{
-                        top: 8, right: 8,
-                        // SEMESTER rotates its labels -30° with textAnchor="end", which shifts
-                        // the first tick left and every tick's descenders down — extra left/bottom
-                        // margin keeps them from clipping against the chart edges.
-                        left: scope === 'SEMESTER' ? 20 : -10,
-                        bottom: scope === 'SEMESTER' ? 12 : 0,
-                      }}
-                    >
-                      <defs>
-                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={COLOR_AREA} stopOpacity={0.3} />
-                          <stop offset="95%" stopColor={COLOR_AREA} stopOpacity={0.03} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                      <XAxis
-                        dataKey="label"
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                        // MONTHLY has 28-31 day labels — thin them out to start/end only.
-                        // SEMESTER has ~6 month labels; interval={0} forces recharts to render
-                        // every one instead of its collision heuristic skipping/duplicating ticks
-                        // (the reported bug). Rotating them keeps them legible on narrower screens
-                        // now that the collision-avoidance algorithm is disabled.
-                        interval={scope === 'MONTHLY' ? 'preserveStartEnd' : 0}
-                        angle={scope === 'SEMESTER' ? -30 : 0}
-                        textAnchor={scope === 'SEMESTER' ? 'end' : 'middle'}
-                        height={scope === 'SEMESTER' ? 42 : 30}
+                    <PieChart>
+                      <Pie
+                        data={donutData}
+                        cx="50%"
+                        cy="46%"
+                        innerRadius={65}
+                        outerRadius={95}
+                        dataKey="value"
+                        startAngle={90}
+                        endAngle={-270}
+                        paddingAngle={paddingAngle}
+                      >
+                        <Cell fill={COLOR_REC} />
+                        <Cell fill={COLOR_EVE} />
+                      </Pie>
+                      <Legend
+                        iconType="circle"
+                        iconSize={11}
+                        wrapperStyle={{ fontSize: 12, color: '#6b7280', paddingTop: 4 }}
                       />
-                      <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<SimpleTooltip />} />
-                      <Area
-                        type="monotone"
-                        dataKey="reservations"
-                        stroke={COLOR_AREA}
-                        strokeWidth={2}
-                        fill="url(#areaGrad)"
-                        dot={false}
-                        activeDot={{ r: 4, strokeWidth: 0, fill: COLOR_AREA }}
-                      />
-                    </AreaChart>
+                      <Tooltip content={<SimpleTooltip unit=" reservas" />} />
+                    </PieChart>
                   </ResponsiveContainer>
-                </ChartCard>
+                  {/* Central label — rendered over the chart */}
+                  {stats && (
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, right: 0,
+                      height: 'calc(100% - 40px)',   // subtract legend height
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      pointerEvents: 'none',
+                    }}>
+                      <span style={{ fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1 }}>
+                        {ratePct > 50 ? `${formatPct(ratePct)}%` : `${formatPct(100 - ratePct)}%`}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                        {ratePct > 50 ? 'Recurrentes' : 'Eventuales'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </ChartCard>
+
+              {/* Tendencia de Reservaciones — AreaChart */}
+              <ChartCard
+                title="Tendencia de Reservaciones"
+                subtitle="Volumen de reservas a lo largo del tiempo"
+                loading={loading}
+              >
+                <ResponsiveContainer width="100%" height={250}>
+                  <AreaChart
+                    data={stats?.trend ?? []}
+                    margin={{
+                      top: 8, right: 8,
+                      // SEMESTER rotates its labels -30° with textAnchor="end", which shifts
+                      // the first tick left and every tick's descenders down — extra left/bottom
+                      // margin keeps them from clipping against the chart edges.
+                      left: scope === 'SEMESTER' ? 20 : -10,
+                      bottom: scope === 'SEMESTER' ? 12 : 0,
+                    }}
+                  >
+                    <defs>
+                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLOR_AREA} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={COLOR_AREA} stopOpacity={0.03} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      axisLine={false}
+                      tickLine={false}
+                      // MONTHLY has 28-31 day labels — thin them out to start/end only.
+                      // SEMESTER has ~6 month labels; interval={0} forces recharts to render
+                      // every one instead of its collision heuristic skipping/duplicating ticks
+                      // (the reported bug). Rotating them keeps them legible on narrower screens
+                      // now that the collision-avoidance algorithm is disabled.
+                      interval={scope === 'MONTHLY' ? 'preserveStartEnd' : 0}
+                      angle={scope === 'SEMESTER' ? -30 : 0}
+                      textAnchor={scope === 'SEMESTER' ? 'end' : 'middle'}
+                      height={scope === 'SEMESTER' ? 42 : 30}
+                    />
+                    <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<SimpleTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="reservations"
+                      stroke={COLOR_AREA}
+                      strokeWidth={2}
+                      fill="url(#areaGrad)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0, fill: COLOR_AREA }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
 
             </div>
           </>

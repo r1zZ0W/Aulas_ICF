@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useQuery } from '@tanstack/react-query';
+import { Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { useCalendar } from '../../hooks/useCalendar';
 import { useReservation } from '../../context/ReservationContext';
@@ -126,7 +127,7 @@ export default function CalendarView() {
       <div className="cal-toolbar">
         <div className="cal-toolbar__left">
           <button className="cal-toolbar__icon-btn" aria-label="Menú">
-            <i className="bi bi-list" />
+            <Menu size={16} />
           </button>
           <button
             className={`cal-toolbar__nav-btn${isPrevDisabled ? ' cal-toolbar__nav-btn--disabled' : ''}`}
@@ -134,10 +135,10 @@ export default function CalendarView() {
             disabled={isPrevDisabled}
             aria-label="Anterior"
           >
-            <i className="bi bi-chevron-left" />
+            <ChevronLeft size={16} />
           </button>
           <button className="cal-toolbar__nav-btn" onClick={() => goTo('next')} aria-label="Siguiente">
-            <i className="bi bi-chevron-right" />
+            <ChevronRight size={16} />
           </button>
           <h2 className="cal-toolbar__title">{title}</h2>
         </div>

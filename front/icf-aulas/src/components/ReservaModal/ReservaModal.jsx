@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { X, Info, Users, Clock, ChevronDown, Plus, ArrowLeft, Calendar, Repeat, Upload, Trash2, TriangleAlert } from 'lucide-react';
+import { X, Info, Users, Clock, ChevronDown, ChevronLeft, ChevronRight, Plus, ArrowLeft, Calendar, Repeat, Upload, Trash2, TriangleAlert } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import UserCombobox from '../UserCombobox/UserCombobox';
 import { typeLabel } from '../../schemas/classroom';
@@ -66,7 +66,7 @@ function DatePicker({ selectedDate, onSelect }) {
           disabled={isCurrentMonth}
           aria-label="Mes anterior"
         >
-          <i className="bi bi-chevron-left" />
+          <ChevronLeft size={16} />
         </button>
         <span className="date-picker__month">{MONTHS_ES[viewMonth]} {viewYear}</span>
         <button
@@ -75,7 +75,7 @@ function DatePicker({ selectedDate, onSelect }) {
           onClick={nextMonth}
           aria-label="Siguiente mes"
         >
-          <i className="bi bi-chevron-right" />
+          <ChevronRight size={16} />
         </button>
       </div>
 

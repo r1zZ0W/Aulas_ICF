@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useReservation } from '../../context/ReservationContext';
 import './MiniCalendar.css';
 
@@ -73,10 +74,10 @@ export default function MiniCalendar() {
         <span className="mini-cal__month">{MONTHS[month]} {year}</span>
         <div className="mini-cal__nav">
           <button className="mini-cal__nav-btn" onClick={prevMonth} aria-label="Mes anterior">
-            <i className="bi bi-chevron-left" />
+            <ChevronLeft size={11} />
           </button>
           <button className="mini-cal__nav-btn" onClick={nextMonth} aria-label="Siguiente mes">
-            <i className="bi bi-chevron-right" />
+            <ChevronRight size={11} />
           </button>
         </div>
       </div>
