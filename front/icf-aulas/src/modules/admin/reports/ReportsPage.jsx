@@ -48,6 +48,26 @@ function formatPct(value) {
   return pctFormatter.format(value ?? 0);
 }
 
+/**
+ * Formatea una cadena en formato "YYYY-MM" (ej. "2026-07")
+ * a una etiqueta legible en español (ej. "Julio 2026").
+ *
+ * @param {string} monthStr - Cadena de fecha en formato "YYYY-MM"
+ * @returns {string} Nombre del mes y año capitalizado, o la cadena original si el formato es inválido.
+ */
+function formatMonthLabel(monthStr) {
+  if (!monthStr || typeof monthStr !== 'string') return '';
+  const [yearStr, monthNumStr] = monthStr.split('-');
+  const year = parseInt(yearStr, 10);
+  const monthNum = parseInt(monthNumStr, 10);
+  if (!yearStr || !monthNumStr || isNaN(year) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+    return monthStr;
+  }
+  const date = new Date(year, monthNum - 1, 1);
+  const monthName = date.toLocaleDateString('es-MX', { month: 'long' });
+  return `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${year}`;
+}
+
 // ── Error formatting ────────────────────────────────────────────────────────────
 
 /**

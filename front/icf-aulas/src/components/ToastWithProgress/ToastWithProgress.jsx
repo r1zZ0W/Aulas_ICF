@@ -1,10 +1,11 @@
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import guardadoSvg from "../../assets/guardado.svg";
 import "./ToastWithProgress.css";
 
 const ICONS = {
   success: guardadoSvg,
   error: null,
+  info: null,
 };
 
 export default function ToastWithProgress({ message, type = "success", duration = 3000 }) {
@@ -14,6 +15,8 @@ export default function ToastWithProgress({ message, type = "success", duration 
         <div className="toast-progress__icon">
           {type === "error" ? (
             <AlertCircle size={48} strokeWidth={2} aria-hidden />
+          ) : type === "info" ? (
+            <Loader2 size={48} strokeWidth={2} className="toast-progress__spinner" aria-hidden />
           ) : (
             <img src={ICONS[type] || guardadoSvg} alt="" width={48} height={48} aria-hidden />
           )}

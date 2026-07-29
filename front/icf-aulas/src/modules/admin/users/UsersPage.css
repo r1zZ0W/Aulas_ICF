@@ -186,6 +186,14 @@
   color: var(--moon-chichi, #ff4e64);
 }
 
+/* Optimistic row -------------------------------------------------------------- */
+/* Applied while a just-created user hasn't been reconciled with the server's
+ * response yet — see useUsers.js's createMutation onMutate. */
+
+.users-page__row--pending {
+  opacity: 0.6;
+}
+
 /* Form grid ----------------------------------------------------------------- */
 
 .users-page__form-grid {

@@ -20,6 +20,8 @@ import './DataTable.css';
  *   When provided, rows receive `cursor: pointer` and call this handler with the full
  *   row object. The caller is responsible for keeping the row object intact (never
  *   pass a truncated version — modals need the original `uuid` for mutations).
+ * @param {(row: any) => string|undefined} [rowClassName] - Optional per-row className,
+ *   appended to the row's own classes (e.g. to dim an optimistically-inserted row).
  */
 export default function DataTable({
   columns = [],
@@ -30,6 +32,7 @@ export default function DataTable({
   emptyState,
   className = '',
   onRowClick,
+  rowClassName,
 }) {
   const hasRows = rows.length > 0;
 
@@ -58,7 +61,7 @@ export default function DataTable({
             {rows.map((row) => (
               <tr
                 key={rowKey ? rowKey(row) : JSON.stringify(row)}
-                className={`data-table__row${onRowClick ? ' data-table__row--clickable' : ''}`}
+                className={`data-table__row${onRowClick ? ' data-table__row--clickable' : ''}${rowClassName?.(row) ? ` ${rowClassName(row)}` : ''}`}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 style={onRowClick ? { cursor: 'pointer' } : undefined}
               >

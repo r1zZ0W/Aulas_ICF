@@ -9,7 +9,7 @@
  *   - handleCreateSubmit / handleEditSubmit → call validateAll() first, so clicking
  *     "Guardar" without touching any field still illuminates every required field.
  */
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { UserCreateSchema, UserUpdateSchema } from '../../../../schemas/index.js';
 import { useZodForm } from '../../../../hooks/useZodForm.js';
 
@@ -82,12 +82,19 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
   const [editUser, setEditUser] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Bumped only in openCreate(). handleCreateSubmit captures it before firing an
+  // optimistic submit; if a newer create session has started by the time that submit
+  // settles (the admin reopened the modal for a different user), the stale callback
+  // becomes a no-op instead of clobbering the newer form/modal state.
+  const createSessionRef = useRef(0);
+
   // ── Zod-backed form instances ───────────────────────────────────────────────
   const createZod = useZodForm(EMPTY_CREATE, UserCreateSchema, { preprocess: createPreprocess });
   const editZod   = useZodForm(EMPTY_UPDATE, UserUpdateSchema, { preprocess: updatePreprocess });
 
   // ── Modal helpers ──────────────────────────────────────────────────────────
   function openCreate() {
+    createSessionRef.current += 1;
     createZod.reset(EMPTY_CREATE);
     setCreateOpen(true);
   }
@@ -145,13 +152,31 @@ export function useUsersForm({ roles, createMutation, updateMutation }) {
       roleId: createZod.formData.roleId ? Number(createZod.formData.roleId) : undefined,
       departamento: createZod.formData.departamento || undefined,
     };
+
+    // Captured before the optimistic close: if the admin reopens the modal (a new
+    // create session) before this request settles, the number below no longer matches
+    // createSessionRef.current and this callback becomes a no-op — see the ref's doc
+    // comment. The mutation's own toast (success/error) still fires unconditionally;
+    // only the form/modal side-effects are guarded.
+    const session = createSessionRef.current;
+
+    // Close instantly instead of waiting for BCrypt (~200-500ms) — see useUsers'
+    // createMutation for the optimistic row this reveals in the table underneath.
+    // The form is deliberately NOT reset yet: on error we reopen with the data intact.
+    setCreateOpen(false);
+
     try {
       await createMutation.mutateAsync(payload);
-      closeCreate();
+      if (createSessionRef.current === session) createZod.reset(EMPTY_CREATE);
     } catch (err) {
-      // useUsers' onError already toasted; additionally highlight the offending
-      // input if the server told us which field caused it (e.g. duplicate email).
-      if (err.fieldErrors) createZod.setServerErrors(err.fieldErrors);
+      // useUsers' onError already toasted and rolled back the optimistic row;
+      // reopen with the same data so the user can fix the offending field in place
+      // (e.g. a duplicate email/username, which fails fast — before BCrypt — so this
+      // reopening happens quickly enough to read as "never closed").
+      if (createSessionRef.current === session) {
+        setCreateOpen(true);
+        if (err.fieldErrors) createZod.setServerErrors(err.fieldErrors);
+      }
     }
   }
 

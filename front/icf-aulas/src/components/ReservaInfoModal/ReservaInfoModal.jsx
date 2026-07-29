@@ -155,7 +155,7 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
             <input
               type="text"
               className="reserva-modal__input reserva-info-modal__readonly"
-              value={`${reservation.numAsistentes ?? 0} estudiantes registrados`}
+              value={`${reservation.attendeeCount ?? 0} estudiantes registrados`}
               readOnly
             />
           </div>

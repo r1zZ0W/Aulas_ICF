@@ -106,7 +106,6 @@ export default function Login() {
                   <p className="fw-medium">
                     Gestiona todas tus reservas de forma rápida y eficiente.
                   </p>
-                  <ProgressBar step={1} containerClassName="progress" />
                 </div>
               </div>
             </div>

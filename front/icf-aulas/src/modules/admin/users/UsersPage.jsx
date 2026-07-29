@@ -195,6 +195,7 @@ export default function UsersPage() {
           columns={columns}
           rows={users}
           rowKey={(row) => row.uuid}
+          rowClassName={(row) => (row.pending ? 'users-page__row--pending' : undefined)}
           loading={usersLoading}
           loadingMessage="Cargando usuarios…"
           emptyState={

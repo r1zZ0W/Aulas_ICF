@@ -37,7 +37,7 @@ const queryClient = new QueryClient({
 });
 
 createRoot(document.getElementById('root')).render(
-  <BrowserRouter>
+  <BrowserRouter basename={import.meta.env.VITE_ROUTER_BASENAME}>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <App />

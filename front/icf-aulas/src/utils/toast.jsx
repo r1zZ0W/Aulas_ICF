@@ -4,16 +4,24 @@ import ToastWithProgress from "../components/ToastWithProgress/ToastWithProgress
 const DURATION = 3000;
 
 export function toast(message, type = "success", duration = DURATION) {
-  sonnerToast.custom(
+  return sonnerToast.custom(
     () => <ToastWithProgress message={message} type={type} duration={duration} />,
     { duration }
   );
 }
 
 toast.success = (message, duration = DURATION) => {
-  toast(message, "success", duration);
+  return toast(message, "success", duration);
 };
 
 toast.error = (message, duration = DURATION) => {
-  toast(message, "error", duration);
+  return toast(message, "error", duration);
+};
+
+toast.info = (message, duration = DURATION) => {
+  return toast(message, "info", duration);
+};
+
+toast.dismiss = (id) => {
+  sonnerToast.dismiss(id);
 };
