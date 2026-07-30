@@ -155,25 +155,30 @@ public class ReservationStudentService {
 
     /**
      * Returns the current roster of a reservation group as plain student data, for the
-     * admin-only "view students" JSON endpoint. Reuses the exact same Excel-parsing logic
-     * as {@link #generatePdf} via {@link #parseRoster}.
+     * "view students" JSON endpoint. Available to the owning teacher and to ADMIN users.
      *
-     * <p>Unlike {@link #generatePdf}, a missing roster file is <b>not</b> an error here: it
-     * is a legitimate state for legacy groups created before the roster became mandatory,
-     * and is reported as an empty list so the frontend can render an empty state. A file
-     * that exists but fails to parse (corrupted workbook, I/O failure) is a genuine
-     * infrastructure fault and is left to propagate as an unhandled exception (mapped to a
-     * 500 by the global exception handler) rather than being silently swallowed into an
-     * empty list — the two situations must not be confused.</p>
+     * <p>A missing roster file is <b>not</b> an error here: it is a legitimate state for
+     * legacy groups created before the roster became mandatory, and is reported as an
+     * empty list so the frontend can render an empty state. A file that exists but fails
+     * to parse (corrupted workbook, I/O failure) is a genuine infrastructure fault and is
+     * left to propagate as an unhandled exception (mapped to a 500 by the global exception
+     * handler) rather than being silently swallowed into an empty list — the two situations
+     * must not be confused.</p>
      *
-     * @param groupUuid public UUID of the reservation group
+     * @param groupUuid     public UUID of the reservation group
+     * @param principalUuid public UUID of the authenticated user
+     * @param isAdmin       {@code true} when the caller holds the ADMIN role (bypasses ownership check)
      * @return the group's students, or an empty list if no roster has been uploaded
      * @throws ResourceNotFoundException when the group does not exist
+     * @throws AccessDeniedException     when a non-admin requests a group they do not own
      */
     @Transactional(readOnly = true)
-    public List<StudentResponseDTO> listStudents(UUID groupUuid) {
-        groupRepository.findByUuid(groupUuid)
+    public List<StudentResponseDTO> listStudents(UUID groupUuid, UUID principalUuid, boolean isAdmin) {
+        ReservationGroup group = groupRepository.findByUuid(groupUuid)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_GROUP_NOT_FOUND, "Reservation group not found: " + groupUuid));
+
+        if (!isAdmin && !group.getUser().getUuid().equals(principalUuid))
+            throw new AccessDeniedException("You can only view the roster of your own reservation groups");
 
         Optional<byte[]> fileBytes = fileStorage.load(properties.getStorageDir(), rosterFileName(groupUuid));
         if (fileBytes.isEmpty())
