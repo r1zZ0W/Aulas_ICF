@@ -5,13 +5,15 @@ import UserCombobox from '../UserCombobox/UserCombobox';
 import { typeLabel } from '../../schemas/classroom';
 import { useReservaModal, WEEKDAY_OPTIONS } from './useReservaModal';
 import './ReservaModal.css';
-import { toDateString } from '../../utils/reservations';
 
 const MONTHS_ES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 const WEEKDAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+import template from '../../assets/attendance_template.xlsx?url';
+import { Download } from 'lucide-react';
 
 /** Formats a raw "HH:MM:SS" time string as "H:MM" for display (e.g. "07:30:00" → "7:30"). */
 const fmtHM = (hms) => {
@@ -303,7 +305,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                       <option value="">
                         {!roomId ? 'Selecciona un aula primero'
                           : slotsLoading ? 'Cargando horarios…'
-                          : 'Sin horarios disponibles'}
+                            : 'Sin horarios disponibles'}
                       </option>
                     )}
                     {startSlots.map(s => (
@@ -371,11 +373,21 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                 errors.file is the ONLY source of error here (required/size/format all live
                 in ReservaFormSchema — see reservaForm.js and useReservaModal's handleFileChange). */}
             <div className="reserva-modal__field">
-              <label className="reserva-modal__label">
-                Lista de alumnos (.xlsx)
-                {/* Cosmético — Zod es la única fuente de verdad */}
-                <span className="reserva-modal__required" aria-hidden="true">*</span>
-              </label>
+              <div className="reserva-modal__label-header">
+                <label className="reserva-modal__label">
+                  Lista de alumnos (.xlsx)
+                  <span className="reserva-modal__required" aria-hidden="true">*</span>
+                </label>
+                <a
+                  href={template}
+                  download="attendance_template.xlsx"
+                  className="reserva-modal__template-link"
+                  title="Descargar plantilla de Excel"
+                >
+                  <Download size={14} />
+                  <span>Descargar plantilla (.XLSX)</span>
+                </a>
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"

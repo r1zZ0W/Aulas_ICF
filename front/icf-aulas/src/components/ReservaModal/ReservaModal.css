@@ -607,6 +607,7 @@
   font-size: 0.78rem;
   color: #6b7280;
 }
+
 /* ── Student roster file field ───────────────────────────── */
 .reserva-modal__file-btn {
   display: inline-flex;
@@ -684,6 +685,47 @@
   font-size: 12px;
   font-weight: 600;
   color: #b3261e;
+}
+
+.reserva-modal__label-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.reserva-modal__template-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--moon-font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: #005687;
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: normal;
+  transition: color 0.15s ease, opacity 0.15s ease;
+  cursor: pointer;
+}
+
+.reserva-modal__template-link:hover {
+  color: #003657;
+  text-decoration: underline;
+}
+
+.reserva-modal__template-link svg {
+  color: #005687;
+  transition: transform 0.15s ease;
+}
+
+.reserva-modal__template-link:hover svg {
+  transform: translateY(1px);
+  color: #003657;
 }
 
 .reserva-modal__time-warning {
