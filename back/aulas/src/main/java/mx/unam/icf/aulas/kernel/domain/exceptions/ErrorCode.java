@@ -100,13 +100,11 @@ public enum ErrorCode {
     REASSIGN_CLASSROOM_INACTIVE,
 
     // ── Student roster ───────────────────────────────────────────────────────
-    ROSTER_NOT_FOUND,
     ROSTER_EMPTY,
     ROSTER_DUPLICATE_STUDENT,
     ROSTER_COUNT_MISMATCH,
     ROSTER_FILE_INVALID,
     ROSTER_FILE_UNREADABLE,
-    ROSTER_PDF_FAILED,
 
     // ── Infra ────────────────────────────────────────────────────────────────
     FILE_TOO_LARGE,

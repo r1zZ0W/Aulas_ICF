@@ -17,7 +17,6 @@ import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentUploadRes
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.DuplicateStudentException;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.EmptyStudentListException;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
-import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.StudentListNotFoundException;
 import mx.unam.icf.aulas.modules.reservations.students.domain.Student;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
@@ -32,15 +31,15 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Application service orchestrating student roster uploads, PDF export, and the JSON
- * student-list read used by the admin-only "view students" feature.
+ * Application service orchestrating student roster uploads and the JSON student-list
+ * read used by the "view students" feature (owning teacher or ADMIN).
  *
  * <p>A roster belongs to a {@link ReservationGroup} (the recurring reservation), not to
  * any individual {@link ReservInstance} date occurrence — the roster is the same across
  * every session of the group. The file is stored as {@code {group_uuid}.xlsx} via the
  * kernel's {@link FileStorageService}. This design accepts that the system keeps no
- * per-date history: both {@link #generatePdf} and {@link #listStudents} always reflect
- * the group's <em>current</em> roster, even when queried in the context of a past session.</p>
+ * per-date history: {@link #listStudents} always reflects the group's <em>current</em>
+ * roster, even when queried in the context of a past session.</p>
  *
  * <h3>Roster-confirmation lifecycle</h3>
  * <p>Since the atomic multipart booking flow, the roster arrives <em>with</em> the booking
@@ -51,7 +50,7 @@ import java.util.stream.Collectors;
  * for legacy groups created before the roster became mandatory at booking time.</p>
  *
  * @author Ithera
- * @version 2.1
+ * @version 2.2
  */
 @Service
 @RequiredArgsConstructor
@@ -64,7 +63,6 @@ public class ReservationStudentService {
     private final StudentListStorageProperties properties;
     private final StudentExcelReader          excelReader;
     private final StudentRosterValidator      rosterValidator;
-    private final StudentListPdfGenerator     pdfGenerator;
     private final ApplicationEventPublisher   eventPublisher;
 
     /**
@@ -124,33 +122,6 @@ public class ReservationStudentService {
             notifyAdmins(group);
 
         return new StudentUploadResponseDTO(students.size());
-    }
-
-    /**
-     * Renders the current roster of a reservation group as a PDF.
-     *
-     * @param groupUuid public UUID of the reservation group
-     * @return PDF bytes ready to be sent as {@code application/pdf}
-     * @throws ResourceNotFoundException  when the group does not exist
-     * @throws StudentListNotFoundException when no roster has been uploaded for the group
-     */
-    @Transactional(readOnly = true)
-    public byte[] generatePdf(UUID groupUuid) {
-        ReservationGroup group = groupRepository.findByUuid(groupUuid)
-                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_GROUP_NOT_FOUND, "Reservation group not found: " + groupUuid));
-
-        // A PDF with no roster makes no sense: absence of the file is a 404 here, unlike
-        // listStudents (below), which treats absence as a legitimate empty result.
-        byte[] fileBytes = fileStorage.load(properties.getStorageDir(), rosterFileName(groupUuid))
-                .orElseThrow(() -> new StudentListNotFoundException(ErrorCode.ROSTER_NOT_FOUND,
-                        "No student roster has been uploaded for reservation group: " + groupUuid));
-
-        List<Student> students = parseRoster(fileBytes);
-
-        StudentRosterContext context = new StudentRosterContext(
-                resolveGroupLabel(group), group.getUser().getFullName(), students.size());
-
-        return pdfGenerator.generate(students, context);
     }
 
     /**
@@ -264,13 +235,6 @@ public class ReservationStudentService {
     }
 
     // ── Naming ────────────────────────────────────────────────────────────────
-
-    private String resolveGroupLabel(ReservationGroup group) {
-        List<ReservInstance> instances = reservInstanceRepository.findByGroupUuidOrderByDateAsc(group.getUuid());
-        return instances.isEmpty()
-                ? "Reservación " + group.getUuid()
-                : instances.getFirst().getClassroom().getName();
-    }
 
     private String rosterFileName(UUID groupUuid) {
         return groupUuid + ".xlsx";

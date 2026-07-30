@@ -9,11 +9,8 @@ import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentResponseD
 import mx.unam.icf.aulas.modules.reservations.students.app.dtos.StudentUploadResponseDTO;
 import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,9 +32,6 @@ import java.util.UUID;
  * ({@code POST /api/v1/reservations/booking}), this upload endpoint serves
  * <em>re-uploads</em> — replacing the roster of an already-created group.</p>
  *
- * <p>No class-level {@code produces} is declared (unlike {@code ReservInstanceController})
- * because this controller mixes JSON responses with a raw PDF download; each method
- * declares its own content type, mirroring {@code ReportController}.</p>
  */
 @RestController
 @RequestMapping("/api/v1/reservations/groups/{groupUuid}/students")
@@ -72,30 +66,6 @@ public class StudentListController implements ResponseHandler {
 
         boolean isAdmin = "ADMIN".equals(principal.getRoleName());
         return ok(service.upload(groupUuid, readBytes(file), principal.getUuid(), isAdmin));
-    }
-
-    /**
-     * Downloads the current student roster as a PDF. Requires ADMIN role.
-     * GET /api/v1/reservations/groups/{groupUuid}/students/pdf
-     *
-     * <p>The PDF always reflects the group's <em>current</em> roster — there is no
-     * per-date historical snapshot (see {@link ReservationStudentService} class docs).</p>
-     *
-     * @param groupUuid public UUID of the reservation group
-     * @return PDF bytes as {@code application/pdf} with a {@code Content-Disposition: attachment} header
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping(value = "/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> downloadPdf(@PathVariable UUID groupUuid) {
-        byte[] pdf = service.generatePdf(groupUuid);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentDisposition(ContentDisposition.attachment().filename("lista-alumnos.pdf").build());
-
-        return ResponseEntity.ok()
-                .headers(headers)
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(pdf);
     }
 
     /**

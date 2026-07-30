@@ -45,7 +45,7 @@ class ReservationStudentServiceTest {
     void setUp() {
         service = new ReservationStudentService(
                 groupRepository, null, null, fileStorage, properties,
-                excelReader, null, null, null);
+                excelReader, null, null);
 
         groupUuid = UUID.randomUUID();
         ownerUuid = UUID.randomUUID();
