@@ -3,15 +3,16 @@
 }
 
 .error-boundary__card {
-  max-width: 420px;
+  max-width: 440px;
   background: var(--moon-goku);
   border-radius: var(--moon-radius-s-lg);
   box-shadow: var(--moon-shadow-md);
 }
 
-.error-boundary__icon {
-  color: var(--moon-dodoria);
-  opacity: 0.9;
+.error-boundary__illustration {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
 }
 
 .error-boundary__title {
@@ -23,9 +24,34 @@
 }
 
 .error-boundary__message {
-  margin: 0;
+  margin: 0 auto;
+  max-width: 360px;
   font-family: var(--moon-font-sans);
   font-size: 15px;
   line-height: 1.5;
   color: var(--moon-content-text-secondary);
+}
+
+.error-boundary__details {
+  font-family: var(--moon-font-sans);
+  font-size: 13px;
+  color: var(--moon-content-text-secondary);
+}
+
+.error-boundary__details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--moon-content-text);
+}
+
+.error-boundary__details pre {
+  margin-top: 8px;
+  max-height: 240px;
+  overflow: auto;
+  background: var(--moon-gohan);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

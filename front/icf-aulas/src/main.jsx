@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-qu
 import { AuthProvider } from './context/AuthContext';
 import { ApiError } from './errors/ApiError.js';
 import { toast } from './utils/toast.jsx';
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary.jsx';
 
 import './styles/reset.css';
 import './styles/utilities.css';
@@ -37,11 +38,13 @@ const queryClient = new QueryClient({
 });
 
 createRoot(document.getElementById('root')).render(
-  <BrowserRouter basename={import.meta.env.VITE_ROUTER_BASENAME}>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </QueryClientProvider>
-  </BrowserRouter>,
+  <ErrorBoundary>
+    <BrowserRouter basename={import.meta.env.VITE_ROUTER_BASENAME}>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </QueryClientProvider>
+    </BrowserRouter>
+  </ErrorBoundary>,
 );
