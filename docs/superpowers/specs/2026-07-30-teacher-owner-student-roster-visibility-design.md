@@ -85,7 +85,9 @@ delete the PDF feature rather than extend it.
     access and drop the PDF references.
 - **Delete:** `StudentListPdfGenerator`, `OpenPdfStudentListGenerator`,
   `StudentRosterContext`, `StudentListNotFoundException`.
-- `ErrorCode`: remove `ROSTER_NOT_FOUND`.
+- `ErrorCode`: remove `ROSTER_NOT_FOUND` and `ROSTER_PDF_FAILED` (both
+  PDF-only; the other `ROSTER_*` codes are shared with upload/validation and
+  must stay).
 - `pom.xml`: remove the `openpdf` dependency and its version property.
 - Sweep `GlobalExceptionHandler` and any Javadoc `@throws` references to
   `StudentListNotFoundException`/`ROSTER_NOT_FOUND` left dangling by the
@@ -100,7 +102,8 @@ delete the PDF feature rather than extend it.
   estudiantes" to the owner row).
 - `ReservaStudentsModal.jsx`: update the "Admin-only" doc comment to reflect
   owner-or-admin access. No logic changes — already role-agnostic/caller-driven.
-- `errors/errorCatalog.js`: remove the now-orphaned `ROSTER_NOT_FOUND` entry.
+- `errors/errorCatalog.js`: remove the now-orphaned `ROSTER_NOT_FOUND` and
+  `ROSTER_PDF_FAILED` entries.
 
 ## Out of scope
 
