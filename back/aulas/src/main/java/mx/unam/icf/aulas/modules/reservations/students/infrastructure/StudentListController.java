@@ -113,20 +113,24 @@ public class StudentListController implements ResponseHandler {
 
     /**
      * Lists the students in the current roster of a reservation group as structured JSON.
-     * Requires ADMIN role. GET /api/v1/reservations/groups/{groupUuid}/students
+     * Available to the owning teacher and to ADMIN users.
+     * GET /api/v1/reservations/groups/{groupUuid}/students
      *
-     * <p>Reuses the same Excel-parsing logic as {@link #downloadPdf} (via
-     * {@link ReservationStudentService#listStudents}); this endpoint exists so the admin
-     * "view students" UI can render structured, searchable data instead of a PDF. Returns
-     * an empty list (not a 404) when no roster has been uploaded yet.</p>
+     * <p>This endpoint lets the "view students" UI render structured, searchable data.
+     * Returns an empty list (not a 404) when no roster has been uploaded yet.</p>
      *
      * @param groupUuid public UUID of the reservation group
+     * @param principal authenticated user (used for ownership/role checks)
      * @return the group's students, or an empty list if no roster has been uploaded
+     * @throws org.springframework.security.access.AccessDeniedException when a non-admin
+     *         requests a group they do not own (403)
      */
-    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<List<StudentResponseDTO>>> list(@PathVariable UUID groupUuid) {
-        return ok(service.listStudents(groupUuid));
+    public ResponseEntity<ApiResponse<List<StudentResponseDTO>>> list(
+            @PathVariable UUID groupUuid,
+            @AuthenticationPrincipal UserDetailsImp principal) {
+        boolean isAdmin = "ADMIN".equals(principal.getRoleName());
+        return ok(service.listStudents(groupUuid, principal.getUuid(), isAdmin));
     }
 
     /**
