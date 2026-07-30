@@ -37,8 +37,9 @@ function fmtTime(date) {
  *  - Admin               → "Ver estudiantes" always (any status, past or future — opens
  *                          {@link ReservaStudentsModal}); "Cancelar" (admin mutation) +
  *                          "Reasignar" only when !isPast && status === 'ACTIVE'.
- *  - Teacher (owner)     → "Cancelar" (user mutation) only when !isPast && status === 'ACTIVE'.
- *  - Teacher (not owner) → read-only, no action buttons.
+ *  - Teacher (owner)     → "Ver estudiantes" always; "Cancelar" (user mutation) only when
+ *                          !isPast && status === 'ACTIVE'.
+ *  - Teacher (not owner) → read-only, no action buttons, no "Ver estudiantes".
  *
  * @param {{
  *   open:        boolean,
@@ -141,7 +142,7 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
           <div className="reserva-modal__field">
             <div className="reserva-info-modal__students-header">
               <label className="reserva-modal__label">Estudiantes inscritos</label>
-              {isAdmin && (
+              {(isAdmin || isOwner) && (
                 <button
                   type="button"
                   className="reserva-info-modal__inline-btn"

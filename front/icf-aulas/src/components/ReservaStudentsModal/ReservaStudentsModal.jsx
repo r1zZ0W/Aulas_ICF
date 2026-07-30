@@ -24,9 +24,11 @@ const columns = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 /**
- * Admin-only, read-only modal listing the students registered for a reservation's
- * roster. Reads `reservation.groupUuid` (the roster is per-*group*, shared across every
- * date occurrence) and `reservation.attendeeCount` (already present on the reservation
+ * Read-only modal listing the students registered for a reservation's roster.
+ * Opened by the owning teacher or an ADMIN — the caller (`ReservaInfoModal`) is
+ * responsible for that gate; this component itself is role-agnostic. Reads
+ * `reservation.groupUuid` (the roster is per-*group*, shared across every date
+ * occurrence) and `reservation.attendeeCount` (already present on the reservation
  * DTO — not part of the roster response).
  *
  * The total attendee count is shown in a summary card, never inside the table: the
