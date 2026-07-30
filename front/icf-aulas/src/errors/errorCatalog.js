@@ -90,13 +90,11 @@ export const ERROR_CATALOG = {
   REASSIGN_CLASSROOM_INACTIVE: { text: 'El aula destino está inactiva.' },
 
   // ── Student roster ───────────────────────────────────────────────────────
-  ROSTER_NOT_FOUND: { text: 'Aún no se ha subido una lista de alumnos para este grupo.' },
   ROSTER_EMPTY: { text: 'La lista de alumnos está vacía o no es válida.' },
   ROSTER_DUPLICATE_STUDENT: { text: 'Hay un alumno duplicado en la lista.' },
   ROSTER_COUNT_MISMATCH: { text: 'El número de alumnos en el Excel no coincide con los asistentes indicados.' },
   ROSTER_FILE_INVALID: { text: 'El archivo no es un .xlsx válido.' },
   ROSTER_FILE_UNREADABLE: { text: 'No se pudo leer el archivo subido.' },
-  ROSTER_PDF_FAILED: { text: 'No se pudo generar el PDF de la lista de alumnos.' },
 
   // ── Infra ────────────────────────────────────────────────────────────────
   FILE_TOO_LARGE: { text: 'El archivo excede el tamaño máximo permitido.' },
