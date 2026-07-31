@@ -181,6 +181,7 @@ export default function CalendarView() {
           allDaySlot={false}
           allDayText="Todo el día"
           height="100%"
+          expandRows={true}
           slotLabelFormat={{ hour: 'numeric', minute: '2-digit', hour12: true }}
           slotLabelInterval="00:30:00"
           dayHeaderContent={dayHeaderContent}
