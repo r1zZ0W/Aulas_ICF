@@ -42,8 +42,8 @@ export const ReservaFormSchema = z
       .union([z.string(), z.number()])
       .transform((v) => (v === '' || v == null ? NaN : Number(v)))
       .refine(
-        (n) => Number.isInteger(n) && n >= 1,
-        'Selecciona el número de alumnos',
+        (n) => Number.isInteger(n) && n >= 2,
+        'Selecciona el número de alumnos (mínimo 2)',
       ),
     // z.any().refine() (NOT z.custom / z.instanceof) — see the fatal-issue note above.
     // EMPTY_RESERVA.file starts as `null`; a null-safe guard in each refine avoids both the

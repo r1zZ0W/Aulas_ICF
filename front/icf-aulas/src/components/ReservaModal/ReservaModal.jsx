@@ -360,7 +360,7 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                   <option value="">
                     {room ? '' : 'Selecciona un aula primero'}
                   </option>
-                  {Array.from({ length: maxAttendees }, (_, i) => i + 1).map(n => (
+                  {Array.from({ length: Math.max(0, maxAttendees - 1) }, (_, i) => i + 2).map(n => (
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>

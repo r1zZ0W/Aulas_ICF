@@ -21,7 +21,7 @@ public record ClassroomRequestDTO(
         String name,
 
         @NotNull(message = "FIELD_REQUIRED")
-        @Min(value = 1, message = "FIELD_OUT_OF_RANGE")
+        @Min(value = 2, message = "FIELD_OUT_OF_RANGE")
         Long capacity,
 
         @NotNull(message = "FIELD_REQUIRED")

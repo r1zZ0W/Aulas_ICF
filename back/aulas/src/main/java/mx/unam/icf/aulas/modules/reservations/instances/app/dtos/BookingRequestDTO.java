@@ -1,9 +1,9 @@
 package mx.unam.icf.aulas.modules.reservations.instances.app.dtos;
 
 import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.time.DayOfWeek;
@@ -23,7 +23,7 @@ import java.util.UUID;
  * unless {@code daysOfWeek} is explicitly provided.
  *
  * @param classroomUuid  public UUID of the requested classroom
- * @param attendeeCount  expected number of attendees (must be positive)
+ * @param attendeeCount  expected number of attendees (must be at least 2)
  * @param timeSlotIds    ordered list of 30-minute slot IDs to book (1–24, covering 07:00–19:00)
  * @param startDate      reservation date; must not be in the past
  * @param daysOfWeek     optional weekdays hint; when provided the request is validated
@@ -45,7 +45,7 @@ public record BookingRequestDTO(
         UUID classroomUuid,
 
         @NotNull(message = "FIELD_REQUIRED")
-        @Positive(message = "FIELD_OUT_OF_RANGE")
+        @Min(value = 2, message = "FIELD_OUT_OF_RANGE")
         Integer attendeeCount,
 
         @NotEmpty(message = "FIELD_REQUIRED")
