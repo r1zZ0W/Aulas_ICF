@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   padding: 40px 48px;
-  background: #f9fafb;
+  background: var(--moon-content-bg);
   min-height: 0;
   overflow-y: auto;
 }
@@ -23,14 +23,14 @@
 .users-page__title {
   font-size: 24px;
   font-weight: 700;
-  color: #101828;
+  color: var(--moon-bulma);
   margin: 0 0 4px;
   line-height: 1.3;
 }
 
 .users-page__subtitle {
   font-size: 15px;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   margin: 0;
 }
 
@@ -60,10 +60,10 @@
   align-items: center;
   gap: 16px;
   padding: 22px 24px;
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: var(--moon-radius-s-lg, 16px);
-  box-shadow: 0px 1px 1.5px rgba(0,0,0,0.1), 0px 1px 1px rgba(0,0,0,0.1);
+  box-shadow: var(--moon-shadow-sm);
 }
 
 .users-page__stat-icon {
@@ -76,22 +76,22 @@
   border-radius: 50%;
 }
 
-.users-page__stat-icon--blue   { background: #e6f0f5; color: var(--moon-piccolo, #005687); }
-.users-page__stat-icon--green  { background: #ecfdf5; color: #059669; }
-.users-page__stat-icon--red    { background: #fef2f2; color: #c10007; }
-.users-page__stat-icon--purple { background: #faf5ff; color: #7c3aed; }
+.users-page__stat-icon--blue   { background: var(--moon-piccolo-10); color: var(--moon-piccolo); }
+.users-page__stat-icon--green  { background: var(--moon-teal-10); color: var(--moon-teal); }
+.users-page__stat-icon--red    { background: var(--moon-dodoria-10); color: var(--moon-dodoria); }
+.users-page__stat-icon--purple { background: var(--moon-purple-10); color: #a855f7; }
 
 .users-page__stat-label {
   font-size: 13px;
   font-weight: 500;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   margin: 0 0 2px;
 }
 
 .users-page__stat-value {
   font-size: 24px;
   font-weight: 700;
-  color: #101828;
+  color: var(--moon-bulma);
   margin: 0;
   line-height: 1.2;
 }
@@ -100,10 +100,10 @@
 
 .users-page__table-card {
   margin-top: 28px;
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: var(--moon-radius-s-lg, 16px);
-  box-shadow: 0px 1px 3px rgba(0,0,0,0.1), 0px 1px 2px -1px rgba(0,0,0,0.1);
+  box-shadow: var(--moon-shadow-sm);
   overflow: hidden;
 }
 
@@ -111,7 +111,7 @@
   display: flex;
   align-items: center;
   padding: 14px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--moon-beerus);
 }
 
 /* Avatar -------------------------------------------------------------------- */
@@ -124,8 +124,8 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #d7e2f1;
-  color: var(--moon-piccolo, #005687);
+  background: var(--moon-piccolo-10);
+  color: var(--moon-piccolo);
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
@@ -141,14 +141,14 @@
 .users-page__user-name {
   font-size: 14px;
   font-weight: 600;
-  color: #101828;
+  color: var(--moon-bulma);
   margin: 0;
   line-height: 1.4;
 }
 
 .users-page__user-email {
   font-size: 13px;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   margin: 0;
   line-height: 1.4;
 }
@@ -170,25 +170,23 @@
   border: none;
   background: transparent;
   border-radius: 10px;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   line-height: 1;
 }
 
 .users-page__action-btn:hover {
-  background: var(--moon-gohan, #efefef);
-  color: var(--moon-bulma, #232222);
+  background: var(--moon-gohan);
+  color: var(--moon-bulma);
 }
 
 .users-page__action-btn--danger:hover {
-  background: var(--moon-chichi-10, rgba(255,78,100,0.1));
-  color: var(--moon-chichi, #ff4e64);
+  background: var(--moon-dodoria-10);
+  color: var(--moon-dodoria);
 }
 
 /* Optimistic row -------------------------------------------------------------- */
-/* Applied while a just-created user hasn't been reconciled with the server's
- * response yet — see useUsers.js's createMutation onMutate. */
 
 .users-page__row--pending {
   opacity: 0.6;

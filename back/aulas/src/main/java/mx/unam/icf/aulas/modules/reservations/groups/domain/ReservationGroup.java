@@ -62,7 +62,7 @@ public class ReservationGroup extends BaseEntity {
 
     /** Current lifecycle status of this group. */
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @Column(name = "status", length = 50)
     private ReservationGroupStatus status;
 
     /**

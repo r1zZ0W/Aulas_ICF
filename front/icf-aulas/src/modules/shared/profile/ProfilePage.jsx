@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Mail, BadgeInfo } from 'lucide-react';
+import { Check, Mail, BadgeInfo, Sun, Moon } from 'lucide-react';
 
 import { useAuth } from '../../../context/AuthContext';
+import { useTheme } from '../../../context/ThemeContext';
 import { ROLES, roleBadgeVariant, roleLabel } from '../../../utils/roles';
 import { getInitials } from '../../../utils/format';
 import { getUserSelfEditFormSchema } from '../../../schemas/user/userSelfEditForm.js';
@@ -67,6 +68,7 @@ export default function ProfilePage() {
 
 function ProfileEditor({ profile }) {
   const { user, updateSession } = useAuth();
+  const { theme, setTheme } = useTheme();
   const isAdmin = user.role === ROLES.ADMIN;
 
   // Memoized: useZodForm keys its internal useCallbacks on schema identity — a fresh instance
@@ -136,7 +138,6 @@ function ProfileEditor({ profile }) {
                 </Badge>
                 <Badge variant="neutral">
                   {profile.institutionalId || 'Sin matrícula'}
-                  {console.log(profile)}
                 </Badge>
               </div>
             </div>
@@ -266,6 +267,46 @@ function ProfileEditor({ profile }) {
             </Button>
           </div>
         </form>
+      </Card>
+
+      <Card className="profile-page__theme-card">
+        <div className="profile-page__section-head">
+          <div>
+            <h3 className="profile-page__section-title">Apariencia</h3>
+          </div>
+          <span className="profile-page__section-note">Personaliza el aspecto de la interfaz</span>
+        </div>
+
+        <div className="profile-page__theme-options">
+          <div className="profile-page__theme-info">
+            <h4 className="profile-page__theme-title">Modo de la página</h4>
+            <p className="profile-page__theme-desc">
+              Selecciona tu tema preferido para la aplicación.
+            </p>
+          </div>
+
+          <div className="profile-page__theme-selector">
+            <button
+              type="button"
+              className={`profile-page__theme-btn ${theme === 'light' ? 'profile-page__theme-btn--active' : ''}`}
+              onClick={() => setTheme('light')}
+              aria-label="Modo Claro"
+            >
+              <Sun size={18} />
+              <span>Modo Claro</span>
+            </button>
+
+            <button
+              type="button"
+              className={`profile-page__theme-btn ${theme === 'dark' ? 'profile-page__theme-btn--active' : ''}`}
+              onClick={() => setTheme('dark')}
+              aria-label="Modo Oscuro"
+            >
+              <Moon size={18} />
+              <span>Modo Oscuro</span>
+            </button>
+          </div>
+        </div>
       </Card>
     </>
   );

@@ -30,14 +30,14 @@
 
 /* Administrador — azul ICF */
 .badge--primary {
-  background: #d7e2f1;
-  border-color: var(--moon-piccolo, #005687);
-  color: var(--moon-piccolo, #005687);
+  background: var(--moon-piccolo-10);
+  border-color: var(--moon-piccolo);
+  color: var(--moon-piccolo);
 }
 
 /* Usuario / Maestro — gris */
 .badge--neutral {
-  background: #f3f4f6;
-  border-color: #d1d5dc;
-  color: #364153;
+  background: var(--moon-gohan);
+  border-color: var(--moon-beerus);
+  color: var(--moon-trunks);
 }

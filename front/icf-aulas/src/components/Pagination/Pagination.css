@@ -5,14 +5,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--moon-beerus);
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .pagination__info {
   font-size: 14px;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   margin: 0;
 }
 
@@ -26,12 +26,12 @@
   font-size: 13px;
   font-weight: 500;
   font-family: var(--moon-font-sans);
-  color: #4a5565;
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
+  color: var(--moon-bulma);
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: 10px;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition: background 0.15s, opacity 0.15s, color 0.15s;
 }
 
 .pagination__btn:disabled {
@@ -40,5 +40,5 @@
 }
 
 .pagination__btn:not(:disabled):hover {
-  background: var(--moon-gohan, #efefef);
+  background: var(--moon-gohan);
 }

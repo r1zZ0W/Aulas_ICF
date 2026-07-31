@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { ApiError } from './errors/ApiError.js';
 import { toast } from './utils/toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary.jsx';
@@ -41,9 +42,11 @@ createRoot(document.getElementById('root')).render(
   <ErrorBoundary>
     <BrowserRouter basename={import.meta.env.VITE_ROUTER_BASENAME}>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>
   </ErrorBoundary>,

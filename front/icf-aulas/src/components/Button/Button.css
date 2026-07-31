@@ -77,8 +77,8 @@
 
 .btn--outline {
   background: transparent;
-  color: #1e2939;
-  border: 1.337px solid #e2e2e2;
+  color: var(--moon-bulma);
+  border: 1.337px solid var(--moon-beerus);
   border-radius: 16px;
   font-weight: 600;
 }

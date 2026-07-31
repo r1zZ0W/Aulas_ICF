@@ -121,7 +121,8 @@
 }
 
 .form-modal__input::placeholder {
-  color: rgba(30, 41, 57, 0.5);
+  color: var(--moon-trunks);
+  opacity: 0.75;
 }
 
 .form-modal__row {
@@ -184,7 +185,8 @@
 }
 
 .form-modal__textarea::placeholder {
-  color: rgba(30, 41, 57, 0.5);
+  color: var(--moon-trunks);
+  opacity: 0.75;
 }
 
 .form-modal__textarea:focus {

@@ -17,26 +17,26 @@
 
 /* Head */
 .data-table__head {
-  background: #f9fafb;
+  background: var(--moon-gohan);
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
 .data-table__head tr {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--moon-beerus);
 }
 
 .data-table__th {
   padding: 11px 16px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--moon-gohan);
+  border-bottom: 1px solid var(--moon-beerus);
 }
 
 .data-table__th:first-child {
@@ -45,7 +45,7 @@
 
 /* Body rows */
 .data-table__row {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--moon-beerus);
   transition: background 0.12s;
 }
 
@@ -54,12 +54,12 @@
 }
 
 .data-table__row:hover {
-  background: #f9fafb;
+  background: var(--moon-gohan);
 }
 
 .data-table__td {
   padding: 16px;
-  color: var(--moon-bulma, #232222);
+  color: var(--moon-bulma);
   vertical-align: middle;
 }
 

@@ -12,27 +12,27 @@
   align-items: center;
   gap: 8px;
   padding: 7px 12px;
-  background: #fff;
-  border: 1px solid #d1d5db;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-right: none;           /* merged with the caret */
   border-radius: 10px 0 0 10px;
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--moon-bulma);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   white-space: nowrap;
 }
 
 /* When there's no caret (read-only for non-admin), use full-radius */
 .semester-btn__main:only-child {
-  border-right: 1px solid #d1d5db;
+  border-right: 1px solid var(--moon-beerus);
   border-radius: 10px;
 }
 
 .semester-btn__main:hover:not(.semester-btn__main--readonly) {
-  background: #f3f4f6;
-  border-color: #9ca3af;
+  background: var(--moon-gohan);
+  border-color: var(--moon-beerus);
 }
 
 .semester-btn__main--readonly {
@@ -40,7 +40,7 @@
 }
 
 .semester-btn__edit-icon {
-  color: #9ca3af;
+  color: var(--moon-trunks);
   flex-shrink: 0;
 }
 
@@ -50,18 +50,18 @@
   align-items: center;
   justify-content: center;
   padding: 0 8px;
-  background: #fff;
-  border: 1px solid #d1d5db;
-  border-left: 1px solid #e5e7eb;  /* subtle separator from main button */
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
+  border-left: 1px solid var(--moon-beerus);  /* subtle separator from main button */
   border-radius: 0 10px 10px 0;
-  color: #6b7280;
+  color: var(--moon-trunks);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
 .semester-btn__caret:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--moon-gohan);
+  color: var(--moon-bulma);
 }
 
 /* ── Dropdown menu ───────────────────────────────────────────────────────── */
@@ -70,10 +70,10 @@
   top: calc(100% + 6px);
   right: 0;
   min-width: 220px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--moon-shadow-md);
   z-index: 200;
   overflow: hidden;
   animation: semester-menu-in 0.12s ease;
@@ -88,7 +88,7 @@
   padding: 8px 14px 6px;
   font-size: 11px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--moon-trunks);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -96,7 +96,7 @@
 .semester-btn__menu-empty {
   padding: 8px 14px;
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--moon-trunks);
 }
 
 .semester-btn__menu-item {
@@ -109,30 +109,30 @@
   background: none;
   border: none;
   font-size: 13px;
-  color: #374151;
+  color: var(--moon-bulma);
   cursor: pointer;
   text-align: left;
-  transition: background 0.1s;
+  transition: background 0.1s, color 0.1s;
 }
 
 .semester-btn__menu-item:hover {
-  background: #f3f4f6;
+  background: var(--moon-gohan);
 }
 
 .semester-btn__menu-item--create {
-  color: #2563eb;
+  color: var(--moon-piccolo);
   font-weight: 500;
   gap: 6px;
   justify-content: flex-start;
 }
 
 .semester-btn__menu-item--create:hover {
-  background: #eff6ff;
+  background: var(--moon-piccolo-10);
 }
 
 .semester-btn__menu-divider {
   height: 1px;
-  background: #e5e7eb;
+  background: var(--moon-beerus);
   margin: 4px 0;
 }
 

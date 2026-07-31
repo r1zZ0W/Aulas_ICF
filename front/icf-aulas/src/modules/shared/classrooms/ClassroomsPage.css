@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   padding: 40px 48px;
-  background: #f9fafb;
+  background: var(--moon-content-bg);
   min-height: 0;
   overflow-y: auto;
 }
@@ -19,8 +19,8 @@
   flex-wrap: wrap;
 }
 
-.classrooms-page__title   { font-size: 24px; font-weight: 700; color: #101828; margin: 0 0 4px; }
-.classrooms-page__subtitle{ font-size: 15px; color: #6a7282; margin: 0; }
+.classrooms-page__title   { font-size: 24px; font-weight: 700; color: var(--moon-bulma); margin: 0 0 4px; }
+.classrooms-page__subtitle{ font-size: 15px; color: var(--moon-trunks); margin: 0; }
 
 /* Header actions: semester button + Nueva Aula button */
 .classrooms-page__header-actions {
@@ -46,13 +46,13 @@
   align-items: center;
   gap: 16px;
   padding: 22px 24px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: 16px;
 }
 
-.classrooms-page__stat-label { font-size: 13px; font-weight: 500; color: #6a7282; margin: 0 0 2px; }
-.classrooms-page__stat-value { font-size: 24px; font-weight: 700; color: #101828; margin: 0; }
+.classrooms-page__stat-label { font-size: 13px; font-weight: 500; color: var(--moon-trunks); margin: 0 0 2px; }
+.classrooms-page__stat-value { font-size: 24px; font-weight: 700; color: var(--moon-bulma); margin: 0; }
 
 /* Stat icons */
 .classrooms-page__stat-icon {
@@ -65,23 +65,17 @@
   flex-shrink: 0;
 }
 
-.classrooms-page__stat-icon--blue  { background: #eff6ff; color: #2563eb; }
-.classrooms-page__stat-icon--green { background: #f0fdf4; color: #16a34a; }
-.classrooms-page__stat-icon--red   { background: #fff1f2; color: #e11d48; }
+.classrooms-page__stat-icon--blue  { background: var(--moon-piccolo-10); color: var(--moon-piccolo); }
+.classrooms-page__stat-icon--green { background: var(--moon-teal-10); color: var(--moon-teal); }
+.classrooms-page__stat-icon--red   { background: var(--moon-dodoria-10); color: var(--moon-dodoria); }
 
-/* Table card
- * Flex column bounded to the remaining viewport height (via `.classrooms-page`'s
- * own flex:1/min-height:0 chain up to `.private-layout` at 100vh). Only the table
- * rows (`.data-table-wrap`, flexed below) scroll internally — the toolbar and the
- * pagination footer stay pinned and always visible, no page-level scroll needed
- * to reach the "Mostrando X al Y de Z aulas" footer.
- */
+/* Table card */
 .classrooms-page__table-card {
   margin-top: 28px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: 16px;
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--moon-shadow-sm);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -94,14 +88,11 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--moon-beerus);
   flex-wrap: wrap;
   flex-shrink: 0;
 }
 
-/* Override DataTable's default max-height: 60vh — here the wrap fills exactly
- * the space table-card has left after the toolbar and pagination, so it can be
- * taller or shorter than 60vh depending on the viewport. */
 .classrooms-page__table-card .data-table-wrap {
   max-height: none;
   flex: 1;
@@ -127,24 +118,24 @@
   border: none;
   background: transparent;
   border-radius: 10px;
-  color: #6a7282;
+  color: var(--moon-trunks);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
 .classrooms__action-btn:hover {
-  background: #efefef;
-  color: #232222;
+  background: var(--moon-gohan);
+  color: var(--moon-bulma);
 }
 
 .classrooms__action-btn--danger:hover {
-  background: rgba(225, 29, 72, 0.08);
-  color: #e11d48;
+  background: var(--moon-dodoria-10);
+  color: var(--moon-dodoria);
 }
 
 .classrooms__action-btn--success:hover {
-  background: rgba(22, 163, 74, 0.08);
-  color: #16a34a;
+  background: var(--moon-teal-10);
+  color: var(--moon-teal);
 }
 
 .classrooms__action-btn--success:disabled {
@@ -178,29 +169,30 @@
 .classrooms-page__form-help {
   display: block;
   font-size: 12px;
-  color: #6a7282;
+  color: var(--moon-trunks);
   margin-top: 4px;
 }
 
 /* ── Children checkbox list (edit modal) ────────────────────────────────── */
 
 .classroom-children {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--moon-beerus);
   border-radius: 10px;
   padding: 12px 14px;
   margin: 0;
+  background: var(--moon-gohan);
 }
 
 .classroom-children__legend {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--moon-bulma);
   padding: 0 4px;
 }
 
 .classroom-children__count {
   font-weight: 400;
-  color: #6a7282;
+  color: var(--moon-trunks);
 }
 
 .classroom-children__list {
@@ -217,13 +209,13 @@
   align-items: center;
   gap: 7px;
   font-size: 13px;
-  color: #374151;
+  color: var(--moon-bulma);
   cursor: pointer;
   user-select: none;
 }
 
 .classroom-children__checkbox {
-  accent-color: #2563eb;
+  accent-color: var(--moon-piccolo);
   width: 15px;
   height: 15px;
   flex-shrink: 0;
@@ -238,6 +230,6 @@
 
 .classroom-children__hint {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--moon-trunks);
   white-space: nowrap;
 }

@@ -6,6 +6,7 @@
   gap: 24px;
   padding: 28px 32px;
   min-height: 100%;
+  background: var(--moon-content-bg);
 }
 
 /* ── Header ───────────────────────────────────────────────────────────────────── */
@@ -30,18 +31,18 @@
   gap: 10px;
   font-size: 22px;
   font-weight: 700;
-  color: var(--moon-bulma, #1a1a2e);
+  color: var(--moon-bulma);
   margin: 0;
 }
 
 .reports-page__title-icon {
-  color: var(--moon-piccolo, #005687);
+  color: var(--moon-piccolo);
   flex-shrink: 0;
 }
 
 .reports-page__subtitle {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--moon-trunks);
   margin: 0;
 }
 
@@ -54,7 +55,7 @@
   font-size: 13px;
   font-weight: 600;
   color: #fff;
-  background: var(--moon-piccolo, #005687);
+  background: var(--moon-piccolo);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -65,7 +66,7 @@
 }
 
 .reports-page__export-btn:hover {
-  background: #004470;
+  background: var(--moon-piccolo-60);
   transform: translateY(-1px);
 }
 
@@ -82,13 +83,13 @@
   gap: 16px;
   align-items: flex-start;
   padding: 20px 24px;
-  background: #f0f7ff;
-  border: 1px solid #bfdbfe;
+  background: var(--moon-piccolo-10);
+  border: 1px solid var(--moon-beerus);
   border-radius: 12px;
 }
 
 .reports-page__info-icon {
-  color: var(--moon-piccolo, #005687);
+  color: var(--moon-piccolo);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -102,20 +103,20 @@
 .reports-page__info-title {
   font-size: 14px;
   font-weight: 700;
-  color: var(--moon-piccolo, #005687);
+  color: var(--moon-piccolo);
   margin: 0;
 }
 
 .reports-page__info-text {
   font-size: 13px;
   line-height: 1.6;
-  color: #374151;
+  color: var(--moon-bulma);
   margin: 0;
 }
 
 .reports-page__info-text strong {
   font-weight: 600;
-  color: #111827;
+  color: var(--moon-bulma);
 }
 
 /* ── Period filter toolbar ────────────────────────────────────────────────────── */
@@ -125,8 +126,8 @@
   align-items: center;
   gap: 16px;
   padding: 14px 20px;
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: 10px;
   flex-wrap: wrap;
 }
@@ -137,20 +138,20 @@
   gap: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--moon-trunks);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .reports-page__filter-label-icon {
-  color: #6b7280;
+  color: var(--moon-trunks);
 }
 
 /* Segmented toggle (Mensual / Semestral) */
 .reports-page__scope-toggle {
   display: flex;
   gap: 0;
-  background: #f3f4f6;
+  background: var(--moon-gohan);
   border-radius: 8px;
   padding: 3px;
 }
@@ -160,7 +161,7 @@
   font-family: var(--moon-font-sans);
   font-size: 13px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--moon-trunks);
   background: transparent;
   border: none;
   border-radius: 6px;
@@ -170,20 +171,20 @@
 }
 
 .reports-page__scope-btn:hover {
-  color: var(--moon-piccolo, #005687);
+  color: var(--moon-piccolo);
 }
 
 .reports-page__scope-btn--active {
-  background: var(--moon-goku, #fff);
-  color: var(--moon-piccolo, #005687);
+  background: var(--moon-goku);
+  color: var(--moon-piccolo);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--moon-shadow-sm);
 }
 
 .reports-page__divider {
   width: 1px;
   height: 24px;
-  background: #e5e7eb;
+  background: var(--moon-beerus);
   flex-shrink: 0;
 }
 
@@ -191,23 +192,11 @@
   min-width: 160px;
 }
 
-/* ── Exportable region (cover + KPI grid + charts) ───────────────────────────────
-   Wrapper that `exportRootRef` points to (see ReportsPage.jsx). Needs its own
-   flex/gap since it's now a nested div rather than the KPI grid and charts grid
-   sitting as direct children of `.reports-page` — this reproduces that spacing. */
-
 .reports-page__export-root {
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
-
-/* ── PDF cover (export-only) ──────────────────────────────────────────────────────
-   Hidden on screen; revealed only while `.reports-page--exporting` is toggled on
-   `.reports-page__export-root` during PDF capture (see handleExportPdf). html2canvas
-   skips `display:none` elements, so this must be a real display toggle, not
-   `visibility`/opacity tricks that would still leave the node occupying layout space
-   and getting captured as an empty box. */
 
 .reports-page__pdf-cover {
   display: none;
@@ -223,20 +212,20 @@
 .reports-page__pdf-cover-title {
   font-size: 20px;
   font-weight: 700;
-  color: var(--moon-bulma, #1a1a2e);
+  color: var(--moon-bulma);
   margin: 0;
 }
 
 .reports-page__pdf-cover-period {
   font-size: 14px;
   font-weight: 600;
-  color: var(--moon-piccolo, #005687);
+  color: var(--moon-piccolo);
   margin: 0;
 }
 
 .reports-page__pdf-cover-meta {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--moon-trunks);
   margin: 0;
 }
 
@@ -260,10 +249,9 @@
   }
 }
 
-/* KPI card — extends .stat-card from theme.css */
 .reports-page__kpi-card {
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -281,7 +269,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: var(--moon-piccolo-10, rgba(0, 86, 135, 0.08));
+  background: var(--moon-piccolo-10);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -289,20 +277,20 @@
 }
 
 .reports-page__kpi-icon {
-  color: var(--moon-piccolo, #005687);
+  color: var(--moon-piccolo);
 }
 
 .reports-page__kpi-label {
   font-size: 13px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--moon-trunks);
   margin: 0;
 }
 
 .reports-page__kpi-value {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: var(--moon-bulma);
   line-height: 1;
   margin: 0;
 }
@@ -333,7 +321,7 @@
 
 .reports-page__kpi-delta-label {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--moon-trunks);
 }
 
 /* ── Charts 2×2 grid ──────────────────────────────────────────────────────────── */
@@ -350,10 +338,9 @@
   }
 }
 
-/* Chart card — extends .chart-card from theme.css */
 .reports-page__chart-card {
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: 12px;
   padding: 20px 20px 16px;
   display: flex;
@@ -364,13 +351,13 @@
 .reports-page__chart-title {
   font-size: 15px;
   font-weight: 700;
-  color: #111827;
+  color: var(--moon-bulma);
   margin: 0;
 }
 
 .reports-page__chart-subtitle {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--moon-trunks);
   margin: 0 0 8px;
 }
 
@@ -379,7 +366,6 @@
   min-height: 250px;
 }
 
-/* Donut center label */
 .reports-page__donut-center {
   position: absolute;
   inset: 0;
@@ -393,20 +379,20 @@
 .reports-page__donut-pct {
   font-size: 26px;
   font-weight: 700;
-  color: #111827;
+  color: var(--moon-bulma);
   line-height: 1;
 }
 
 .reports-page__donut-label {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--moon-trunks);
   text-align: center;
 }
 
 /* ── Skeleton / loading state ─────────────────────────────────────────────────── */
 
 .reports-page__skeleton {
-  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background: linear-gradient(90deg, var(--moon-gohan) 25%, var(--moon-beerus) 50%, var(--moon-gohan) 75%);
   background-size: 200% 100%;
   animation: reports-skeleton-shimmer 1.4s infinite;
   border-radius: 6px;
@@ -431,8 +417,6 @@
   height: 250px;
   border-radius: 8px;
 }
-
-/* ── Responsive adjustments ───────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
   .reports-page {

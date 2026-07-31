@@ -4,7 +4,7 @@
   border-radius: 32px;
   overflow: hidden;
   padding: 0;
-  background: #f9fafb;
+  background: var(--moon-goku);
   max-height: none;
 }
 
@@ -17,18 +17,18 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #f0f7ff;
-  border: 1px solid #bfe0ff;
+  background: var(--moon-piccolo-10);
+  border: 1px solid var(--moon-beerus);
   border-radius: 8px;
   padding: 6px 12px;
   font-family: var(--moon-font-sans);
   font-size: 12px;
   font-weight: 600;
-  color: #005687;
+  color: var(--moon-piccolo);
 }
 
 .reserva-info-modal__readonly {
-  background: #f9fafb;
+  background: var(--moon-gohan);
   cursor: default;
   pointer-events: none;
   color: var(--moon-bulma);

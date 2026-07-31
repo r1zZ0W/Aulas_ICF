@@ -3,7 +3,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--moon-goku);
   border-radius: 12px;
   border: 1px solid var(--moon-beerus);
   overflow: hidden;
@@ -206,7 +206,7 @@
 }
 
 .fc .fc-col-header-cell {
-  background: #fff;
+  background: var(--moon-goku);
 }
 
 .fc .fc-col-header-cell-cushion {
@@ -250,13 +250,13 @@
 
 /* Highlight the hovered active day column for booking */
 .fc .fc-timegrid-col:not(.fc-day-past):hover {
-  background-color: rgba(0, 86, 135, 0.08) !important;
+  background-color: var(--moon-piccolo-10) !important;
 }
 
 /* Disabled time slots styling */
 .fc .fc-bg-event.disabled-time-slot {
-  background: rgba(0, 0, 0, 0.04) !important;
-  opacity: 1 !important;
+  background: var(--moon-gohan) !important;
+  opacity: 0.7 !important;
   cursor: not-allowed !important;
   pointer-events: auto !important;
 }
@@ -306,12 +306,12 @@
 
 /* Month view – past day cells */
 .fc .fc-daygrid-day.fc-day-past {
-  background: #fafafa;
+  background: var(--moon-gohan);
   cursor: not-allowed;
 }
 
 .fc .fc-daygrid-day.fc-day-past .fc-daygrid-day-number {
-  color: #c0c6ce;
+  color: var(--moon-trunks);
 }
 
 /* Month view – future/today cells are clickable */

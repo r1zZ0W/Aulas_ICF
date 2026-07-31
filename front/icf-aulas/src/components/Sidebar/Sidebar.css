@@ -4,7 +4,7 @@
   max-width: 240px;
   box-sizing: border-box;
   height: 100vh;
-  background-color: #ffffff;
+  background-color: var(--moon-goku);
   color: var(--moon-bulma);
   display: flex;
   flex-direction: column;

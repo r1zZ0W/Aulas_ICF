@@ -1,5 +1,5 @@
 .buscador__icon {
-  color: rgba(30, 41, 57, 0.5);
+  color: var(--moon-trunks);
   pointer-events: none;
 }
 
@@ -10,15 +10,17 @@
   font-size: 16px;
   font-weight: 400;
   color: var(--moon-content-text);
-  background: #fff;
-  border: 1.466px solid #e2e2e2;
+  background: var(--moon-goku);
+  border: 1.466px solid var(--moon-beerus);
   border-radius: 12px;
   transition: border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .buscador__input::placeholder {
-  color: rgba(30, 41, 57, 0.5);
+  color: var(--moon-trunks);
+  opacity: 0.75;
 }
 
 .buscador__input:focus {

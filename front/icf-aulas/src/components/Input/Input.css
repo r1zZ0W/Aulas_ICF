@@ -9,7 +9,7 @@
   line-height: 15px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: #595d62;
+  color: var(--moon-trunks);
 }
 
 .input-wrap__required {
@@ -25,16 +25,18 @@
   font-size: 16px;
   font-weight: 400;
   color: var(--moon-content-text);
-  background: #fff;
-  border: 1.337px solid #e2e2e2;
+  background: var(--moon-goku);
+  border: 1.337px solid var(--moon-beerus);
   border-radius: 12px;
   transition:
     border-color 0.2s,
-    box-shadow 0.2s;
+    box-shadow 0.2s,
+    background-color 0.2s;
 }
 
 .input-wrap__input::placeholder {
-  color: rgba(30, 41, 57, 0.5);
+  color: var(--moon-trunks);
+  opacity: 0.75;
 }
 
 .input-wrap__input:hover:not(:disabled):not(:focus) {

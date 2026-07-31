@@ -54,6 +54,56 @@
   --moon-font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+[data-theme="dark"] {
+  /* Backgrounds */
+  --moon-content-bg: #0f172a;
+  --moon-goku: #1e293b;
+  --moon-gohan: #334155;
+
+  /* Borders */
+  --moon-content-border: #334155;
+  --moon-beerus: #334155;
+
+  /* Text */
+  --moon-content-text: #f8fafc;
+  --moon-content-text-secondary: #94a3b8;
+  --moon-bulma: #f8fafc;
+  --moon-trunks: #94a3b8;
+
+  /* Primary / accent */
+  --moon-content-focus: #38bdf8;
+  --moon-piccolo: #0284c7;
+  --moon-piccolo-10: rgba(56, 189, 248, 0.18);
+  --moon-piccolo-60: #38bdf8;
+  --moon-btn-primary: #0284c7;
+
+  /* Status */
+  --moon-dodoria: #f87171;
+  --moon-dodoria-10: rgba(248, 113, 113, 0.18);
+  --moon-chichi: #f87171;
+  --moon-chichi-10: rgba(248, 113, 113, 0.18);
+  --moon-chichi-90: rgba(248, 113, 113, 0.9);
+  --moon-teal: #2dd4bf;
+  --moon-teal-10: rgba(45, 212, 191, 0.18);
+  --moon-teal-90: rgba(45, 212, 191, 0.9);
+  --moon-krillin: #fbbf24;
+  --moon-krillin-70: rgba(251, 191, 36, 0.7);
+  --moon-roshi-70: rgba(74, 222, 128, 0.7);
+  --moon-purple-10: rgba(168, 85, 247, 0.2);
+  --moon-red-10: rgba(248, 113, 113, 0.3);
+
+  /* Shadows */
+  --moon-shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --moon-shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --moon-card-hover-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+body {
+  background-color: var(--moon-content-bg);
+  color: var(--moon-content-text);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
 
 .moon-card,
 .stat-card,

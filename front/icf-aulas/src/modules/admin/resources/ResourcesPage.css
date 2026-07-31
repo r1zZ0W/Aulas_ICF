@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   padding: 40px 48px;
-  background: #f9fafb;
+  background: var(--moon-content-bg);
   min-height: 0;
   overflow-y: auto;
 }
@@ -23,14 +23,14 @@
 .resources-page__title {
   font-size: 24px;
   font-weight: 700;
-  color: #101828;
+  color: var(--moon-bulma);
   margin: 0 0 4px;
   line-height: 1.3;
 }
 
 .resources-page__subtitle {
   font-size: 15px;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   margin: 0;
 }
 
@@ -54,10 +54,10 @@
   align-items: center;
   gap: 16px;
   padding: 22px 24px;
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: var(--moon-radius-s-lg, 16px);
-  box-shadow: 0px 1px 1.5px rgba(0,0,0,0.1), 0px 1px 1px rgba(0,0,0,0.1);
+  box-shadow: var(--moon-shadow-sm);
 }
 
 .resources-page__stat-icon {
@@ -70,20 +70,20 @@
   border-radius: 50%;
 }
 
-.resources-page__stat-icon--blue  { background: #e6f0f5; color: var(--moon-piccolo, #005687); }
-.resources-page__stat-icon--green { background: #ecfdf5; color: #059669; }
+.resources-page__stat-icon--blue  { background: var(--moon-piccolo-10); color: var(--moon-piccolo); }
+.resources-page__stat-icon--green { background: var(--moon-teal-10); color: var(--moon-teal); }
 
 .resources-page__stat-label {
   font-size: 13px;
   font-weight: 500;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   margin: 0 0 2px;
 }
 
 .resources-page__stat-value {
   font-size: 24px;
   font-weight: 700;
-  color: #101828;
+  color: var(--moon-bulma);
   margin: 0;
   line-height: 1.2;
 }
@@ -92,10 +92,10 @@
 
 .resources-page__table-card {
   margin-top: 28px;
-  background: var(--moon-goku, #fff);
-  border: 1px solid #e5e7eb;
+  background: var(--moon-goku);
+  border: 1px solid var(--moon-beerus);
   border-radius: var(--moon-radius-s-lg, 16px);
-  box-shadow: 0px 1px 3px rgba(0,0,0,0.1), 0px 1px 2px -1px rgba(0,0,0,0.1);
+  box-shadow: var(--moon-shadow-sm);
   overflow: hidden;
 }
 
@@ -103,7 +103,7 @@
   display: flex;
   align-items: center;
   padding: 14px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--moon-beerus);
 }
 
 /* Resource cells -------------------------------------------------------------- */
@@ -111,18 +111,18 @@
 .resources-page__resource-name {
   font-size: 14px;
   font-weight: 600;
-  color: #101828;
+  color: var(--moon-bulma);
 }
 
 .resources-page__resource-description {
   font-size: 13px;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
 }
 
 .resources-page__resource-qty {
   font-size: 14px;
   font-weight: 500;
-  color: #101828;
+  color: var(--moon-bulma);
 }
 
 /* Action buttons ------------------------------------------------------------ */
@@ -142,20 +142,20 @@
   border: none;
   background: transparent;
   border-radius: 10px;
-  color: var(--moon-trunks, #6a7282);
+  color: var(--moon-trunks);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   line-height: 1;
 }
 
 .resources-page__action-btn:hover {
-  background: var(--moon-gohan, #efefef);
-  color: var(--moon-bulma, #232222);
+  background: var(--moon-gohan);
+  color: var(--moon-bulma);
 }
 
 .resources-page__action-btn--danger:hover {
-  background: var(--moon-chichi-10, rgba(255,78,100,0.1));
-  color: var(--moon-chichi, #ff4e64);
+  background: var(--moon-dodoria-10);
+  color: var(--moon-dodoria);
 }
 
 /* Form grid ----------------------------------------------------------------- */
