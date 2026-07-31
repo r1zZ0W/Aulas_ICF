@@ -12,7 +12,7 @@ export default function LogoHeader({ containerClassName = "text-end mb-4" }) {
         <img
           src={aulasHeaderPng}
           alt="Logo Ithera"
-          className="img-fluid"
+          className="img-fluid logo-header-img"
         />
       </div>
     </div>

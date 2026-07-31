@@ -12,6 +12,11 @@ body {
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  transition: background-color 0.25s ease;
+}
+
+[data-theme="dark"] .bg-custom-layout {
+  background-color: var(--moon-content-bg);
 }
 
 .card-container {
@@ -21,9 +26,16 @@ body {
   border-radius: 20px;
   box-shadow: 0 10px 25px rgb(0, 0, 0, 0.2);
   overflow: hidden;
-  border: none;
+  border: 1px solid transparent;
   min-height: 75vh;
   display: flex;
+  transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+[data-theme="dark"] .card-container {
+  background-color: var(--moon-goku);
+  border-color: var(--moon-beerus);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
 }
 
 /*
@@ -94,6 +106,26 @@ body {
   background-color: #fff !important;
 }
 
+.login-form-panel {
+  background-color: #ffffff;
+  color: var(--moon-bulma);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+[data-theme="dark"] .login-form-panel {
+  background-color: var(--moon-goku);
+  color: var(--moon-bulma);
+}
+
+.logo-header-img {
+  transition: filter 0.25s ease, opacity 0.25s ease;
+}
+
+[data-theme="dark"] .logo-header-img {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
 .fw-bolder {
   font-weight: bolder !important;
 }
@@ -124,6 +156,16 @@ body {
   color: #1a1a1a;
   height: 100%;
   overflow: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+[data-theme="dark"] .open-box {
+  background-color: #172554;
+  color: var(--moon-bulma);
+}
+
+[data-theme="dark"] .open-box p {
+  color: var(--moon-trunks);
 }
 
 .illustration-img {
@@ -133,6 +175,12 @@ body {
   object-fit: contain;
   margin-bottom: 2rem;
   margin-top: 1rem;
+  transition: filter 0.25s ease, mix-blend-mode 0.25s ease;
+}
+
+[data-theme="dark"] .illustration-img {
+  mix-blend-mode: screen;
+  filter: invert(0.85) hue-rotate(180deg);
 }
 
 .ithera-progress-bar-color {
@@ -200,10 +248,22 @@ body {
   border: 1px solid rgba(211, 48, 74, 0.2);
 }
 
+[data-theme="dark"] .form-message--error {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.15);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
 .form-message--success {
   color: #15803d;
   background: rgba(22, 163, 74, 0.1);
   border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+[data-theme="dark"] .form-message--success {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.3);
 }
 
 .form-message--warning {
@@ -221,13 +281,84 @@ body {
   display: block;
 }
 
+[data-theme="dark"] .form-field-error {
+  color: #f87171;
+}
+
 /* Custom label styles for Login page */
 .login-form-label {
   font-family: var(--moon-font-sans) !important;
   font-size: 18px !important;
   font-weight: 400 !important;
   text-transform: none !important;
-  color: #1c1c1c !important;
+  color: var(--moon-bulma) !important;
   letter-spacing: -0.5px !important;
   margin-bottom: 4px !important;
+  transition: color 0.25s ease;
+}
+
+/* Session Modal Styles */
+.session-modal {
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 520px;
+  max-width: 100%;
+  text-align: center;
+  font-family: var(--moon-font-sans);
+}
+
+.session-modal__icon-box {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: var(--moon-piccolo-10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.25s ease;
+}
+
+.session-modal__icon-svg path,
+.session-modal__icon-svg rect {
+  stroke: var(--moon-piccolo);
+}
+
+.session-modal__icon-svg circle {
+  fill: var(--moon-piccolo);
+}
+
+.session-modal__title {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--moon-bulma);
+  transition: color 0.25s ease;
+}
+
+.session-modal__message {
+  margin: 0 auto 28px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--moon-trunks);
+  max-width: 400px;
+  transition: color 0.25s ease;
+}
+
+.session-modal__btn {
+  padding: 11px 20px;
+  border-radius: 10px;
+  border: none;
+  background: var(--moon-piccolo);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.session-modal__btn:hover {
+  opacity: 0.9;
 }

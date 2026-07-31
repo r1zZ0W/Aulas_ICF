@@ -4,13 +4,11 @@ import Button from "../../../components/Button/Button";
 import InputField from "../components/InputField";
 import PasswordInput from "../components/PasswordInput";
 import LogoHeader from "../components/LogoHeader";
-import ProgressBar from "../components/ProgressBar";
 import LoadingOverlay from "../../../components/LoadingOverlay/LoadingOverlay";
 import Modal from "../../../components/Modal/Modal";
 import { useLogin } from "../../../hooks/useLogin";
 
 import "../styles/public.css";
-import { AtomIcon } from "lucide-react";
 import logoIcfPng from "../../../assets/logo_icf.png";
 
 /** Maps an auth reason to a human-readable modal content. */
@@ -24,7 +22,6 @@ const SESSION_MODAL_CONTENT = {
     message: 'Tu sesión expiró o el token ya no es válido. Inicia sesión nuevamente.',
   },
 };
-
 
 /**
  * Login page rendered at /login.
@@ -71,18 +68,18 @@ export default function Login() {
 
       {/* Modal de sesión requerida / expirada */}
       <Modal open={!!sessionModal} className="w-auto">
-        <div style={modalStyles.container}>
-          <div style={modalStyles.iconBox}>
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
-              <path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="#2563eb" strokeWidth="1.8" strokeLinecap="round" />
-              <rect x="4" y="10" width="16" height="10" rx="2.5" stroke="#2563eb" strokeWidth="1.8" />
-              <circle cx="12" cy="15" r="1.2" fill="#2563eb" />
+        <div className="session-modal">
+          <div className="session-modal__icon-box">
+            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" className="session-modal__icon-svg">
+              <path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <rect x="4" y="10" width="16" height="10" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="12" cy="15" r="1.2" fill="currentColor" />
             </svg>
           </div>
-          <h2 style={modalStyles.title}>{sessionModal?.title}</h2>
-          <p style={modalStyles.message}>{sessionModal?.message}</p>
+          <h2 className="session-modal__title">{sessionModal?.title}</h2>
+          <p className="session-modal__message">{sessionModal?.message}</p>
           <button
-            style={modalStyles.btn}
+            className="session-modal__btn"
             onClick={() => setSessionModal(null)}
             autoFocus
           >
@@ -111,7 +108,7 @@ export default function Login() {
             </div>
 
             {/* Right panel — login form */}
-            <div className="col-sm-5 p-5 bg-white">
+            <div className="col-sm-5 p-5 login-form-panel">
               <div
                 className="d-flex flex-column h-100 justify-content-center mt-4"
                 style={{ width: "33vw", marginLeft: "1vw" }}
@@ -171,49 +168,3 @@ export default function Login() {
     </>
   );
 }
-
-const modalStyles = {
-  container: {
-    padding: '40px 32px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    width: '520px',
-    maxWidth: '100%',
-    textAlign: 'center',
-    fontFamily: 'Inter, system-ui, sans-serif',
-  },
-  iconBox: {
-    width: '80px',
-    height: '80px',
-    margin: '0 auto 20px',
-    borderRadius: '50%',
-    background: '#eaf2ff',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    margin: '0 0 12px',
-    fontSize: '28px',
-    fontWeight: 800,
-    color: '#0f172a',
-  },
-  message: {
-    margin: '0 auto 28px',
-    fontSize: '15px',
-    lineHeight: 1.65,
-    color: '#475569',
-    maxWidth: '400px',
-  },
-  btn: {
-    padding: '11px 20px',
-    borderRadius: '10px',
-    border: 'none',
-    background: '#2563eb',
-    color: '#fff',
-    fontWeight: 600,
-    fontSize: '14px',
-    cursor: 'pointer',
-  },
-};
