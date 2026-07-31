@@ -237,7 +237,9 @@ export default function ReservaModal({ open, onClose, initialStart = null, initi
                 >
                   <option value="" />
                   {availableRooms.map(r => (
-                    <option key={r.uuid} value={r.uuid}>{r.label}</option>
+                    <option key={r.uuid} value={r.uuid} disabled={r.capacity < 2}>
+                      {r.label}{r.capacity < 2 ? ' — capacidad insuficiente' : ''}
+                    </option>
                   ))}
                 </select>
                 <ChevronDown size={18} className="reserva-modal__chevron" />

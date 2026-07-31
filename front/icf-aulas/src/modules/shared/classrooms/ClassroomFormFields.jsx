@@ -56,7 +56,7 @@ export default function ClassroomFormFields({
       <Input
         label="Capacidad"
         type="number"
-        min={2}
+        min={1}
         max={500}
         value={form.capacity}
         onChange={(e) => onField('capacity', Number(e.target.value))}

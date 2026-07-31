@@ -17,7 +17,7 @@ export const ClassroomRequestSchema = z.object({
   capacity: z
     .number({ error: 'La capacidad debe ser un número' })
     .int('La capacidad debe ser un número entero')
-    .min(2, 'La capacidad debe ser al menos 2')
+    .min(1, 'La capacidad debe ser al menos 1')
     .max(500, 'La capacidad máxima admitida es de 500 personas'),
 
   // NOTE: this project's zod v4.4.3 silently ignores the old `errorMap` option (no error, no

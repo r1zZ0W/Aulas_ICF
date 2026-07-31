@@ -61,7 +61,7 @@ public class ReservInstance extends BaseEntity {
 
     /** Current lifecycle status of this instance; defaults to {@link ReservInstanceStatus#ACTIVE} on creation. */
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 50)
+    @Column(name = "status")
     private ReservInstanceStatus status = ReservInstanceStatus.ACTIVE;
 
     /** Expected number of attendees for this session. */

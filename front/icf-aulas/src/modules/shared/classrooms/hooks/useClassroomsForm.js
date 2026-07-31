@@ -82,7 +82,7 @@ export function useClassroomsForm({
     setPrevChildUuids(currentChildren);
     zod.reset({
       name: classroom.name ?? '',
-      capacity: classroom.capacity ?? 2,
+      capacity: classroom.capacity ?? 1,
       type: classroom.type ?? 'AULA',
       description: classroom.description ?? '',
       linkedRoomUuid: classroom.linkedRoomUuid ?? null,
