@@ -1,5 +1,7 @@
 package mx.unam.icf.aulas.modules.reservations.instances.app.exceptions;
 
+import lombok.Getter;
+
 import java.time.LocalDate;
 
 /**
@@ -13,9 +15,18 @@ import java.time.LocalDate;
  * @author Ithera
  * @version 1.0
  */
+@Getter
 public class ReservationConflictException extends RuntimeException {
 
+    /**
+     * -- GETTER --
+     * Returns the conflicting date.
+     */
     private final LocalDate conflictDate;
+    /**
+     * -- GETTER --
+     * Returns the conflicting time-slot ID (1–24).
+     */
     private final Integer   conflictTimeSlotId;
 
     /**
@@ -28,9 +39,4 @@ public class ReservationConflictException extends RuntimeException {
         this.conflictTimeSlotId = timeSlotId;
     }
 
-    /** Returns the conflicting date. */
-    public LocalDate getConflictDate() { return conflictDate; }
-
-    /** Returns the conflicting time-slot ID (1–24). */
-    public Integer getConflictTimeSlotId() { return conflictTimeSlotId; }
 }
