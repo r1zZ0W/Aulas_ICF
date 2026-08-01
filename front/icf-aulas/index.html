@@ -6,7 +6,24 @@
   <link rel="icon" href="/favicon-light.svg" media="(prefers-color-scheme: light)">
   <link rel="icon" href="/favicon-dark.svg" media="(prefers-color-scheme: dark)">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark">
   <title>Aulas - ICF</title>
+  <script>
+    // Applies the theme before first paint, synchronously, so a hard reload never flashes
+    // the "wrong" theme while React mounts. Mirrors ThemeContext's own storage/fallback
+    // logic (src/context/ThemeContext.jsx) — keep the two in sync if either changes.
+    (function () {
+      try {
+        var saved = localStorage.getItem('app-theme');
+        document.documentElement.dataset.theme =
+          (saved === 'dark' || saved === 'light')
+            ? saved
+            : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
 </head>
 
 <body>
