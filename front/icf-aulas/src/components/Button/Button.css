@@ -9,7 +9,23 @@
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.12s ease;
+}
+
+/* Replaces the previous whileTap={{ scale: 0.96 }} (motion/react) press effect —
+   same visual result via a compositor-only transform, at zero JS cost. */
+.btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 .btn--small {
