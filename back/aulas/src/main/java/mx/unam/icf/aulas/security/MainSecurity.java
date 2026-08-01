@@ -102,6 +102,10 @@ public class MainSecurity {
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowCredentials(true);
+        // Lets the browser cache the preflight so it isn't repeated on every request —
+        // every call carries a non-simple Authorization header, so preflights are otherwise
+        // unavoidable per the CORS spec.
+        config.setMaxAge(3600L);
         
         UrlBasedCorsConfigurationSource src = new UrlBasedCorsConfigurationSource();
         src.registerCorsConfiguration("/**", config);
