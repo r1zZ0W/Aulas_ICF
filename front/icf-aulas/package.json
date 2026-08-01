@@ -6,15 +6,17 @@
   "scripts": {
     "dev": "vite --port 5173 --open",
     "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "preview:dev": "vite build --mode development && vite preview",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.3.0",
     "@fullcalendar/daygrid": "^6.1.21",
     "@fullcalendar/interaction": "^6.1.21",
     "@fullcalendar/react": "^6.1.21",
     "@fullcalendar/timegrid": "^6.1.21",
-    "@moondesignsystem/react": "^2.5.21",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-tooltip": "^1.2.12",
     "@tanstack/react-query": "^5.101.2",
@@ -22,14 +24,11 @@
     "jspdf": "^4.2.1",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^1.24.0",
-    "motion": "^12.42.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
-    "react-transition-group": "^4.4.5",
     "recharts": "^3.9.2",
     "sonner": "^2.0.7",
-    "styled-components": "^6.4.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
