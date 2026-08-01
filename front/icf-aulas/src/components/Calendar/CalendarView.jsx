@@ -6,10 +6,10 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { useQuery } from '@tanstack/react-query';
 import { Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 
-import { useCalendar } from '../../hooks/useCalendar';
+import { useCalendar, getStartOfCurrentWeek } from '../../hooks/useCalendar';
 import { useReservation } from '../../context/ReservationContext';
 import { getAvailability } from '../../api/reservations';
-import { instanceToEvent } from '../../utils/reservations';
+import { instanceToEvent, toDateString } from '../../utils/reservations';
 import DayEventsModal from './DayEventsModal';
 import ErrorBanner from '../ErrorBanner/ErrorBanner';
 
@@ -48,7 +48,20 @@ export default function CalendarView() {
   // ── Calendar date range (updated on every FullCalendar navigation) ──────────
   // Kept LOCAL to this component: datesSet fires on every prev/next click, so
   // putting this in global context would re-render the entire provider subtree.
-  const [calendarRange, setCalendarRange] = useState({ from: null, to: null });
+  //
+  // Seeded with the current week (not {from:null,to:null}) so the availability query is
+  // enabled from the first render instead of waiting for FullCalendar to mount and fire its
+  // first datesSet — that used to make /availability the last request to leave, behind three
+  // others, purely because it depended on a heavy calendar library finishing its own mount.
+  // Must mirror initialView="timeGridWeek" + firstDay={1} below: if this range doesn't match
+  // FullCalendar's own first datesSet, React Query treats it as a different queryKey and fires
+  // a second, redundant request instead of serving the seeded one from cache.
+  const [calendarRange, setCalendarRange] = useState(() => {
+    const monday = getStartOfCurrentWeek();
+    const nextMonday = new Date(monday);
+    nextMonday.setDate(monday.getDate() + 7);
+    return { from: toDateString(monday), to: toDateString(nextMonday) };
+  });
 
   const handleRangeChange = useCallback((range) => {
     setCalendarRange(range);

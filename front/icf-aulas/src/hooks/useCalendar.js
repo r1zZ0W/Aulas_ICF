@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useReservation } from '../context/ReservationContext';
+import { toDateString } from '../utils/reservations';
 
 const MONTHS_ES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -22,6 +23,22 @@ const formatMonthTitle = (start) => {
 };
 
 /**
+ * Returns the Date (local midnight) of the Monday of the current week.
+ * Shared with CalendarView, which seeds its initial availability query range with it —
+ * must match FullCalendar's `firstDay={1}` so the seeded range and the first `datesSet`
+ * produce the same queryKey.
+ */
+export function getStartOfCurrentWeek() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = today.getDay();
+  const diff = today.getDate() - (day === 0 ? 6 : day - 1);
+  const monday = new Date(today.setDate(diff));
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+/**
  * Calendar interaction logic for FullCalendar.
  *
  * @param {object}   [opts]
@@ -36,16 +53,6 @@ export function useCalendar({ onRangeChange } = {}) {
   const { openModal, openInfoModal } = useReservation();
   const [overflowDay, setOverflowDay] = useState(null);
   const [isPrevDisabled, setIsPrevDisabled] = useState(false);
-
-  const getStartOfCurrentWeek = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const day = today.getDay();
-    const diff = today.getDate() - (day === 0 ? 6 : day - 1);
-    const monday = new Date(today.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  };
 
   const getStartOfCurrentMonth = () => {
     const today = new Date();
@@ -117,16 +124,10 @@ export function useCalendar({ onRangeChange } = {}) {
   const handleDatesSet = (info) => {
     setCurrentView(info.view.type);
 
-    // Compute local YYYY-MM-DD strings — safe against timezone shifts
+    // Local YYYY-MM-DD strings — safe against timezone shifts
     const start = info.start;
     const end   = info.end;
-    const toStr = (d) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${dd}`;
-    };
-    onRangeChange?.({ from: toStr(start), to: toStr(end) });
+    onRangeChange?.({ from: toDateString(start), to: toDateString(end) });
 
     if (info.view.type === 'timeGridWeek') {
       setTitle(formatWeekTitle(start, end));
