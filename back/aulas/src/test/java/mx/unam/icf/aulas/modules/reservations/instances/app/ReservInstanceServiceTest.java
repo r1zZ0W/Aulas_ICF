@@ -24,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -80,7 +81,8 @@ class ReservInstanceServiceTest {
     void setUp() {
         service = new ReservInstanceService(
                 reservInstanceRepository, mapper, groupRepository, classroomRepository,
-                timeSlotRepository, null, null, null, null, null, null, null, null, null);
+                timeSlotRepository, null, null, null, null, null, null, null, null, null,
+                Clock.systemDefaultZone());
 
         reservationDate = LocalDate.now().plusMonths(1);
         while (reservationDate.getDayOfWeek() == DayOfWeek.SUNDAY)

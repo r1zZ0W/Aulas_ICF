@@ -3,11 +3,11 @@ package mx.unam.icf.aulas.modules.reservations.instances.infrastructure;
 import jakarta.persistence.criteria.*;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceFilter;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstance;
+import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservationTimeframeRule;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -46,10 +46,13 @@ public final class ReservInstanceSpecification {
      * All predicates are combined with AND. A {@code null} or blank filter field
      * is silently skipped (no restriction on that dimension).
      *
-     * @param f the filter criteria; must not be {@code null}
+     * @param f     the filter criteria; must not be {@code null}
+     * @param today reference date resolved from the application {@code Clock}, used to build
+     *              the {@code timeframe} predicate via {@link ReservationTimeframeRule}; only
+     *              read when {@code f.timeframe()} is non-null
      * @return a ready-to-use {@link Specification}
      */
-    public static Specification<ReservInstance> build(ReservInstanceFilter f) {
+    public static Specification<ReservInstance> build(ReservInstanceFilter f, LocalDate today) {
         return (root, query, cb) -> {
 
             Class<?> rt = query.getResultType();
@@ -91,9 +94,11 @@ public final class ReservInstanceSpecification {
                 ));
             }
 
-            // -- status ------------------------------------------------------------------
-            if (f.status() != null) {
-                predicates.add(cb.equal(root.get("status"), f.status()));
+            // -- status --------------------------------------------------------------------
+            // IN (...) rather than a single equality so one request can select several
+            // statuses at once — e.g. "Cancelada" = CANCELLED_BY_USER OR CANCELLED_BY_ADMIN.
+            if (f.statuses() != null && !f.statuses().isEmpty()) {
+                predicates.add(root.get("status").in(f.statuses()));
             }
 
             // -- reassigned --------------------------------------------------------------
@@ -103,6 +108,14 @@ public final class ReservInstanceSpecification {
             // false → only instances that were never reassigned (clean "Activa" partition).
             if (f.reassigned() != null) {
                 predicates.add(cb.equal(root.get("reassigned"), f.reassigned()));
+            }
+
+            // -- timeframe -----------------------------------------------------------------
+            // Orthogonal to status: classifies by date alone (see ReservationTimeframeRule),
+            // so "ACTIVE + PAST" (Finalizada) and "ACTIVE + UPCOMING" (Activa) are both
+            // expressible without a new ReservInstanceStatus value.
+            if (f.timeframe() != null) {
+                predicates.add(ReservationTimeframeRule.toPredicate(cb, root.get("date"), f.timeframe(), today));
             }
 
             // -- classroomId -------------------------------------------------------------

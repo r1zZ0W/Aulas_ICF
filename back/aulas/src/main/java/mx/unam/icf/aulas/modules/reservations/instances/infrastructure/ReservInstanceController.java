@@ -18,6 +18,7 @@ import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceF
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceRequestDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.app.dtos.ReservInstanceResponseDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
+import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservationTimeframe;
 import mx.unam.icf.aulas.kernel.domain.exceptions.ErrorCode;
 import mx.unam.icf.aulas.modules.reservations.students.app.exceptions.InvalidExcelFileException;
 
@@ -68,19 +69,24 @@ public class ReservInstanceController implements ResponseHandler {
      * <ul>
      *   <li>{@code search} — case-insensitive LIKE over classroom name and user full name
      *       (min. 3 chars recommended; full table scan below that threshold)</li>
-     *   <li>{@code status} — exact match; invalid value → 400</li>
+     *   <li>{@code status} — exact match against one or more values (repeat the param, e.g.
+     *       {@code status=CANCELLED_BY_USER&status=CANCELLED_BY_ADMIN}); invalid value → 400</li>
      *   <li>{@code reassigned} — {@code true} = only admin-reassigned instances;
      *       {@code false} = only never-reassigned instances; omitted = no restriction.
      *       Combine with {@code status=ACTIVE} for clean "Activa/Reasignada" partition.
      *       Non-boolean value (e.g. {@code reassigned=foo}) → 400.</li>
+     *   <li>{@code timeframe} — {@code UPCOMING} or {@code PAST}, relative to the server's
+     *       current date; orthogonal to {@code status} (e.g. {@code status=ACTIVE&timeframe=PAST}
+     *       selects "Finalizada": never cancelled, but its date has passed).</li>
      *   <li>{@code classroomId} — equality on classroom UUID</li>
      *   <li>{@code from} / {@code to} — inclusive date range (ISO format {@code yyyy-MM-dd})</li>
      * </ul>
      *
      * @param criteria    pagination and sorting criteria, resolved by {@link PageCriteriaArgumentResolver}
      * @param search      optional case-insensitive search term (classroom name or user name)
-     * @param status      optional status filter
+     * @param status      optional status filter (one or more values)
      * @param reassigned  optional reassignment flag filter ({@code true}/{@code false}; omit for no restriction)
+     * @param timeframe   optional {@code UPCOMING}/{@code PAST} filter relative to today
      * @param classroomId optional classroom UUID filter
      * @param from        optional start date (inclusive)
      * @param to          optional end date (inclusive)
@@ -95,12 +101,13 @@ public class ReservInstanceController implements ResponseHandler {
                     defaultDirection = "desc")
             PageCriteria criteria,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) ReservInstanceStatus status,
+            @RequestParam(required = false) List<ReservInstanceStatus> status,
             @RequestParam(required = false) Boolean reassigned,
+            @RequestParam(required = false) ReservationTimeframe timeframe,
             @RequestParam(required = false) UUID classroomId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        ReservInstanceFilter filter = new ReservInstanceFilter(search, status, reassigned, classroomId, from, to, null);
+        ReservInstanceFilter filter = new ReservInstanceFilter(search, status, reassigned, timeframe, classroomId, from, to, null);
         return ok(service.findAll(filter, criteria.toPageable()));
     }
 
@@ -132,8 +139,9 @@ public class ReservInstanceController implements ResponseHandler {
      * @param principal   authenticated user (used for access control)
      * @param criteria    pagination and sorting criteria
      * @param search      optional case-insensitive search term
-     * @param status      optional status filter
+     * @param status      optional status filter (one or more values)
      * @param reassigned  optional reassignment flag filter ({@code true}/{@code false}; omit for no restriction)
+     * @param timeframe   optional {@code UPCOMING}/{@code PAST} filter relative to today
      * @param classroomId optional classroom UUID filter
      * @param from        optional start date (inclusive)
      * @param to          optional end date (inclusive)
@@ -149,14 +157,15 @@ public class ReservInstanceController implements ResponseHandler {
                     defaultDirection = "desc")
             PageCriteria criteria,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) ReservInstanceStatus status,
+            @RequestParam(required = false) List<ReservInstanceStatus> status,
             @RequestParam(required = false) Boolean reassigned,
+            @RequestParam(required = false) ReservationTimeframe timeframe,
             @RequestParam(required = false) UUID classroomId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         if (!"ADMIN".equals(principal.getRoleName()) && !userUuid.equals(principal.getUuid()))
             throw new AccessDeniedException("You can only view your own reservations");
-        ReservInstanceFilter filter = new ReservInstanceFilter(search, status, reassigned, classroomId, from, to, null);
+        ReservInstanceFilter filter = new ReservInstanceFilter(search, status, reassigned, timeframe, classroomId, from, to, null);
         return ok(service.findByUser(userUuid, filter, criteria.toPageable()));
     }
 

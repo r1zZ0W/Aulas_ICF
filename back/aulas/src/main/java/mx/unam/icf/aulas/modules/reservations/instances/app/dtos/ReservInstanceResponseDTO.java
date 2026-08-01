@@ -2,6 +2,7 @@ package mx.unam.icf.aulas.modules.reservations.instances.app.dtos;
 
 import mx.unam.icf.aulas.modules.academic.timeslots.app.dtos.TimeSlotDTO;
 import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservInstanceStatus;
+import mx.unam.icf.aulas.modules.reservations.instances.domain.ReservationTimeframe;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,9 +38,15 @@ import java.util.UUID;
  *                       (e.g. "Programación I — parcial"); {@code null} when not provided —
  *                       the frontend should fall back to {@code classroomName} in that case.
  *                       Never an empty string (normalized to {@code null} on write).
+ * @param timeframe      {@link ReservationTimeframe#UPCOMING} or {@link ReservationTimeframe#PAST},
+ *                       derived from {@code date} against the reference date supplied by the
+ *                       service layer (never {@code null} — see
+ *                       {@link mx.unam.icf.aulas.modules.reservations.instances.domain.ReservationTimeframeRule}).
+ *                       Independent of {@code status}: a cancelled instance still carries a
+ *                       timeframe, but the frontend badge gives cancellation precedence.
  *
  * @author Ithera
- * @version 4.2
+ * @version 4.3
  */
 public record ReservInstanceResponseDTO(
         UUID uuid,
@@ -55,5 +62,6 @@ public record ReservInstanceResponseDTO(
         List<TimeSlotDTO> timeSlots,
         LocalDateTime createdAt,
         Boolean reassigned,
-        String title
+        String title,
+        ReservationTimeframe timeframe
 ) {}

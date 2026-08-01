@@ -50,10 +50,10 @@ import mx.unam.icf.aulas.modules.resources.classrooms.infrastructure.ClassroomRe
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -108,6 +108,7 @@ public class ReservInstanceService {
     private final StudentRosterValidator     rosterValidator;
     private final FileStorageService         fileStorage;
     private final StudentListStorageProperties rosterStorageProperties;
+    private final Clock                      clock;
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -127,9 +128,10 @@ public class ReservInstanceService {
      */
     @Transactional(readOnly = true)
     public PagedResultDTO<ReservInstanceResponseDTO> findAll(ReservInstanceFilter filter, Pageable pageable) {
+        LocalDate today = LocalDate.now(clock);
         return PageMapper.toDto(
-                reservInstanceRepository.findAll(ReservInstanceSpecification.build(filter), pageable),
-                mapper::toDtoList);
+                reservInstanceRepository.findAll(ReservInstanceSpecification.build(filter, today), pageable),
+                list -> mapper.toDtoList(list, today));
     }
 
     /**
@@ -142,7 +144,8 @@ public class ReservInstanceService {
     public ReservInstanceResponseDTO findByUuid(UUID uuid) {
         return mapper.toDto(
             reservInstanceRepository.findByUuid(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_NOT_FOUND, "Reservation instance not found: " + uuid))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.RESERVATION_NOT_FOUND, "Reservation instance not found: " + uuid)),
+            LocalDate.now(clock)
         );
     }
 
@@ -160,9 +163,10 @@ public class ReservInstanceService {
      */
     @Transactional(readOnly = true)
     public PagedResultDTO<ReservInstanceResponseDTO> findByUser(UUID userUuid, ReservInstanceFilter filter, Pageable pageable) {
+        LocalDate today = LocalDate.now(clock);
         return PageMapper.toDto(
-                reservInstanceRepository.findAll(ReservInstanceSpecification.build(filter.withUser(userUuid)), pageable),
-                mapper::toDtoList);
+                reservInstanceRepository.findAll(ReservInstanceSpecification.build(filter.withUser(userUuid), today), pageable),
+                list -> mapper.toDtoList(list, today));
     }
 
     /**
@@ -182,7 +186,7 @@ public class ReservInstanceService {
         List<ReservInstance> instances = (classroomUuid != null)
             ? reservInstanceRepository.findActiveByClassroomAndDateRange(classroomUuid, from, to, ReservInstanceStatus.ACTIVE)
             : reservInstanceRepository.findActiveByDateRange(from, to, ReservInstanceStatus.ACTIVE);
-        return mapper.toDtoList(instances);
+        return mapper.toDtoList(instances, LocalDate.now(clock));
     }
 
     /**
@@ -291,7 +295,7 @@ public class ReservInstanceService {
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND, "User not found with UUID: " + target));
 
         // 3. Ensure the requested start date does not exceed the currently active semester
-        Semester currentSemester = semesterRepository.findCurrent(LocalDate.now())
+        Semester currentSemester = semesterRepository.findCurrent(LocalDate.now(clock))
             .orElseThrow(() -> new DomainException(ErrorCode.SEMESTER_NO_ACTIVE, "No active semester available at this time"));
 
         if (dto.startDate().isAfter(currentSemester.getEndDate()))
@@ -339,8 +343,8 @@ public class ReservInstanceService {
 
 
         // 9. Per-date in-memory validations (no DB round-trips here)
-        LocalDate today    = LocalDate.now();
-        LocalTime nowTime  = LocalTime.now(ZoneId.of("America/Mexico_City"));
+        LocalDate today    = LocalDate.now(clock);
+        LocalTime nowTime  = LocalTime.now(clock);
         for (LocalDate d : targetDates) {
             if (d.isBefore(today))
                 throw new DomainException(ErrorCode.RESERVATION_DATE_IN_PAST, "Date " + d + " is in the past");
@@ -373,14 +377,14 @@ public class ReservInstanceService {
         List<ReservSlot> classroomConflicts = slotRepository.findClassroomConflictsInScope(
             bookingScope, dto.timeSlotIds(), targetDates);
         if (!classroomConflicts.isEmpty()) {
-            ReservSlot first = classroomConflicts.get(0);
+            ReservSlot first = classroomConflicts.getFirst();
             throw new ReservationConflictException(first.getDate(), first.getTimeSlot().getId());
         }
 
         List<ReservSlot> userConflicts = slotRepository.findUserConflicts(
             user.getId(), dto.timeSlotIds(), targetDates);
         if (!userConflicts.isEmpty()) {
-            ReservSlot first = userConflicts.get(0);
+            ReservSlot first = userConflicts.getFirst();
             throw new ReservationConflictException(first.getDate(), first.getTimeSlot().getId());
         }
 
@@ -421,7 +425,7 @@ public class ReservInstanceService {
         // is @TransactionalEventListener(AFTER_COMMIT), so no email fires unless the commit
         // below actually consolidates. (The old flow deferred this to ReservationStudentService
         // .upload; the roster now arrives with the booking, so the notification does too.)
-        ReservInstance first = saved.get(0);
+        ReservInstance first = saved.getFirst();
         List<String> adminEmails = userRepository.findByRoleName("ADMIN")
             .stream().map(User::getEmail).collect(Collectors.toList());
         eventPublisher.publishEvent(new ReservInstanceCreatedEventDTO(
@@ -442,7 +446,7 @@ public class ReservInstanceService {
         fileStorage.store(rosterStorageProperties.getStorageDir(),
             group.getUuid() + ".xlsx", rosterBytes);
 
-        return mapper.toDtoList(saved);
+        return mapper.toDtoList(saved, today);
     }
 
     /**
@@ -474,7 +478,7 @@ public class ReservInstanceService {
         if (!Boolean.TRUE.equals(classroom.getIsActive()))
             throw new DomainException(ErrorCode.CLASSROOM_INACTIVE, "The requested classroom is inactive and cannot be reserved");
 
-        if (dto.date().isBefore(LocalDate.now()))
+        if (dto.date().isBefore(LocalDate.now(clock)))
             throw new DomainException(ErrorCode.RESERVATION_DATE_IN_PAST, "Reservation date cannot be in the past");
 
         if (dto.date().getDayOfWeek() == DayOfWeek.SUNDAY)
@@ -498,8 +502,8 @@ public class ReservInstanceService {
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.TIMESLOT_NOT_FOUND, "Time slot not found: " + id)))
             .toList();
 
-        if (dto.date().equals(LocalDate.now())) {
-            LocalTime cutoff = LocalTime.now().plusMinutes(15);
+        if (dto.date().equals(LocalDate.now(clock))) {
+            LocalTime cutoff = LocalTime.now(clock).plusMinutes(15);
             TimeSlot earliest = timeSlots.stream()
                 .min(Comparator.comparing(TimeSlot::getStartTime))
                 .orElseThrow();
@@ -554,7 +558,7 @@ public class ReservInstanceService {
             adminEmails
         ));
 
-        return mapper.toDto(saved);
+        return mapper.toDto(saved, LocalDate.now(clock));
     }
 
     // ── Cancellation ──────────────────────────────────────────────────────────
@@ -599,7 +603,7 @@ public class ReservInstanceService {
             maestroEmail, maestroFullName, classroomName, date,
             start, end, reservationId, false, null, adminEmails
         ));
-        return mapper.toDto(saved);
+        return mapper.toDto(saved, LocalDate.now(clock));
     }
 
     /**
@@ -638,7 +642,7 @@ public class ReservInstanceService {
             maestroEmail, maestroFullName, classroomName, date,
             start, end, reservationId, true, null, adminEmails
         ));
-        return mapper.toDto(saved);
+        return mapper.toDto(saved, LocalDate.now(clock));
     }
 
     // ── Reassignment ──────────────────────────────────────────────────────────
@@ -778,7 +782,7 @@ public class ReservInstanceService {
             adminEmails
         ));
 
-        return mapper.toDto(saved);
+        return mapper.toDto(saved, LocalDate.now(clock));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
