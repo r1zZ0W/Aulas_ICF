@@ -13,6 +13,9 @@ export default function LogoHeader({ containerClassName = "text-end mb-4" }) {
           src={aulasHeaderPng}
           alt="Logo Ithera"
           className="img-fluid logo-header-img"
+          width="187"
+          height="69"
+          decoding="async"
         />
       </div>
     </div>

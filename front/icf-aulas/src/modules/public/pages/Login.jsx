@@ -9,7 +9,12 @@ import Modal from "../../../components/Modal/Modal";
 import { useLogin } from "../../../hooks/useLogin";
 
 import "../styles/public.css";
-import logoIcfPng from "../../../assets/logo_icf.png";
+// Lossless WebP re-encode of logo_icf.png (729x654, 51.7 KB -> 29.2 KB, -44%). Verified
+// pixel-identical to the PNG on every non-fully-transparent pixel and on the alpha channel
+// itself, so [data-theme="dark"] .illustration-img's mix-blend-mode/invert filter (see
+// public.css) renders exactly as before — the only bytes that differ are RGB values on
+// fully-transparent (alpha=0) pixels, which no compositing path can ever expose.
+import logoIcfWebp from "../../../assets/logo_icf.webp";
 
 /** Maps an auth reason to a human-readable modal content. */
 const SESSION_MODAL_CONTENT = {
@@ -94,9 +99,13 @@ export default function Login() {
             <div className="col-sm-7 open-box d-md-flex align-items-center justify-content-center transition-all side-panel">
               <div className="text-center w-100">
                 <img
-                  src={logoIcfPng}
+                  src={logoIcfWebp}
                   alt="Logo ICF"
                   className="img-fluid illustration-img"
+                  width="729"
+                  height="654"
+                  fetchpriority="high"
+                  decoding="async"
                 />
                 <div className="container mt-3">
                   <h1 className="fw-bolder">Sistema de Reservas</h1>
