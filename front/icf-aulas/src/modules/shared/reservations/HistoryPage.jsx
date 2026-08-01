@@ -5,6 +5,7 @@ import { History, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useReservation } from '../../../context/ReservationContext';
 import { useReservationHistory } from './hooks/useReservationHistory';
+import { optionsFor, toQueryParams, normalizeKey } from './statusFilter';
 import { usePagination } from '../../../hooks/usePagination';
 import { useTableSort } from '../../../hooks/useTableSort';
 import { useUrlFilters } from '../../../hooks/useUrlFilters';
@@ -23,24 +24,8 @@ import './HistoryPage.css';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const VALID_STATUSES = ['ACTIVE', 'CANCELLED_BY_USER', 'CANCELLED_BY_ADMIN'];
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_SORTS = ['date', 'status', 'createdAt'];
-
-const STATUS_OPTIONS_ADMIN = [
-  { value: '',                   label: 'Todos los estados'      },
-  { value: 'ACTIVE',             label: 'Activa'                 },
-  { value: 'REASSIGNED',         label: 'Reasignada'             },
-  { value: 'CANCELLED_BY_USER',  label: 'Cancelada por maestro'  },
-  { value: 'CANCELLED_BY_ADMIN', label: 'Cancelada por admin'    },
-];
-
-const STATUS_OPTIONS_TEACHER = [
-  { value: '',           label: 'Todos los estados' },
-  { value: 'ACTIVE',     label: 'Activa'            },
-  { value: 'REASSIGNED', label: 'Reasignada'        },
-  { value: 'CANCELLED_BY_USER', label: 'Cancelada'  },
-];
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
 
@@ -89,7 +74,9 @@ function SortHeader({ field, label, sort, direction, onToggle }) {
  *
  * All list state (search, page, sort, direction, status, classroomId, from, to)
  * lives in the URL as the single source of truth — copying the URL reproduces
- * the exact view in another tab.
+ * the exact view in another tab. The `status` param holds a *selection key*
+ * (see `./statusFilter.js`), translated into the real `status`/`reassigned`/`timeframe`
+ * API params in one place so the dropdown label and the fetched data can never disagree.
  *
  * Maestro view: own reservations only, no Organizador column, no tabs.
  * Admin view: tabs "Todas las Reservas" / "Mis Reservas"; Organizador column on "Todas".
@@ -100,32 +87,15 @@ export default function HistoryPage() {
 
   // URL-synced state — all three hooks write to useSearchParams
   const { searchInput, setSearchInput, search, page, setPage } = usePagination({ debounce: 300, minSearchLength: 3 });
-  const { sort, direction, toggleSort } = useTableSort({ defaultSort: 'date', defaultDirection: 'desc', allowed: ALLOWED_SORTS });
-  const { values: filterValues, setFilter, resetFilters } = useUrlFilters(['status', 'reassigned', 'classroomId', 'from', 'to']);
+  const { values: filterValues, setFilter, resetFilters } = useUrlFilters(['status', 'classroomId', 'from', 'to']);
   const [, setParams] = useSearchParams();
 
   // ── Render-phase sanitization ───────────────────────────────────────────────
   // Must happen here (not in a useEffect) so that React Query always receives valid
   // params from the very first render cycle — an effect fires after render and would
-  // let a bad status=REASSIGNED or status=GARBAGE request reach the backend (→ 400).
-
-  // 'REASSIGNED' is a virtual UI alias; map it to real params in memory.
-  const isVirtualReassigned = filterValues.status === 'REASSIGNED';
-
-  const safeStatus = isVirtualReassigned
-    ? 'ACTIVE'
-    : (VALID_STATUSES.includes(filterValues.status) ? filterValues.status : '');
-
-  // ABSOLUTE RULE: `reassigned` is an EXCLUSIVE sub-partition of ACTIVE.
-  // Derive from safeStatus (not filterValues.reassigned in isolation) so that
-  // ?status=CANCELLED_BY_USER&reassigned=true or a bare ?reassigned=true cannot
-  // inject the flag into a non-ACTIVE query (URL injection defense).
-  //   • safeStatus !== 'ACTIVE' → undefined (buildPageParams strips the param)
-  //   • ACTIVE + reassigned=true (or virtual alias) → true
-  //   • ACTIVE, any other case  → false (clean "Activa" partition, anti-leak)
-  const safeReassigned = safeStatus === 'ACTIVE'
-    ? (filterValues.reassigned === 'true' || isVirtualReassigned ? true : false)
-    : undefined;
+  // let a bad/unknown status key reach the backend for one render (→ 400).
+  const statusKey = normalizeKey(filterValues.status, user?.role);
+  const { status: apiStatus, reassigned: apiReassigned, timeframe: apiTimeframe } = toQueryParams(statusKey);
 
   const safeClassroomId = filterValues.classroomId || '';
   const safeFrom = DATE_REGEX.test(filterValues.from) ? filterValues.from : '';
@@ -133,61 +103,52 @@ export default function HistoryPage() {
 
   // ── Cosmetic URL cleanup (useEffect) ────────────────────────────────────────
   // The render-phase block above already made the fetch correct; this effect only
-  // rewrites the address bar so bookmarks / copy-paste produce canonical URLs.
-  // It also sweeps unknown garbage statuses so the URL doesn't stay dirty silently.
+  // rewrites the address bar so bookmarks / copy-paste produce canonical URLs, and
+  // sweeps the legacy `reassigned` param (pre-dating the single-key `status` contract).
   useEffect(() => {
-    const raw = filterValues.status;
-    if (!raw) return;
-    if (raw === 'REASSIGNED') {
+    const rawStatus = filterValues.status;
+    const legacyReassigned = new URLSearchParams(window.location.search).get('reassigned');
+    if (!rawStatus && legacyReassigned === null) return;
+
+    // A maestro's old bookmark for "Cancelada" used the raw backend status
+    // (`CANCELLED_BY_USER`) directly — that literal is no longer a maestro-facing key
+    // (their "Cancelada" now groups both actors under `CANCELLED`). Upgrade it instead
+    // of just dropping the filter, so the bookmark keeps working.
+    const isLegacyCancelledLiteral =
+      (rawStatus === 'CANCELLED_BY_USER' || rawStatus === 'CANCELLED_BY_ADMIN')
+      && normalizeKey(rawStatus, user?.role) === '';
+
+    let canonicalKey = statusKey;
+    if (rawStatus === 'ACTIVE' && legacyReassigned === 'true') {
+      canonicalKey = 'REASSIGNED'; // old two-param combo for "Reasignada"
+    } else if (isLegacyCancelledLiteral) {
+      canonicalKey = 'CANCELLED';
+    }
+
+    if (rawStatus !== canonicalKey || legacyReassigned !== null) {
       setParams(prev => {
         const next = new URLSearchParams(prev);
-        next.set('status', 'ACTIVE');
-        next.set('reassigned', 'true');
-        return next;
-      }, { replace: true });
-    } else if (!VALID_STATUSES.includes(raw)) {
-      // Unknown value → strip it (and any orphan reassigned flag) from the URL.
-      setParams(prev => {
-        const next = new URLSearchParams(prev);
-        next.delete('status');
+        if (canonicalKey) next.set('status', canonicalKey); else next.delete('status');
         next.delete('reassigned');
         return next;
       }, { replace: true });
     }
-  }, [filterValues.status, setParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filterValues.status, statusKey, user?.role, setParams]);
 
-  // ── Atomic setter for the (status, reassigned) pair ─────────────────────────
-  // useUrlFilters.setFilter deletes any key whose value is falsy, so it cannot
-  // persist `reassigned=false` in isolation. Both params must be written in one
-  // setParams call to produce a single browser-history entry.
   function applyStatusSelection(value) {
     setParams(prev => {
       const next = new URLSearchParams(prev);
       next.delete('page'); // Reset pagination whenever the status filter changes.
-      if (value === 'REASSIGNED') {
-        next.set('status', 'ACTIVE');
-        next.set('reassigned', 'true');
-      } else if (value === 'ACTIVE') {
-        next.set('status', 'ACTIVE');
-        next.set('reassigned', 'false');
-      } else if (value) {
-        // CANCELLED_BY_USER / CANCELLED_BY_ADMIN — no reassigned constraint.
-        next.set('status', value);
-        next.delete('reassigned');
-      } else {
-        // '' → "Todos los estados" — clear both params.
-        next.delete('status');
-        next.delete('reassigned');
-      }
+      if (value) next.set('status', value); else next.delete('status');
+      next.delete('reassigned'); // no longer a distinct URL param — swept defensively
       return next;
     }, { replace: true });
   }
 
-  // Derive the Select's displayed value from the sanitized state so the label
-  // and the data always agree — never read the raw URL value here.
-  const statusSelectValue = safeStatus === 'ACTIVE'
-    ? (safeReassigned ? 'REASSIGNED' : 'ACTIVE')
-    : (safeStatus || '');
+  // Próximas (UPCOMING) read best nearest-first; Finalizadas/Canceladas read best most-recent-first.
+  // An explicit `direction` in the URL (from clicking a column header) still wins — see useTableSort.
+  const defaultDirection = apiTimeframe === 'UPCOMING' ? 'asc' : 'desc';
+  const { sort, direction, toggleSort } = useTableSort({ defaultSort: 'date', defaultDirection, allowed: ALLOWED_SORTS });
 
   // Render-layer short-circuits (plan items #7 and #8):
   //  • isIncompleteSearch: hook is blind to local input — force items=[] in render
@@ -203,8 +164,9 @@ export default function HistoryPage() {
     page,
     size: DEFAULT_PAGE_SIZE,
     search,
-    status: safeStatus,
-    reassigned: safeReassigned,
+    status: apiStatus,
+    reassigned: apiReassigned,
+    timeframe: apiTimeframe,
     classroomId: safeClassroomId,
     from: (dateRangeValid && safeFrom) ? safeFrom : undefined,
     to: (dateRangeValid && safeTo) ? safeTo : undefined,
@@ -214,7 +176,7 @@ export default function HistoryPage() {
 
   const items = blocked ? [] : rawItems;
   const showOrganizer = isAdmin && tab === 'all';
-  const hasFilters = !!(search || safeStatus || safeReassigned !== undefined || safeClassroomId || safeFrom || safeTo);
+  const hasFilters = !!(search || statusKey || safeClassroomId || safeFrom || safeTo);
 
   // ── Room options for the filter dropdown ──────────────────────────────────
   const roomOptions = [
@@ -263,7 +225,7 @@ export default function HistoryPage() {
 
   // Single setParams call (via resetFilters) + local state clear — atomic, one history entry
   const handleReset = () => {
-    resetFilters(['search', 'sort', 'direction']);
+    resetFilters(['search', 'sort', 'direction', 'reassigned']);
     setSearchInput('');
   };
 
@@ -327,9 +289,9 @@ export default function HistoryPage() {
             style={{ flex: '1 1 200px', maxWidth: 440 }}
           />
           <Select
-            value={statusSelectValue}
+            value={statusKey}
             onChange={applyStatusSelection}
-            options={isAdmin ? STATUS_OPTIONS_ADMIN : STATUS_OPTIONS_TEACHER}
+            options={optionsFor(user?.role)}
             placeholder="Estado"
             size="sm"
             className="history-page__filter-select"

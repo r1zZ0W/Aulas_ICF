@@ -24,12 +24,17 @@ import { ROLES } from '../../../../utils/roles.js';
  * @param {number}         [params.size=10]           - Page size.
  * @param {string}         [params.search='']         - Server-side full-text search (≥3 chars gate is
  *                                                       enforced upstream in HistoryPage, not here).
- * @param {string}         [params.status='']         - Reservation status filter (ACTIVE, CANCELLED_*).
+ * @param {string|string[]} [params.status='']        - Reservation status filter (ACTIVE, CANCELLED_*).
+ *                                                       An array selects several statuses at once
+ *                                                       (e.g. "Cancelada" = both CANCELLED_BY_USER
+ *                                                       and CANCELLED_BY_ADMIN).
  * @param {boolean|undefined} [params.reassigned]     - Reassignment flag filter:
  *                                                       true  = only admin-reassigned instances,
  *                                                       false = only never-reassigned instances,
  *                                                       undefined = no restriction (omits param).
  *                                                       No default so undefined propagates cleanly.
+ * @param {string}         [params.timeframe]         - `UPCOMING`|`PAST` filter relative to today;
+ *                                                       orthogonal to `status`.
  * @param {string}         [params.classroomId='']   - Classroom UUID filter.
  * @param {string}         [params.from]              - ISO date lower bound (yyyy-MM-dd).
  * @param {string}         [params.to]                - ISO date upper bound (yyyy-MM-dd).
@@ -53,6 +58,7 @@ export function useReservationHistory({
   search = '',
   status = '',
   reassigned,
+  timeframe,
   classroomId = '',
   from,
   to,
@@ -65,14 +71,22 @@ export function useReservationHistory({
   const effectiveUuid = user?.uuid;
   const queryAll = isAdmin && tab === 'all';
 
+  // `status` may be a string or an array (multi-select filters like "Cancelada"). An empty
+  // array is truthy in JS, so `status || undefined` alone would keep it — normalize both
+  // shapes to `undefined` when there's nothing to filter on.
+  const normalizedStatus = Array.isArray(status)
+    ? (status.length ? status : undefined)
+    : (status || undefined);
+
   const filterParams = {
     page,
     size,
     search:      search      || undefined,
-    status:      status      || undefined,
+    status:      normalizedStatus,
     // `reassigned` has no || undefined guard: `false` is a valid filter value that must be sent.
     // `undefined` (no restriction) is left as-is so buildPageParams omits the param entirely.
     reassigned,
+    timeframe,
     classroomId: classroomId || undefined,
     from,
     to,

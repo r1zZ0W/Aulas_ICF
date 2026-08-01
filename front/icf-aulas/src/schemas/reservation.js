@@ -1,7 +1,7 @@
 /**
  * @fileoverview Compatibility barrel file re-exporting reservation-related validation schemas.
  */
-export { DayOfWeekEnum, ReservationGroupStatusEnum, ReservInstanceStatusEnum } from './reservation/enums.js';
+export { DayOfWeekEnum, ReservationGroupStatusEnum, ReservInstanceStatusEnum, ReservTimeframeEnum } from './reservation/enums.js';
 export { default as default, ReservationGroupRequestSchema } from './reservation/reservationGroupRequest.js';
 export { ReservationGroupResponseSchema } from './reservation/reservationGroupResponse.js';
 export { ReservInstanceRequestSchema } from './reservation/reservInstanceRequest.js';

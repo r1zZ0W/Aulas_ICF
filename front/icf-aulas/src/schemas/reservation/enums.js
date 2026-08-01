@@ -23,3 +23,14 @@ export const ReservInstanceStatusEnum = z.enum(
   ['ACTIVE', 'CANCELLED_BY_USER', 'CANCELLED_BY_ADMIN'],
   { error: 'Estado de instancia no válido' }
 );
+
+/**
+ * Temporal classification of a reservation instance relative to the server's current date,
+ * derived by the backend on every read (never stored) — see
+ * `ReservationTimeframeRule` on the backend for the exact `date < today` boundary.
+ * Orthogonal to `ReservInstanceStatusEnum`: a cancelled instance still carries a timeframe.
+ */
+export const ReservTimeframeEnum = z.enum(
+  ['UPCOMING', 'PAST'],
+  { error: 'Periodo de reserva no válido' }
+);

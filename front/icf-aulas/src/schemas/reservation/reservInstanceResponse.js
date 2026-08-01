@@ -2,7 +2,7 @@
  * @fileoverview Validation schema for individual reservation instance responses.
  */
 import { z } from 'zod';
-import { ReservInstanceStatusEnum } from './enums.js';
+import { ReservInstanceStatusEnum, ReservTimeframeEnum } from './enums.js';
 import { TimeSlotSchema } from '../timeSlot.js';
 
 /**
@@ -28,6 +28,12 @@ export const ReservInstanceResponseSchema = z.object({
   reassigned: z.boolean().optional().default(false),
   /** Free-form class/event label. */
   title: z.string().nullable().optional(),
+  /**
+   * Backend-derived classification relative to today: UPCOMING or PAST. Always present —
+   * the backend never omits it — so the frontend badge/filter logic can trust its value
+   * instead of recomputing "has this passed?" from `date` in multiple places.
+   */
+  timeframe: ReservTimeframeEnum,
 });
 
 export default ReservInstanceResponseSchema;

@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../utils/roles';
 import { useReservation } from '../../context/ReservationContext';
 import { typeLabel } from '../../schemas/classroom';
-import { slotsToRange, isReservationPast } from '../../utils/reservations';
+import { slotsToRange, hasReservationEnded } from '../../utils/reservations';
 import '../ReservaModal/ReservaModal.css';
 import './ReservaInfoModal.css';
 import { TriangleAlert } from 'lucide-react';
@@ -36,9 +36,9 @@ function fmtTime(date) {
  * Visibility rules:
  *  - Admin               → "Ver estudiantes" always (any status, past or future — opens
  *                          {@link ReservaStudentsModal}); "Cancelar" (admin mutation) +
- *                          "Reasignar" only when !isPast && status === 'ACTIVE'.
+ *                          "Reasignar" only when !hasReservationEnded && status === 'ACTIVE'.
  *  - Teacher (owner)     → "Ver estudiantes" always; "Cancelar" (user mutation) only when
- *                          !isPast && status === 'ACTIVE'.
+ *                          !hasReservationEnded && status === 'ACTIVE'.
  *  - Teacher (not owner) → read-only, no action buttons, no "Ver estudiantes".
  *
  * @param {{
@@ -92,11 +92,12 @@ export default function ReservaInfoModal({ open, onClose, reservation, onEdit })
   const isCancelling =
     cancelReservationMutation.isPending || cancelReservationAdminMutation.isPending;
 
-  // Hide cancel/reassign actions when the reservation is already in the past
-  const isPast = isReservationPast(reservation);
+  // Hide cancel/reassign actions once the reservation's last time slot has already ended
+  // (operational guard — distinct from the history badge's day-precision `timeframe`).
+  const hasEnded = hasReservationEnded(reservation);
 
-  // Guard: show action buttons only for active, future reservations
-  const canAct = !isPast && reservation.status === 'ACTIVE';
+  // Guard: show action buttons only for active, still-actionable reservations
+  const canAct = !hasEnded && reservation.status === 'ACTIVE';
 
   return (
     <Modal open={open} className="reserva-info-modal">

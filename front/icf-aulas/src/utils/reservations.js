@@ -83,10 +83,17 @@ export function labelsToTimeSlotIds(catalog, startLabel, endLabel) {
     .map(slot => slot.id);
 }
 
-// ── Past-reservation guard ────────────────────────────────────────────────────
+// ── Cancellation guard ───────────────────────────────────────────────────────
 
 /**
- * Returns `true` when the reservation's end time has already passed.
+ * Returns `true` when the reservation's end time has already passed — i.e. whether it can
+ * still be cancelled. This is an *operational* rule, precise to the minute (last time-slot's
+ * `endTime`), and answers a different question than the backend-derived `timeframe` field
+ * (`ReservInstanceResponseDTO.timeframe`, `UPCOMING`/`PAST`), which classifies by calendar day
+ * for the history badge/filter. A reservation happening right now is `timeframe: 'UPCOMING'`
+ * (today hasn't ended) but `hasReservationEnded(...) === true` once its last slot is over — so
+ * the "Cancelar" button and the "Finalizada" badge can disagree for a few hours on the same day,
+ * by design: one gates an action, the other classifies a record.
  *
  * Uses the last time-slot's `endTime` combined with `date` to build a local-time
  * Date, then compares against `Date.now()`. Returns `false` (i.e. still actionable)
@@ -95,7 +102,7 @@ export function labelsToTimeSlotIds(catalog, startLabel, endLabel) {
  * @param {{ date: string, timeSlots: Array<{ endTime: string }> }} reservation
  * @returns {boolean}
  */
-export function isReservationPast(reservation) {
+export function hasReservationEnded(reservation) {
   if (!reservation?.date || !reservation?.timeSlots?.length) return false;
   const [year, month, day] = reservation.date.split('-').map(Number);
   const last = reservation.timeSlots[reservation.timeSlots.length - 1];
@@ -121,17 +128,30 @@ export function fmtTime(date) {
 /**
  * Derives the badge variant and label for a reservation instance.
  *
- * Precedence (mirrors the Figma design; status takes priority over the reassigned flag):
- *  1. CANCELLED_BY_USER or CANCELLED_BY_ADMIN  → danger  / "Cancelada"
- *  2. reassigned === true (status still ACTIVE) → primary / "Reasignada"
- *  3. Otherwise (ACTIVE, not reassigned)        → success / "Activa"
+ * Precedence — a cancelled reservation never shows "Finalizada", and "Finalizada" takes
+ * priority over "Reasignada" (both are just display hints on top of an ACTIVE status):
+ *  1. CANCELLED_BY_USER                          → danger  / "Cancelada"
+ *  2. CANCELLED_BY_ADMIN                          → danger  / "Cancelada por administrador"
+ *  3. timeframe === 'PAST' (status still ACTIVE)  → neutral / "Finalizada"
+ *  4. reassigned === true (status still ACTIVE)   → primary / "Reasignada"
+ *  5. Otherwise (ACTIVE, upcoming, not reassigned) → success / "Activa"
  *
- * @param {{ status: string, reassigned?: boolean }} reservation
+ * `timeframe` is read verbatim from the backend (`ReservInstanceResponseDTO.timeframe`) —
+ * this function never recomputes "has this date passed?" itself, so the badge and the
+ * `timeframe` filter in HistoryPage can never disagree about the same row.
+ *
+ * @param {{ status: string, reassigned?: boolean, timeframe?: 'UPCOMING'|'PAST' }} reservation
  * @returns {{ variant: 'success'|'danger'|'primary'|'neutral', label: string }}
  */
-export function reservationBadge({ status, reassigned } = {}) {
-  if (status === 'CANCELLED_BY_USER' || status === 'CANCELLED_BY_ADMIN') {
+export function reservationBadge({ status, reassigned, timeframe } = {}) {
+  if (status === 'CANCELLED_BY_USER') {
     return { variant: 'danger', label: 'Cancelada' };
+  }
+  if (status === 'CANCELLED_BY_ADMIN') {
+    return { variant: 'danger', label: 'Cancelada por administrador' };
+  }
+  if (timeframe === 'PAST') {
+    return { variant: 'neutral', label: 'Finalizada' };
   }
   if (reassigned) {
     return { variant: 'primary', label: 'Reasignada' };

@@ -28,16 +28,16 @@ const api = createApiClient();
 
 /**
  * Returns a paginated list of all reservation instances (admin use).
- * GET /api/v1/reservations[?page=&size=&sort=&direction=&search=&status=&reassigned=&classroomId=&from=&to=]
+ * GET /api/v1/reservations[?page=&size=&sort=&direction=&search=&status=&reassigned=&timeframe=&classroomId=&from=&to=]
  *
  * Allowed sort fields: createdAt, date, status. Default: date desc.
  * Returns the raw API response so `parsePageResponse` can extract items/totalPages.
  *
- * @param {{ page?: number, size?: number, sort?: string, direction?: string, search?: string, status?: string, reassigned?: boolean, classroomId?: string, from?: string, to?: string }} [params={}]
+ * @param {{ page?: number, size?: number, sort?: string, direction?: string, search?: string, status?: string|string[], reassigned?: boolean, timeframe?: string, classroomId?: string, from?: string, to?: string }} [params={}]
  * @returns {Promise<object>} Raw API response containing `items`, `totalPages`, etc.
  */
-export async function getReservations({ page, size, sort = 'date', direction = 'desc', search, status, reassigned, classroomId, from, to } = {}) {
-  const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, classroomId, from, to });
+export async function getReservations({ page, size, sort = 'date', direction = 'desc', search, status, reassigned, timeframe, classroomId, from, to } = {}) {
+  const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, timeframe, classroomId, from, to });
   const pageResult = await api.getValidated(`/api/v1/reservations${qs}`);
   if (Array.isArray(pageResult?.items)) pageResult.items = z.array(ReservInstanceResponseSchema).parse(pageResult.items);
   return pageResult;
@@ -46,17 +46,17 @@ export async function getReservations({ page, size, sort = 'date', direction = '
 /**
  * Returns a paginated list of reservation instances belonging to a specific user.
  * A Maestro may only query their own UUID; an admin can query any user.
- * GET /api/v1/reservations/user/{userUuid}[?page=&size=&sort=&direction=&search=&status=&reassigned=&classroomId=&from=&to=]
+ * GET /api/v1/reservations/user/{userUuid}[?page=&size=&sort=&direction=&search=&status=&reassigned=&timeframe=&classroomId=&from=&to=]
  *
  * Allowed sort fields: createdAt, date, status. Default: date desc.
  * Returns the raw API response so `parsePageResponse` can extract items/totalPages.
  *
  * @param {string} userUuid
- * @param {{ page?: number, size?: number, sort?: string, direction?: string, search?: string, status?: string, reassigned?: boolean, classroomId?: string, from?: string, to?: string }} [params={}]
+ * @param {{ page?: number, size?: number, sort?: string, direction?: string, search?: string, status?: string|string[], reassigned?: boolean, timeframe?: string, classroomId?: string, from?: string, to?: string }} [params={}]
  * @returns {Promise<object>} Raw API response containing `items`, `totalPages`, etc.
  */
-export async function getReservationsByUser(userUuid, { page, size, sort = 'date', direction = 'desc', search, status, reassigned, classroomId, from, to } = {}) {
-  const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, classroomId, from, to });
+export async function getReservationsByUser(userUuid, { page, size, sort = 'date', direction = 'desc', search, status, reassigned, timeframe, classroomId, from, to } = {}) {
+  const qs = buildPageParams({ page, size, sort, direction, search, status, reassigned, timeframe, classroomId, from, to });
   const pageResult = await api.getValidated(`/api/v1/reservations/user/${userUuid}${qs}`, {
     overrides: { ACCESS_DENIED: 'Solo puedes consultar tu propio historial de reservas.' },
   });
