@@ -2,9 +2,12 @@ import { lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
 import { useAuth } from './context/AuthContext';
 import LoadingOverlay from './components/LoadingOverlay/LoadingOverlay';
+import PublicRouter from './routes/PublicRouter';
 
+// PrivateRouter (and every page it renders) stays lazy: an unauthenticated visitor on
+// /login should never pay for the dashboard bundle. PublicRouter is imported eagerly
+// (see below) so the login form itself isn't gated behind an extra chunk fetch.
 const PrivateRouter = lazy(() => import('./routes/PrivateRouter'));
-const PublicRouter = lazy(() => import('./routes/PublicRouter'));
 
 /**
  * Root component. Delegates routing entirely to context:

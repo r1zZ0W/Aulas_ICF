@@ -1,7 +1,12 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { lazy } from 'react';
+// Eager: this is the first paint for every unauthenticated visitor, and its own
+// dependency graph is light (Button/Input/Modal/useLogin + Zod) — see the login
+// bundle-leak plan for the audit. Loading it lazily meant a login → chunk fetch →
+// render waterfall for zero benefit, since it's needed immediately anyway.
+import Login from '../modules/public/pages/Login';
 
-const Login = lazy(() => import('../modules/public/pages/Login'));
+// These stay lazy: reachable only from an error condition, never the first paint.
 const Error401 = lazy(() => import('../errors/Error401'));
 const Error403 = lazy(() => import('../errors/Error403'));
 const Error404 = lazy(() => import('../errors/Error404'));
