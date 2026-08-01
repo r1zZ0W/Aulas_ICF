@@ -1,5 +1,6 @@
 import { createApiClient } from './base.js';
-import { LoginRequestSchema, LoginResponseSchema } from '../schemas/index.js';
+import LoginRequestSchema from '../schemas/login/loginRequest.js';
+import LoginResponseSchema from '../schemas/login/loginResponse.js';
 import { resolveApiError, assertValidRequestPayload } from '../errors/resolveApiError.js';
 
 /**

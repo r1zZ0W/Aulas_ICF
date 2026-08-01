@@ -10,7 +10,7 @@
  *     "Guardar" without touching any field still illuminates every required field.
  */
 import { useState, useRef } from 'react';
-import { UserCreateSchema, UserUpdateSchema } from '../../../../schemas/index.js';
+import { UserCreateSchema, UserUpdateSchema } from '../../../../schemas/user/userRequest.js';
 import { useZodForm } from '../../../../hooks/useZodForm.js';
 
 // ── Empty form state ──────────────────────────────────────────────────────────

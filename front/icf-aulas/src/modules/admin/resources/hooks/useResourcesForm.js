@@ -9,7 +9,7 @@
  *     "Guardar" without touching any field still illuminates every required field.
  */
 import { useState } from 'react';
-import { ResourceRequestSchema } from '../../../../schemas/index.js';
+import { ResourceRequestSchema } from '../../../../schemas/resource.js';
 import { useZodForm } from '../../../../hooks/useZodForm.js';
 
 // ── Empty form state ──────────────────────────────────────────────────────────

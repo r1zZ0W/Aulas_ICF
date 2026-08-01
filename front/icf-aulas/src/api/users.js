@@ -7,12 +7,10 @@
  *    response with a Zod schema, and route any failure through resolveApiError.
  */
 import { createApiClient } from './base.js';
-import {
-  UserResponseSchema,
-  UserStatsSchema,
-  RoleResponseSchema,
-  PagedResultSchema,
-} from '../schemas/index.js';
+import UserResponseSchema from '../schemas/user/userResponse.js';
+import UserStatsSchema from '../schemas/user/userStats.js';
+import RoleResponseSchema from '../schemas/role.js';
+import { PagedResultSchema } from '../schemas/pagedResult.js';
 import { buildPageParams } from '../utils/queryUtils.js';
 
 const api = createApiClient();
