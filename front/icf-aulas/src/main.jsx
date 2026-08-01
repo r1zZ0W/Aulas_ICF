@@ -7,6 +7,12 @@ import { ApiError } from './errors/ApiError.js';
 import { toast } from './utils/toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary.jsx';
 
+// Self-hosted DM Sans (variable font). Must load before theme.css, which reads
+// --moon-font-sans and is where the "DM Sans" family name is consumed. Replaces the
+// Google Fonts <link> in index.html — that pulled the full ital+opsz+100..1000 range
+// from a third-party origin and blocked first paint; the code only ever uses
+// 400/500/600/700/800, never italics.
+import '@fontsource-variable/dm-sans/wght.css';
 import './styles/reset.css';
 import './styles/utilities.css';
 import './styles/theme.css';
