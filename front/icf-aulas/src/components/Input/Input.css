@@ -98,3 +98,23 @@
 .input-wrap__input::-ms-clear {
   display: none;
 }
+
+/* Manejo del autocompletado nativo del navegador (soporta modo claro y oscuro) */
+.input-wrap__input:-webkit-autofill,
+.input-wrap__input:-webkit-autofill:hover,
+.input-wrap__input:-webkit-autofill:focus,
+.input-wrap__input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--moon-goku, #ffffff) inset !important;
+  -webkit-text-fill-color: var(--moon-content-text) !important;
+  caret-color: var(--moon-content-text) !important;
+  transition: background-color 50000s ease-in-out 0s;
+}
+
+[data-theme="dark"] .input-wrap__input:-webkit-autofill,
+[data-theme="dark"] .input-wrap__input:-webkit-autofill:hover,
+[data-theme="dark"] .input-wrap__input:-webkit-autofill:focus,
+[data-theme="dark"] .input-wrap__input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #f8fafc !important;
+}
