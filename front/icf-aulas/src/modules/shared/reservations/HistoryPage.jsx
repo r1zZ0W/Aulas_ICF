@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { History, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 
@@ -179,13 +179,13 @@ export default function HistoryPage() {
   const hasFilters = !!(search || statusKey || safeClassroomId || safeFrom || safeTo);
 
   // ── Room options for the filter dropdown ──────────────────────────────────
-  const roomOptions = [
+  const roomOptions = useMemo(() => [
     { value: '', label: 'Todas las aulas' },
     ...rooms.map(r => ({ value: r.uuid, label: r.label })),
-  ];
+  ], [rooms]);
 
   // ── Column definitions ────────────────────────────────────────────────────
-  const columns = [
+  const columns = useMemo(() => [
     {
       key: 'detalle',
       header: 'Detalle',
@@ -218,7 +218,7 @@ export default function HistoryPage() {
         return <Badge variant={variant}>{label}</Badge>;
       },
     },
-  ];
+  ], [showOrganizer, sort, direction, toggleSort]);
 
   // ── Derived UI ────────────────────────────────────────────────────────────
   const pageTitle = isAdmin ? 'Historial General de Reservas' : 'Historial de Reservas';
