@@ -1,3 +1,4 @@
+import { useMemo, lazy, Suspense } from 'react';
 import { Users, ShieldCheck, Plus, Pencil, Trash2 } from 'lucide-react';
 
 import { useUsers } from './hooks/useUsers';
@@ -15,9 +16,11 @@ import Badge from '../../../components/Badge/Badge';
 import EmptyState from '../../../components/EmptyState/EmptyState';
 import ErrorBanner from '../../../components/ErrorBanner/ErrorBanner';
 import Pagination from '../../../components/Pagination/Pagination';
-import FormModal from '../../../components/FormModal/FormModal';
-import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
-import UserFormFields from './UserFormFields';
+
+// ── Lazy-loaded modal components ──────────────────────────────────────────────
+const FormModal = lazy(() => import('../../../components/FormModal/FormModal'));
+const ConfirmDeleteModal = lazy(() => import('../../../components/ConfirmDeleteModal/ConfirmDeleteModal'));
+const UserFormFields = lazy(() => import('./UserFormFields'));
 
 import './UsersPage.css';
 
@@ -71,62 +74,68 @@ export default function UsersPage() {
   } = useUsersForm({ roles, createMutation, updateMutation });
 
   // ── Select options ───────────────────────────────────────────────────────────
-  const roleOptions = roles.map((r) => ({
-    value: String(r.id),
-    label: DISPLAY_ROLE[r.name] ?? r.name,
-  }));
+  const roleOptions = useMemo(
+    () => roles.map((r) => ({
+      value: String(r.id),
+      label: DISPLAY_ROLE[r.name] ?? r.name,
+    })),
+    [roles]
+  );
 
   // ── Table columns ────────────────────────────────────────────────────────────
-  const columns = [
-    {
-      key: 'usuario',
-      header: 'Usuario',
-      width: '28%',
-      render: (row) => (
-        <div className="users-page__user-cell">
-          <span className="users-page__avatar">{getInitials(row)}</span>
-          <div>
-            <p className="users-page__user-name">{row.firstName} {row.lastNames}</p>
-            <p className="users-page__user-email">{row.email}</p>
+  const columns = useMemo(
+    () => [
+      {
+        key: 'usuario',
+        header: 'Usuario',
+        width: '28%',
+        render: (row) => (
+          <div className="users-page__user-cell">
+            <span className="users-page__avatar">{getInitials(row)}</span>
+            <div>
+              <p className="users-page__user-name">{row.firstName} {row.lastNames}</p>
+              <p className="users-page__user-email">{row.email}</p>
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      key: 'roleName',
-      header: 'Rol',
-      width: '14%',
-      render: (row) => (
-        <Badge variant={roleBadgeVariant(row.roleName)}>{roleLabel(row.roleName)}</Badge>
-      ),
-    },
-    {
-      key: 'acciones',
-      header: 'Acciones',
-      width: '14%',
-      align: 'right',
-      render: (row) => (
-        <div className="users-page__actions">
-          <button
-            type="button"
-            className="users-page__action-btn"
-            title="Editar usuario"
-            onClick={() => openEdit(row)}
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            type="button"
-            className="users-page__action-btn users-page__action-btn--danger"
-            title="Eliminar usuario"
-            onClick={() => setDeleteTarget(row)}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      ),
-    },
-  ];
+        ),
+      },
+      {
+        key: 'roleName',
+        header: 'Rol',
+        width: '14%',
+        render: (row) => (
+          <Badge variant={roleBadgeVariant(row.roleName)}>{roleLabel(row.roleName)}</Badge>
+        ),
+      },
+      {
+        key: 'acciones',
+        header: 'Acciones',
+        width: '14%',
+        align: 'right',
+        render: (row) => (
+          <div className="users-page__actions">
+            <button
+              type="button"
+              className="users-page__action-btn"
+              title="Editar usuario"
+              onClick={() => openEdit(row)}
+            >
+              <Pencil size={16} />
+            </button>
+            <button
+              type="button"
+              className="users-page__action-btn users-page__action-btn--danger"
+              title="Eliminar usuario"
+              onClick={() => setDeleteTarget(row)}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [openEdit, setDeleteTarget]
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -223,62 +232,71 @@ export default function UsersPage() {
         )}
       </div>
 
-      {/* ── Modal: Crear usuario ─────────────────────────────────────────── */}
-      <FormModal
-        open={createOpen}
-        onClose={closeCreate}
-        title="Nuevo Usuario"
-        subtitle="Completa la información para registrar un nuevo acceso al sistema."
-        submitLabel="Crear Usuario"
-        submitIcon={<Plus size={18} />}
-        submitIconSize={18}
-        loading={createMutation.isPending}
-        onSubmit={handleCreateSubmit}
-      >
-        <UserFormFields
-          mode="create"
-          form={createForm}
-          onField={handleCreateField}
-          onBlurField={handleCreateBlur}
-          errors={createErrors}
-          roleOptions={roleOptions}
-        />
-      </FormModal>
+      {/* ── Modales condicionales envueltos en Suspense ──────────────────── */}
+      <Suspense fallback={null}>
+        {/* ── Modal: Crear usuario ─────────────────────────────────────────── */}
+        {createOpen && (
+          <FormModal
+            open={createOpen}
+            onClose={closeCreate}
+            title="Nuevo Usuario"
+            subtitle="Completa la información para registrar un nuevo acceso al sistema."
+            submitLabel="Crear Usuario"
+            submitIcon={<Plus size={18} />}
+            submitIconSize={18}
+            loading={createMutation.isPending}
+            onSubmit={handleCreateSubmit}
+          >
+            <UserFormFields
+              mode="create"
+              form={createForm}
+              onField={handleCreateField}
+              onBlurField={handleCreateBlur}
+              errors={createErrors}
+              roleOptions={roleOptions}
+            />
+          </FormModal>
+        )}
 
-      {/* ── Modal: Editar usuario ─────────────────────────────────────────── */}
-      <FormModal
-        open={!!editUser}
-        onClose={closeEdit}
-        title="Editar Usuario"
-        subtitle={editUser ? `${editUser.firstName} ${editUser.lastNames}` : ''}
-        submitLabel="Guardar cambios"
-        loading={updateMutation.isPending}
-        onSubmit={handleEditSubmit}
-      >
-        <UserFormFields
-          mode="edit"
-          form={editForm}
-          onField={handleEditField}
-          onBlurField={handleEditBlur}
-          errors={editErrors}
-          roleOptions={roleOptions}
-        />
-      </FormModal>
+        {/* ── Modal: Editar usuario ─────────────────────────────────────────── */}
+        {editUser && (
+          <FormModal
+            open={!!editUser}
+            onClose={closeEdit}
+            title="Editar Usuario"
+            subtitle={editUser ? `${editUser.firstName} ${editUser.lastNames}` : ''}
+            submitLabel="Guardar cambios"
+            loading={updateMutation.isPending}
+            onSubmit={handleEditSubmit}
+          >
+            <UserFormFields
+              mode="edit"
+              form={editForm}
+              onField={handleEditField}
+              onBlurField={handleEditBlur}
+              errors={editErrors}
+              roleOptions={roleOptions}
+            />
+          </FormModal>
+        )}
 
-      {/* ── Modal: Eliminar ───────────────────────────────────────────────── */}
-      <ConfirmDeleteModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
-        title="¿Eliminar usuario?"
-        message={
-          deleteTarget
-            ? `Se eliminará permanentemente a ${deleteTarget.firstName} ${deleteTarget.lastNames} junto con todas sus reservaciones. Esta acción no se puede deshacer.`
-            : 'Esta acción eliminará permanentemente al usuario y todas sus reservaciones.'
-        }
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
-      />
+        {/* ── Modal: Eliminar ───────────────────────────────────────────────── */}
+        {deleteTarget && (
+          <ConfirmDeleteModal
+            open={!!deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
+            title="¿Eliminar usuario?"
+            message={
+              deleteTarget
+                ? `Se eliminará permanentemente a ${deleteTarget.firstName} ${deleteTarget.lastNames} junto con todas sus reservaciones. Esta acción no se puede deshacer.`
+                : 'Esta acción eliminará permanentemente al usuario y todas sus reservaciones.'
+            }
+            confirmLabel="Eliminar"
+            cancelLabel="Cancelar"
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

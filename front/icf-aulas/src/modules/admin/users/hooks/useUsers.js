@@ -64,12 +64,14 @@ export function useUsers({ search, page = 0, size = 20, sort, direction } = {}) 
   const { data: stats = { total: 0, active: 0, inactive: 0, admins: 0 } } = useQuery({
     queryKey: ['users', 'stats'],
     queryFn: getUserStats,
+    staleTime: 60_000,
   });
 
   // ── Roles catalogue (small, rarely changes) ──────────────────────────────────
   const { data: roles = [] } = useQuery({
     queryKey: ['roles'],
     queryFn: getRoles,
+    staleTime: 5 * 60 * 1000,
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
