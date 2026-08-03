@@ -37,6 +37,7 @@ export default function ProfilePage() {
   const { data: profile, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['profile'],
     queryFn: getMyProfile,
+    staleTime: 5 * 60 * 1000,
   });
 
   if (isLoading) {
