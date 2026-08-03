@@ -26,7 +26,7 @@ import { useApiMutation } from '../../../../hooks/useApiMutation';
  *   updateMutation: import('@tanstack/react-query').UseMutationResult,
  * }}
  */
-export function useSemesters() {
+export function useSemesters({ listEnabled = true } = {}) {
   // ── Active semester (single object or null on 404) ───────────────────────────
   const { data: activeSemester = null, isFetching: loading } = useQuery({
     queryKey: ['semesters', 'active'],
@@ -42,6 +42,7 @@ export function useSemesters() {
     queryKey: ['semesters', 'list'],
     queryFn: getSemesters,
     staleTime: 60_000,
+    enabled: listEnabled,
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────

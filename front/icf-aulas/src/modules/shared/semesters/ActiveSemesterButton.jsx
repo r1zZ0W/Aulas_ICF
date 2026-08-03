@@ -12,7 +12,7 @@
  *
  * @param {{ isAdmin: boolean }} props
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { CalendarDays, ChevronDown, Plus, Pencil } from 'lucide-react';
 
 import { useSemesters } from './hooks/useSemesters';
@@ -23,8 +23,9 @@ import {
   SEMESTER_STATUS_BADGE_VARIANT,
 } from '../../../utils/semester';
 import Badge from '../../../components/Badge/Badge';
-import FormModal from '../../../components/FormModal/FormModal';
-import SemesterFormFields from './SemesterFormFields';
+
+const FormModal = lazy(() => import('../../../components/FormModal/FormModal'));
+const SemesterFormFields = lazy(() => import('./SemesterFormFields'));
 
 import './ActiveSemesterButton.css';
 
@@ -33,7 +34,9 @@ export default function ActiveSemesterButton({ isAdmin }) {
   const menuRef = useRef(null);
 
   // ── Server state ──────────────────────────────────────────────────────────────
-  const { activeSemester, semesters, createMutation, updateMutation } = useSemesters();
+  const { activeSemester, semesters, createMutation, updateMutation } = useSemesters({
+    listEnabled: menuOpen,
+  });
 
   // ── Form / modal state ────────────────────────────────────────────────────────
   const {
@@ -154,28 +157,30 @@ export default function ActiveSemesterButton({ isAdmin }) {
       </div>
 
       {/* ── Form modal (admin only) ── */}
-      {isAdmin && (
-        <FormModal
-          open={open}
-          onClose={close}
-          title={mode === 'create' ? 'Nuevo Semestre' : 'Editar Semestre'}
-          subtitle={
-            mode === 'create'
-              ? 'Define el nombre y las fechas del semestre.'
-              : (editTarget?.name ?? '')
-          }
-          submitLabel={mode === 'create' ? 'Crear Semestre' : 'Guardar cambios'}
-          submitIcon={mode === 'create' ? <Plus size={18} /> : undefined}
-          loading={createMutation.isPending || updateMutation.isPending}
-          onSubmit={handleSubmit}
-        >
-          <SemesterFormFields
-            form={form}
-            onField={onField}
-            onBlurField={onFieldBlur}
-            errors={formErrors}
-          />
-        </FormModal>
+      {isAdmin && open && (
+        <Suspense fallback={null}>
+          <FormModal
+            open={open}
+            onClose={close}
+            title={mode === 'create' ? 'Nuevo Semestre' : 'Editar Semestre'}
+            subtitle={
+              mode === 'create'
+                ? 'Define el nombre y las fechas del semestre.'
+                : (editTarget?.name ?? '')
+            }
+            submitLabel={mode === 'create' ? 'Crear Semestre' : 'Guardar cambios'}
+            submitIcon={mode === 'create' ? <Plus size={18} /> : undefined}
+            loading={createMutation.isPending || updateMutation.isPending}
+            onSubmit={handleSubmit}
+          >
+            <SemesterFormFields
+              form={form}
+              onField={onField}
+              onBlurField={onFieldBlur}
+              errors={formErrors}
+            />
+          </FormModal>
+        </Suspense>
       )}
     </>
   );

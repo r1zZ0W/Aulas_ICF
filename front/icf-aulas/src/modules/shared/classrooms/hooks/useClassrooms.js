@@ -159,11 +159,12 @@ export function useClassrooms({ search, page = 0, size = 10, sort, direction } =
  *
  * @returns {{ allClassrooms: object[] }}
  */
-export function useAllClassrooms() {
+export function useAllClassrooms({ enabled = true } = {}) {
   const { data } = useQuery({
     queryKey: ['classrooms', 'all'],
     queryFn: () => getClassrooms({ size: 500, sort: 'name', direction: 'asc' }),
     staleTime: 60_000,
+    enabled,
   });
 
   return { allClassrooms: data?.items ?? [] };

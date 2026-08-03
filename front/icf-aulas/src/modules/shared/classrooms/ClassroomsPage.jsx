@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Plus, Eye, Pencil, Trash2, Building2, CheckCircle2, XCircle, ToggleLeft, ToggleRight, Boxes } from 'lucide-react';
 
 import { useAuth } from '../../../context/AuthContext';
@@ -19,12 +19,14 @@ import Badge from '../../../components/Badge/Badge';
 import EmptyState from '../../../components/EmptyState/EmptyState';
 import ErrorBanner from '../../../components/ErrorBanner/ErrorBanner';
 import Pagination from '../../../components/Pagination/Pagination';
-import FormModal from '../../../components/FormModal/FormModal';
-import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
-import ClassroomFormFields from './ClassroomFormFields';
-import ClassroomInfoModal from './ClassroomInfoModal';
-import ClassroomResourcesModal from './ClassroomResourcesModal';
 import ActiveSemesterButton from '../semesters/ActiveSemesterButton';
+
+// ── Lazy-loaded conditional modal components ─────────────────────────────────
+const FormModal = lazy(() => import('../../../components/FormModal/FormModal'));
+const ConfirmDeleteModal = lazy(() => import('../../../components/ConfirmDeleteModal/ConfirmDeleteModal'));
+const ClassroomFormFields = lazy(() => import('./ClassroomFormFields'));
+const ClassroomInfoModal = lazy(() => import('./ClassroomInfoModal'));
+const ClassroomResourcesModal = lazy(() => import('./ClassroomResourcesModal'));
 
 import './ClassroomsPage.css';
 
@@ -75,27 +77,6 @@ export default function ClassroomsPage() {
     direction: 'asc',
   });
 
-  // ── Full catalog (for parent/child selectors + InfoModal children list) ────────
-  const { allClassrooms } = useAllClassrooms();
-
-  // ── Keep the URL page in range after the total shrinks (e.g. deleting the last
-  // row of the last page) — otherwise the query keeps requesting a page that no
-  // longer exists and the pagination footer shows a broken count.
-  useEffect(() => {
-    if (!loading && page > 0 && page >= totalPages) {
-      setPage(Math.max(0, totalPages - 1));
-    }
-  }, [loading, page, totalPages, setPage]);
-
-  // ── Apply client-side status filter ──────────────────────────────────────────
-  // Only meaningful for admins (teachers already receive active-only from server).
-  const classrooms = useMemo(() => {
-    if (!isAdmin || statusFilter === 'all') return rawClassrooms;
-    if (statusFilter === 'active') return rawClassrooms.filter((r) => r.isActive);
-    if (statusFilter === 'inactive') return rawClassrooms.filter((r) => !r.isActive);
-    return rawClassrooms;
-  }, [rawClassrooms, statusFilter, isAdmin]);
-
   // ── Modal / form state ────────────────────────────────────────────────────────
   const {
     createOpen, editTarget, viewTarget, deleteTarget,
@@ -114,8 +95,30 @@ export default function ClassroomsPage() {
     createMutation,
     updateMutation,
     setChildrenMutation,
-    allClassrooms,
   });
+
+  const isAnyModalOpen = Boolean(createOpen || editTarget || viewTarget || deleteTarget || resourcesTarget);
+
+  // ── Full catalog (for parent/child selectors + InfoModal children list) ────────
+  const { allClassrooms } = useAllClassrooms({ enabled: isAnyModalOpen });
+
+  // ── Keep the URL page in range after the total shrinks (e.g. deleting the last
+  // row of the last page) — otherwise the query keeps requesting a page that no
+  // longer exists and the pagination footer shows a broken count.
+  useEffect(() => {
+    if (!loading && page > 0 && page >= totalPages) {
+      setPage(Math.max(0, totalPages - 1));
+    }
+  }, [loading, page, totalPages, setPage]);
+
+  // ── Apply client-side status filter ──────────────────────────────────────────
+  // Only meaningful for admins (teachers already receive active-only from server).
+  const classrooms = useMemo(() => {
+    if (!isAdmin || statusFilter === 'all') return rawClassrooms;
+    if (statusFilter === 'active') return rawClassrooms.filter((r) => r.isActive);
+    if (statusFilter === 'inactive') return rawClassrooms.filter((r) => !r.isActive);
+    return rawClassrooms;
+  }, [rawClassrooms, statusFilter, isAdmin]);
 
   // ── Parent options (cycles excluded) ─────────────────────────────────────────
   const parentOptions = useMemo(
@@ -378,86 +381,98 @@ export default function ClassroomsPage() {
       </div>
 
       {/* ── Modal: Ver información ──────────────────────────────────────────── */}
-      <ClassroomInfoModal
-        open={!!viewTarget}
-        onClose={closeView}
-        classroom={viewTarget}
-        allClassrooms={allClassrooms}
-      />
+      {viewTarget && (
+        <Suspense fallback={null}>
+          <ClassroomInfoModal
+            open={!!viewTarget}
+            onClose={closeView}
+            classroom={viewTarget}
+            allClassrooms={allClassrooms}
+          />
+        </Suspense>
+      )}
 
       {/* ── Modales de administración (solo ADMIN) ──────────────────────────── */}
       {isAdmin && (
-        <>
+        <Suspense fallback={null}>
           {/* Recursos del aula */}
-          <ClassroomResourcesModal
-            open={!!resourcesTarget}
-            onClose={() => setResourcesTarget(null)}
-            classroom={resourcesTarget}
-          />
+          {resourcesTarget && (
+            <ClassroomResourcesModal
+              open={!!resourcesTarget}
+              onClose={() => setResourcesTarget(null)}
+              classroom={resourcesTarget}
+            />
+          )}
 
           {/* Crear */}
-          <FormModal
-            open={createOpen}
-            onClose={closeCreate}
-            title="Nueva Aula"
-            subtitle="Completa la información para registrar una nueva aula."
-            submitLabel="Crear Aula"
-            submitIcon={<Plus size={18} />}
-            loading={createMutation.isPending}
-            onSubmit={handleCreateSubmit}
-          >
-            <ClassroomFormFields
-              mode="create"
-              form={form}
-              onField={onField}
-              onBlurField={onFieldBlur}
-              errors={errors}
-              parentOptions={parentOptions}
-            />
-          </FormModal>
+          {createOpen && (
+            <FormModal
+              open={createOpen}
+              onClose={closeCreate}
+              title="Nueva Aula"
+              subtitle="Completa la información para registrar una nueva aula."
+              submitLabel="Crear Aula"
+              submitIcon={<Plus size={18} />}
+              loading={createMutation.isPending}
+              onSubmit={handleCreateSubmit}
+            >
+              <ClassroomFormFields
+                mode="create"
+                form={form}
+                onField={onField}
+                onBlurField={onFieldBlur}
+                errors={errors}
+                parentOptions={parentOptions}
+              />
+            </FormModal>
+          )}
 
           {/* Editar */}
-          <FormModal
-            open={!!editTarget}
-            onClose={closeEdit}
-            title="Editar Aula"
-            subtitle={editTarget?.name ?? ''}
-            submitLabel="Guardar cambios"
-            loading={updateMutation.isPending || setChildrenMutation.isPending}
-            onSubmit={handleEditSubmit}
-          >
-            <ClassroomFormFields
-              mode="edit"
-              form={form}
-              onField={onField}
-              onBlurField={onFieldBlur}
-              errors={errors}
-              parentOptions={parentOptions}
-              childOptions={childOptions}
-            />
-          </FormModal>
+          {editTarget && (
+            <FormModal
+              open={!!editTarget}
+              onClose={closeEdit}
+              title="Editar Aula"
+              subtitle={editTarget?.name ?? ''}
+              submitLabel="Guardar cambios"
+              loading={updateMutation.isPending || setChildrenMutation.isPending}
+              onSubmit={handleEditSubmit}
+            >
+              <ClassroomFormFields
+                mode="edit"
+                form={form}
+                onField={onField}
+                onBlurField={onFieldBlur}
+                errors={errors}
+                parentOptions={parentOptions}
+                childOptions={childOptions}
+              />
+            </FormModal>
+          )}
 
           {/* Eliminar */}
-          <ConfirmDeleteModal
-            open={!!deleteTarget}
-            onClose={() => setDeleteTarget(null)}
-            onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
-            title="¿Eliminar esta aula?"
-            message={
-              deleteTarget
-                ? deleteTargetChildren.length > 0
-                  ? `Se eliminará "${deleteTarget.name}" de forma permanente. ` +
-                  `⚠️ Esta aula es padre de ${deleteTargetChildren.length} aula${deleteTargetChildren.length !== 1 ? 's' : ''} ` +
-                  `(${deleteTargetChildren.map((c) => c.name).join(', ')}); ` +
-                  `al eliminarla quedarán desvinculadas. ` +
-                  `Esta acción no se puede deshacer.`
-                  : `Se eliminará "${deleteTarget.name}" de forma permanente. Esta acción no se puede deshacer.`
-                : 'Esta acción eliminará el aula seleccionada.'
-            }
-            confirmLabel="Eliminar"
-            cancelLabel="Cancelar"
-          />
-        </>
+          {deleteTarget && (
+            <ConfirmDeleteModal
+              open={!!deleteTarget}
+              onClose={() => setDeleteTarget(null)}
+              onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
+              title="¿Eliminar esta aula?"
+              message={
+                deleteTarget
+                  ? deleteTargetChildren.length > 0
+                    ? `Se eliminará "${deleteTarget.name}" de forma permanente. ` +
+                    `⚠️ Esta aula es padre de ${deleteTargetChildren.length} aula${deleteTargetChildren.length !== 1 ? 's' : ''} ` +
+                    `(${deleteTargetChildren.map((c) => c.name).join(', ')}); ` +
+                    `al eliminarla quedarán desvinculadas. ` +
+                    `Esta acción no se puede deshacer.`
+                    : `Se eliminará "${deleteTarget.name}" de forma permanente. Esta acción no se puede deshacer.`
+                  : 'Esta acción eliminará el aula seleccionada.'
+              }
+              confirmLabel="Eliminar"
+              cancelLabel="Cancelar"
+            />
+          )}
+        </Suspense>
       )}
     </div>
   );
