@@ -1,3 +1,4 @@
+import { useMemo, lazy, Suspense } from 'react';
 import { Boxes, PackageCheck, Plus, Pencil, Trash2 } from 'lucide-react';
 
 import { useResources } from './hooks/useResources';
@@ -12,9 +13,11 @@ import DataTable from '../../../components/DataTable/DataTable';
 import EmptyState from '../../../components/EmptyState/EmptyState';
 import ErrorBanner from '../../../components/ErrorBanner/ErrorBanner';
 import Pagination from '../../../components/Pagination/Pagination';
-import FormModal from '../../../components/FormModal/FormModal';
-import ConfirmDeleteModal from '../../../components/ConfirmDeleteModal/ConfirmDeleteModal';
-import ResourceFormFields from './ResourceFormFields';
+
+// ── Lazy-loaded modal components ──────────────────────────────────────────────
+const FormModal = lazy(() => import('../../../components/FormModal/FormModal'));
+const ConfirmDeleteModal = lazy(() => import('../../../components/ConfirmDeleteModal/ConfirmDeleteModal'));
+const ResourceFormFields = lazy(() => import('./ResourceFormFields'));
 
 import './ResourcesPage.css';
 
@@ -72,56 +75,59 @@ export default function ResourcesPage() {
   } = useResourcesForm({ createMutation, updateMutation });
 
   // ── Table columns ────────────────────────────────────────────────────────────
-  const columns = [
-    {
-      key: 'name',
-      header: 'Recurso',
-      width: '28%',
-      render: (row) => <span className="resources-page__resource-name">{row.name}</span>,
-    },
-    {
-      key: 'description',
-      header: 'Descripción',
-      width: '42%',
-      render: (row) => (
-        <span className="resources-page__resource-description">
-          {row.description || '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'quantity',
-      header: 'Cant.',
-      width: '12%',
-      render: (row) => <span className="resources-page__resource-qty">{row.quantity}</span>,
-    },
-    {
-      key: 'acciones',
-      header: 'Acciones',
-      width: '18%',
-      align: 'right',
-      render: (row) => (
-        <div className="resources-page__actions">
-          <button
-            type="button"
-            className="resources-page__action-btn"
-            title="Editar recurso"
-            onClick={() => openEdit(row)}
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            type="button"
-            className="resources-page__action-btn resources-page__action-btn--danger"
-            title="Eliminar recurso"
-            onClick={() => setDeleteTarget(row)}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      ),
-    },
-  ];
+  const columns = useMemo(
+    () => [
+      {
+        key: 'name',
+        header: 'Recurso',
+        width: '28%',
+        render: (row) => <span className="resources-page__resource-name">{row.name}</span>,
+      },
+      {
+        key: 'description',
+        header: 'Descripción',
+        width: '42%',
+        render: (row) => (
+          <span className="resources-page__resource-description">
+            {row.description || '—'}
+          </span>
+        ),
+      },
+      {
+        key: 'quantity',
+        header: 'Cant.',
+        width: '12%',
+        render: (row) => <span className="resources-page__resource-qty">{row.quantity}</span>,
+      },
+      {
+        key: 'acciones',
+        header: 'Acciones',
+        width: '18%',
+        align: 'right',
+        render: (row) => (
+          <div className="resources-page__actions">
+            <button
+              type="button"
+              className="resources-page__action-btn"
+              title="Editar recurso"
+              onClick={() => openEdit(row)}
+            >
+              <Pencil size={16} />
+            </button>
+            <button
+              type="button"
+              className="resources-page__action-btn resources-page__action-btn--danger"
+              title="Eliminar recurso"
+              onClick={() => setDeleteTarget(row)}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [openEdit, setDeleteTarget]
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -219,60 +225,69 @@ export default function ResourcesPage() {
         )}
       </div>
 
-      {/* ── Modal: Crear recurso ─────────────────────────────────────────── */}
-      <FormModal
-        open={createOpen}
-        onClose={closeCreate}
-        title="Nuevo Recurso"
-        subtitle="Agrega un nuevo tipo de equipo al catálogo global."
-        submitLabel="Crear Recurso"
-        submitIcon={<Plus size={18} />}
-        submitIconSize={18}
-        loading={createMutation.isPending}
-        onSubmit={handleCreateSubmit}
-      >
-        <ResourceFormFields
-          mode="create"
-          form={createForm}
-          onField={handleCreateField}
-          onBlurField={handleCreateBlur}
-          errors={createErrors}
-        />
-      </FormModal>
+      {/* ── Modales condicionales envueltos en Suspense ──────────────────── */}
+      <Suspense fallback={null}>
+        {/* ── Modal: Crear recurso ─────────────────────────────────────────── */}
+        {createOpen && (
+          <FormModal
+            open={createOpen}
+            onClose={closeCreate}
+            title="Nuevo Recurso"
+            subtitle="Agrega un nuevo tipo de equipo al catálogo global."
+            submitLabel="Crear Recurso"
+            submitIcon={<Plus size={18} />}
+            submitIconSize={18}
+            loading={createMutation.isPending}
+            onSubmit={handleCreateSubmit}
+          >
+            <ResourceFormFields
+              mode="create"
+              form={createForm}
+              onField={handleCreateField}
+              onBlurField={handleCreateBlur}
+              errors={createErrors}
+            />
+          </FormModal>
+        )}
 
-      {/* ── Modal: Editar recurso ─────────────────────────────────────────── */}
-      <FormModal
-        open={!!editResource}
-        onClose={closeEdit}
-        title="Editar Recurso"
-        subtitle={editResource ? editResource.name : ''}
-        submitLabel="Guardar cambios"
-        loading={updateMutation.isPending}
-        onSubmit={handleEditSubmit}
-      >
-        <ResourceFormFields
-          mode="edit"
-          form={editForm}
-          onField={handleEditField}
-          onBlurField={handleEditBlur}
-          errors={editErrors}
-        />
-      </FormModal>
+        {/* ── Modal: Editar recurso ─────────────────────────────────────────── */}
+        {editResource && (
+          <FormModal
+            open={!!editResource}
+            onClose={closeEdit}
+            title="Editar Recurso"
+            subtitle={editResource ? editResource.name : ''}
+            submitLabel="Guardar cambios"
+            loading={updateMutation.isPending}
+            onSubmit={handleEditSubmit}
+          >
+            <ResourceFormFields
+              mode="edit"
+              form={editForm}
+              onField={handleEditField}
+              onBlurField={handleEditBlur}
+              errors={editErrors}
+            />
+          </FormModal>
+        )}
 
-      {/* ── Modal: Eliminar ───────────────────────────────────────────────── */}
-      <ConfirmDeleteModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
-        title="¿Eliminar recurso?"
-        message={
-          deleteTarget
-            ? `Se eliminará permanentemente "${deleteTarget.name}" del catálogo, junto con sus asignaciones a cualquier aula. Esta acción no se puede deshacer.`
-            : 'Esta acción eliminará permanentemente el recurso y sus asignaciones a las aulas.'
-        }
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
-      />
+        {/* ── Modal: Eliminar ───────────────────────────────────────────────── */}
+        {deleteTarget && (
+          <ConfirmDeleteModal
+            open={!!deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={() => deleteMutation.mutateAsync(deleteTarget?.uuid)}
+            title="¿Eliminar recurso?"
+            message={
+              deleteTarget
+                ? `Se eliminará permanentemente "${deleteTarget.name}" del catálogo, junto con sus asignaciones a cualquier aula. Esta acción no se puede deshacer.`
+                : 'Esta acción eliminará permanentemente el recurso y sus asignaciones a las aulas.'
+            }
+            confirmLabel="Eliminar"
+            cancelLabel="Cancelar"
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

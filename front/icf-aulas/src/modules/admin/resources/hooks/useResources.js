@@ -64,6 +64,7 @@ export function useResources({ search, page = 0, size = 20, sort, direction } = 
   const { data: stats = { totalTypes: 0, totalUnits: 0 } } = useQuery({
     queryKey: ['resources', 'stats'],
     queryFn: getResourceStats,
+    staleTime: 60_000,
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
