@@ -1,22 +1,12 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, lazy, Suspense } from 'react';
 import {
   BarChart3, Info, Download,
   BookOpen, Building2, UserCheck, RefreshCw,
   CalendarRange,
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
-  PieChart, Pie, Legend,
-  AreaChart, Area,
-} from 'recharts';
 
 import { useReportStatistics } from './hooks/useReportStatistics';
 import { useAvailableMonths } from './hooks/useAvailableMonths';
-// Dynamically imported inside handleExportPdf, not statically here: html2canvas-pro +
-// jsPDF add ~200KB to whatever chunk imports them, and most visits to this page never
-// click "Exportar PDF" — loading them eagerly would tax every admin who just wants to
-// look at the charts.
 import { toast } from '../../../utils/toast';
 import Select from '../../../components/Select/Select';
 import EmptyState from '../../../components/EmptyState/EmptyState';
@@ -25,24 +15,9 @@ import { useSemesters } from '../../shared/semesters/hooks/useSemesters';
 
 import './ReportsPage.css';
 
-// ── Palette (alineada con --moon-piccolo #005687) ──────────────────────────────
+// ── Dynamic import for heavy Recharts grid ────────────────────────────────────
+const ReportCharts = lazy(() => import('./ReportCharts'));
 
-const COLOR_PRIMARY = '#005687';
-const COLOR_LIGHT = '#bfdbfe';
-const COLOR_BARS = [COLOR_PRIMARY, '#1a6fa0', '#3388b8', '#4da0cf', '#66b3e0'];
-const COLOR_REC = COLOR_PRIMARY;
-// Visibly distinct from COLOR_REC (was a near-invisible #bfdbfe) so the donut's
-// "eventuales" slice/legend swatch doesn't disappear against the light card background.
-const COLOR_EVE = '#94a3b8';
-const COLOR_AREA = COLOR_PRIMARY;
-
-// Subtle bar-hover guide: keeps the visual "which bar am I over" cue (full removal via
-// `cursor={false}` would leave the user guessing) without the heavy default gray band.
-const BAR_CURSOR = { fill: 'rgba(0, 0, 0, 0.04)' };
-
-// 1 decimal — NOT Math.round: rounding to an integer would show a real 0.3% rate as
-// "0%" (looks like zero recurrence) or a real 99.6% as "100%" (hides that exceptions
-// exist), which matters for an admin-facing metric.
 const pctFormatter = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 });
 function formatPct(value) {
   return pctFormatter.format(value ?? 0);
@@ -70,13 +45,6 @@ function formatMonthLabel(monthStr) {
 
 // ── Error formatting ────────────────────────────────────────────────────────────
 
-/**
- * Convierte errores técnicos de generación y exportación de PDF en mensajes
- * claros y legibles para el usuario final.
- *
- * @param {Error|unknown} error
- * @returns {string} Mensaje entendible en español para tostadas / banners.
- */
 function formatPdfErrorMessage(error) {
   if (!error) {
     return 'No se pudo generar el reporte en PDF. Por favor, inténtalo de nuevo.';
@@ -118,7 +86,6 @@ function formatPdfErrorMessage(error) {
   if (msg.toLowerCase().includes('download') || msg.toLowerCase().includes('permission'))
     return 'El navegador ha bloqueado la descarga del archivo. Revisa los permisos de descargas.';
 
-  // Si el mensaje es limpio y sin detalles técnicos de JS (stack traces, undefined, etc.)
   if (
     msg &&
     !msg.includes('TypeError') &&
@@ -134,9 +101,6 @@ function formatPdfErrorMessage(error) {
 
 // ── Subcomponents ──────────────────────────────────────────────────────────────
 
-/**
- * Single KPI card: icon + label + large value + optional delta/sub-line.
- */
 function StatCard({ icon: Icon, label, value, sub, delta }) {
   const isLoading = value === undefined;
 
@@ -182,37 +146,6 @@ function StatCard({ icon: Icon, label, value, sub, delta }) {
   );
 }
 
-/**
- * Card wrapper for charts: title + subtitle + body slot.
- *
- * `data-pdf-block` marks the whole card as one atomic unit for the PDF export
- * (see `exportStatisticsPdf.js`): a chart is captured as a single image and is
- * never split across two PDF pages.
- */
-function ChartCard({ title, subtitle, loading, children }) {
-  return (
-    <div className="reports-page__chart-card chart-card" data-pdf-block>
-      <h3 className="reports-page__chart-title">{title}</h3>
-      <p className="reports-page__chart-subtitle">{subtitle}</p>
-      <div className="reports-page__chart-body">
-        {loading
-          ? <div className="reports-page__skeleton reports-page__chart-skeleton" />
-          : children
-        }
-      </div>
-    </div>
-  );
-}
-
-/**
- * PDF-only cover block: identifies which period the export captures.
- *
- * Hidden on screen by default (`.reports-page__pdf-cover { display: none }`); made
- * visible only while `.reports-page--exporting` is toggled on the export root during
- * capture (see `handleExportPdf`). `html2canvas` skips `display:none` elements, so the
- * cover must actually be visible at capture time — it is never rendered conditionally
- * via React state, only via an imperative class toggle timed around the capture call.
- */
 function ReportPdfCover({ scope, periodLabel, totalReservations }) {
   const generatedAt = new Date().toLocaleString('es-MX', {
     dateStyle: 'long',
@@ -235,29 +168,8 @@ function ReportPdfCover({ scope, periodLabel, totalReservations }) {
   );
 }
 
-// ── Custom tooltip ─────────────────────────────────────────────────────────────
-
-function SimpleTooltip({ active, payload, label, unit = '' }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: '#1e293b', color: '#f1f5f9', padding: '8px 12px', borderRadius: 8, fontSize: 13 }}>
-      <p style={{ margin: 0, fontWeight: 600 }}>{label ?? payload[0].name}</p>
-      <p style={{ margin: '2px 0 0', opacity: 0.85 }}>
-        {payload[0].value}{unit}
-      </p>
-    </div>
-  );
-}
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
-/**
- * Reportes y Estadísticas — ADMIN-only analytics dashboard.
- *
- * Period filter state is kept local (`useState`) for now; when the backend
- * endpoint is connected, consider migrating to `useSearchParams` (URL as
- * single source of truth) following the same pattern as `HistoryPage`.
- */
 export default function ReportsPage() {
   // ── Period filter state ────────────────────────────────────────────────────
   const [scope, setScope] = useState('MONTHLY');
@@ -297,9 +209,6 @@ export default function ReportsPage() {
     return activeSemesterUuid;
   }, [scope, latestAvailableMonth, activeSemesterUuid]);
 
-  // Both start blank — the list of months/semesters loads asynchronously, so there's no
-  // synchronous default to seed the state with. The render-time fallback below (`|| …`)
-  // resolves to the newest month / active semester as soon as that data arrives.
   const [anchorMonthly, setAnchorMonthly] = useState('');
   const [anchorSemester, setAnchorSemester] = useState('');
 
@@ -311,10 +220,6 @@ export default function ReportsPage() {
   const anchorOptions = scope === 'MONTHLY' ? monthOptions : semesterOptions;
 
   // ── PDF export metadata ──────────────────────────────────────────────────────
-  // Human-readable label for the PDF cover vs. a raw slug value for the filename —
-  // kept separate because `formatMonthLabel`'s output ("Julio 2026") isn't
-  // filesystem-friendly, and a semester UUID is meaningless in a filename. Both are
-  // derived from the same resolved `anchor` so they always describe the same period.
   const periodLabel = scope === 'MONTHLY'
     ? (anchor ? formatMonthLabel(anchor) : '')
     : (semesterOptions.find(o => o.value === anchor)?.label ?? '');
@@ -329,14 +234,8 @@ export default function ReportsPage() {
   // ── Exportar PDF ───────────────────────────────────────────────────────────
   const exportRootRef = useRef(null);
   const [exporting, setExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(null); // { current, total } | null while capturing
+  const [exportProgress, setExportProgress] = useState(null);
 
-  // `isFetching` (not just `loading`) matters here: `useReportStatistics` uses
-  // `keepPreviousData`, so right after switching scope/anchor `loading` is already
-  // false but the charts are still showing the *previous* period's numbers while the
-  // new ones load in the background. Exporting during that window would produce a PDF
-  // whose cover names the new period while the captured charts show the old one — the
-  // exact defect this refactor removes, reintroduced through a side door.
   const exportDisabled = exporting || loading || isFetching || !stats || stats.totalReservations === 0;
 
   async function handleExportPdf() {
@@ -346,9 +245,6 @@ export default function ReportsPage() {
     setExporting(true);
     root.classList.add('reports-page--exporting');
     try {
-      // Let the now-visible cover block paint before html2canvas walks the DOM —
-      // `display:none` elements are skipped by html2canvas, so it must actually be
-      // rendered by the time capture starts.
       await new Promise(resolve => requestAnimationFrame(resolve));
 
       const { exportBlocksToPdf, buildReportFilename } = await import('./exportStatisticsPdf.js');
@@ -364,26 +260,11 @@ export default function ReportsPage() {
       console.error('Error al exportar el reporte a PDF:', error);
       toast.error(formatPdfErrorMessage(error));
     } finally {
-      // Always restore visibility, even on failure — the cover must never linger
-      // visible on screen because the capture threw partway through.
       root.classList.remove('reports-page--exporting');
       setExporting(false);
       setExportProgress(null);
     }
   }
-
-  // ── Derived values ─────────────────────────────────────────────────────────
-  const ratePct = stats?.recurrenceRatePct ?? 0;
-  const recurringCount = stats?.recurrence.recurring ?? 0;
-  const oneTimeCount = stats?.recurrence.oneTime ?? 0;
-  const paddingAngle = (recurringCount > 0 && oneTimeCount > 0) ? 2 : 0;
-
-  const donutData = stats
-    ? [
-      { name: 'Recurrentes', value: recurringCount },
-      { name: 'Eventuales', value: oneTimeCount },
-    ]
-    : [];
 
   return (
     <div className="reports-page">
@@ -516,163 +397,10 @@ export default function ReportsPage() {
               />
             </div>
 
-            {/* ── Charts grid ───────────────────────────────────────────────────── */}
-            <div className="reports-page__charts-grid">
-
-              {/* Aulas Más Ocupadas — BarChart vertical */}
-              <ChartCard
-                title="Aulas Más Ocupadas"
-                subtitle="Horas totales de reservación por aula"
-                loading={loading}
-              >
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={stats?.mostOccupiedClassrooms ?? []} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit=" h" />} />
-                    <Bar dataKey="hours" radius={[4, 4, 0, 0]} maxBarSize={50}>
-                      {(stats?.mostOccupiedClassrooms ?? []).map((_, i) => (
-                        <Cell key={i} fill={COLOR_BARS[i % COLOR_BARS.length]} />
-                      ))
-                      }
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-              {/* Usuarios con Más Reservas — BarChart horizontal */}
-              <ChartCard
-                title="Usuarios con Más Reservas"
-                subtitle="Top organizadores o departamentos"
-                loading={loading}
-              >
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart
-                    layout="vertical"
-                    data={stats?.topUsers ?? []}
-                    margin={{ top: 8, right: 24, left: 8, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <Tooltip cursor={BAR_CURSOR} content={<SimpleTooltip unit="" />} />
-                    <Bar dataKey="reservations" radius={[0, 4, 4, 0]} maxBarSize={22}>
-                      {(stats?.topUsers ?? []).map((_, i) => (
-                        <Cell key={i} fill={i === 0 ? COLOR_PRIMARY : COLOR_LIGHT} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-              {/* Recurrencia de Reservas — PieChart (donut) */}
-              <ChartCard
-                title="Recurrencia de Reservas"
-                subtitle="Proporción de eventos recurrentes vs eventuales"
-                loading={loading}
-              >
-                <div style={{ position: 'relative', width: '100%', height: 250 }}>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={donutData}
-                        cx="50%"
-                        cy="46%"
-                        innerRadius={65}
-                        outerRadius={95}
-                        dataKey="value"
-                        startAngle={90}
-                        endAngle={-270}
-                        paddingAngle={paddingAngle}
-                      >
-                        <Cell fill={COLOR_REC} />
-                        <Cell fill={COLOR_EVE} />
-                      </Pie>
-                      <Legend
-                        iconType="circle"
-                        iconSize={11}
-                        wrapperStyle={{ fontSize: 12, color: '#6b7280', paddingTop: 4 }}
-                      />
-                      <Tooltip content={<SimpleTooltip unit=" reservas" />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  {/* Central label — rendered over the chart */}
-                  {stats && (
-                    <div style={{
-                      position: 'absolute', top: 0, left: 0, right: 0,
-                      height: 'calc(100% - 40px)',   // subtract legend height
-                      display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      pointerEvents: 'none',
-                    }}>
-                      <span style={{ fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1 }}>
-                        {ratePct > 50 ? `${formatPct(ratePct)}%` : `${formatPct(100 - ratePct)}%`}
-                      </span>
-                      <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                        {ratePct > 50 ? 'Recurrentes' : 'Eventuales'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </ChartCard>
-
-              {/* Tendencia de Reservaciones — AreaChart */}
-              <ChartCard
-                title="Tendencia de Reservaciones"
-                subtitle="Volumen de reservas a lo largo del tiempo"
-                loading={loading}
-              >
-                <ResponsiveContainer width="100%" height={250}>
-                  <AreaChart
-                    data={stats?.trend ?? []}
-                    margin={{
-                      top: 8, right: 8,
-                      // SEMESTER rotates its labels -30° with textAnchor="end", which shifts
-                      // the first tick left and every tick's descenders down — extra left/bottom
-                      // margin keeps them from clipping against the chart edges.
-                      left: scope === 'SEMESTER' ? 20 : -10,
-                      bottom: scope === 'SEMESTER' ? 12 : 0,
-                    }}
-                  >
-                    <defs>
-                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={COLOR_AREA} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={COLOR_AREA} stopOpacity={0.03} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
-                      axisLine={false}
-                      tickLine={false}
-                      // MONTHLY has 28-31 day labels — thin them out to start/end only.
-                      // SEMESTER has ~6 month labels; interval={0} forces recharts to render
-                      // every one instead of its collision heuristic skipping/duplicating ticks
-                      // (the reported bug). Rotating them keeps them legible on narrower screens
-                      // now that the collision-avoidance algorithm is disabled.
-                      interval={scope === 'MONTHLY' ? 'preserveStartEnd' : 0}
-                      angle={scope === 'SEMESTER' ? -30 : 0}
-                      textAnchor={scope === 'SEMESTER' ? 'end' : 'middle'}
-                      height={scope === 'SEMESTER' ? 42 : 30}
-                    />
-                    <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<SimpleTooltip />} />
-                    <Area
-                      type="monotone"
-                      dataKey="reservations"
-                      stroke={COLOR_AREA}
-                      strokeWidth={2}
-                      fill="url(#areaGrad)"
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 0, fill: COLOR_AREA }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-            </div>
+            {/* ── Charts grid (Lazy loaded Recharts) ─────────────────────────────── */}
+            <Suspense fallback={<div className="reports-page__skeleton reports-page__chart-skeleton" style={{ height: 500 }} />}>
+              <ReportCharts stats={stats} loading={loading} scope={scope} />
+            </Suspense>
           </>
         )}
       </div>
